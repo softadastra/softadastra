@@ -35,11 +35,19 @@
 
 ---
 
-### 📈 Our Ecosystem
-- 🟠 **Softadastra Marketplace** → products, vendors, and digital shops  
-- 🟢 **Softadastra Logistics** → delivery agencies & shipment tracking  
-- 🔵 **Softadastra Chat** → real-time communication  
-- 🟣 **Softadastra Cloud** → decentralized storage (future)  
+### 📊 GitHub Stats
+
+<p align="center">
+  <img src="https://github-readme-stats.vercel.app/api?username=Softadastra&show_icons=true&theme=react&hide_border=true&title_color=FF9900&icon_color=155E4E" height="165">
+  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Softadastra&layout=compact&theme=react&hide_border=true&title_color=FF9900" height="165">
+</p>
+
+---
+
+### 📈 Contribution Graph
+<p align="center">
+  <img src="https://github-readme-activity-graph.vercel.app/graph?username=Softadastra&theme=react-dark&hide_border=true&bg_color=0D1117&color=FF9900&line=155E4E&point=FFFFFF">
+</p>
 
 ---
 
@@ -55,7 +63,7 @@
 
 ---
 
-### 🌍 Featured Organizations
+### 🌍 Related Organizations
 - 🟢 [@vixcpp](https://github.com/vixcpp) — The C++ framework powering Softadastra  
 - 🧠 [@adastra-labs](https://github.com/adastra-labs) — Research & innovation hub  
 - 🟠 [@Softadastra](https://github.com/Softadastra) — Marketplace & backend ecosystem  
@@ -66,7 +74,7 @@
 <p align="center">
   <a href="https://x.com/Softadastra"><img src="https://img.shields.io/badge/X%20(Twitter)-@Softadastra-FF9900?style=for-the-badge&logo=x&logoColor=white"></a>
   <a href="https://softadastra.com"><img src="https://img.shields.io/badge/Softadastra-Website-155E4E?style=for-the-badge&logo=firefox-browser&logoColor=white"></a>
-  <a href="https://www.linkedin.com/company/softadastra"><img src="https://img.shields.io/badge/LinkedIn-Softadastra-FF9900?style=for-the-badge&logo=linkedin&logoColor=white"></a>
+  <a href="https://www.linkedin.com/in/soft-adastra-646195377"><img src="https://img.shields.io/badge/LinkedIn-Softadastra-FF9900?style=for-the-badge&logo=linkedin&logoColor=white"></a>
   <a href="https://youtube.com/@Softadastra"><img src="https://img.shields.io/badge/YouTube-Softadastra-FF0000?style=for-the-badge&logo=youtube&logoColor=white"></a>
 </p>
 
