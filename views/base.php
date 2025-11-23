@@ -61,8 +61,8 @@
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
         crossorigin="anonymous"
         defer></script>
-
     <!-- Global JS -->
+    <script src="<?= asset('assets/js/pageUserHome.js') ?>" defer></script>
     <script src="<?= asset('assets/js/spa.js') ?>" defer></script>
     <script src="<?= asset('assets/js/app.js') ?>" defer></script>
     <script src="<?= asset('assets/js/modal.js') ?>" defer></script>

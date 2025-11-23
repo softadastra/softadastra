@@ -12,6 +12,7 @@ use Ivi\Core\Utils\FlashMessage;
 use Ivi\Http\RedirectResponse;
 use Modules\User\Core\Services\UserService;
 use Ivi\Http\Request;
+use Modules\Auth\Core\Helpers\AuthRedirect;
 use Modules\Auth\Core\Helpers\AuthUser;
 use Modules\User\Core\Helpers\UserHelper;
 
@@ -22,7 +23,6 @@ class AuthController extends Controller
 
     public function __construct()
     {
-        // Google config
         $config = config_value('google');
         if (!$config || !is_array($config)) {
             throw new \RuntimeException(
@@ -31,17 +31,16 @@ class AuthController extends Controller
         }
 
         $this->google = new GoogleService($config);
-
-        // Inject UserService (qui contient le wrapper vers UserRegistrationService)
         $this->users = make(UserService::class);
     }
 
     // ---------------------------------------------------
     // GET PAGES
     // ---------------------------------------------------
-
     public function home(): HtmlResponse
     {
+        AuthRedirect::redirectIfAuthenticated();
+
         $styles = module_asset('Auth/Core', 'assets/css/home.css');
 
         return $this->view('auth::home', [
@@ -54,13 +53,9 @@ class AuthController extends Controller
     /**
      * Handle Google OAuth callback
      */
-    /**
-     * Handle Google OAuth callback
-     */
     public function handleGoogleCallback(Request $request)
     {
         try {
-            // 1️⃣ Récupérer le code renvoyé par Google
             $code = $request->get('code');
             if (!$code) {
                 FlashMessage::add('error', "Google login failed: missing authorization code.");
@@ -68,7 +63,6 @@ class AuthController extends Controller
                 return;
             }
 
-            // 2️⃣ Récupérer le profil Google
             $googleUser = $this->google->fetchUser($code);
             if (!$googleUser || empty($googleUser->email)) {
                 FlashMessage::add('error', "Google login failed: unable to fetch Google account.");
@@ -76,10 +70,8 @@ class AuthController extends Controller
                 return;
             }
 
-            // 3️⃣ Appeler le service → il gère TOUT (login, création, flash, redirect)
             $this->users->loginWithGoogleOAuth($googleUser);
 
-            // 4️⃣ NE RIEN FAIRE APRÈS → la fonction du service a déjà fait la redirection
             return;
         } catch (\Throwable $e) {
             error_log("[Google OAuth] Exception: " . $e->getMessage());
@@ -88,13 +80,10 @@ class AuthController extends Controller
         }
     }
 
-    // Logout
     public function logout(): JsonResponse
     {
-        // Supprime session + cookie
         AuthUser::logout();
 
-        // Retourne un JSON pour que le frontend SPA puisse réagir
         return new JsonResponse([
             'success' => true,
             'message' => 'Logged out successfully.'
@@ -103,6 +92,8 @@ class AuthController extends Controller
 
     public function showLoginForm(): HtmlResponse
     {
+        AuthRedirect::redirectIfAuthenticated();
+
         $styles  = module_asset('Auth/Core', 'assets/css/login.css');
         $scripts = module_asset('Auth/Core', 'assets/js/login.js');
         error_log("CSRF token session: " . ($_SESSION['csrf_token'] ?? 'NULL'));
@@ -117,6 +108,8 @@ class AuthController extends Controller
 
     public function showRegistrationForm(): HtmlResponse
     {
+        AuthRedirect::redirectIfAuthenticated();
+
         $styles  = module_asset('Auth/Core', 'assets/css/register.css');
         $scripts = module_asset('Auth/Core', 'assets/js/register.js');
 
@@ -128,10 +121,6 @@ class AuthController extends Controller
         ]);
     }
 
-    // ---------------------------------------------------
-    // POST REGISTER (compatible avec ton test !)
-    // ---------------------------------------------------
-
     public function handleRegistration(Request $request): JsonResponse
     {
         $data = $request->all();
@@ -142,10 +131,8 @@ class AuthController extends Controller
 
         $result = $this->users->register($fullname, $email, $password);
 
-        // HTTP status
         $status = empty($result['errors']) ? 201 : 422;
 
-        // Toujours garantir array
         if (!isset($result['errors']) || $result['errors'] === null) {
             $result['errors'] = [];
         }
@@ -153,9 +140,6 @@ class AuthController extends Controller
         return new JsonResponse($result, $status);
     }
 
-    // ---------------------------------------------------
-    // POST LOGIN (SPA-friendly)
-    // ---------------------------------------------------
     public function handleLogin(Request $request): JsonResponse
     {
         $data = $request->all();
@@ -230,7 +214,6 @@ class AuthController extends Controller
             ], 500);
         }
     }
-
 
     public function showSyncPage(): HtmlResponse
     {
