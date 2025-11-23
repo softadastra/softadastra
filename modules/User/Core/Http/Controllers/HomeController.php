@@ -4,42 +4,20 @@ namespace Modules\User\Core\Http\Controllers;
 
 use App\Controllers\Controller;
 use Ivi\Http\HtmlResponse;
-use Modules\Auth\Core\Helpers\AuthMiddleware;
-use Modules\Auth\Core\Helpers\AuthUser;
+use Modules\Auth\Core\Helpers\AuthRedirect;
 
 class HomeController extends Controller
 {
     public function index(): HtmlResponse
     {
-        $auth = new AuthUser();
-        $user = $auth->getUser();
-
-        $userData = null;
-        $message  = "Hello guest!";
-
-        if ($user) {
-            $userData = [
-                'id'       => $user->getId(),
-                'email'    => $user->getEmail(),
-                'username' => $user->getUsername(),
-                'roles'    => $user->getRoleNames(),
-            ];
-            $message = "Hello " . htmlspecialchars($user->getUsername()) . "!";
-        } else {
-            // header('Location: /auth/login');
-            // exit;
-        }
+        AuthRedirect::redirectIfGuest('/auth/login');
 
         // 🔹 Assets
         $styles  = module_asset('User/Core', 'assets/css/style.css');
-        $scripts = module_asset('User/Core', 'assets/js/script.js');
 
         return $this->view(strtolower('User') . '::home', [
             'title'    => 'My Account',
-            'message'  => $message,
-            'user'     => $userData,
             'styles'   => $styles,
-            'scripts'  => $scripts,
         ]);
     }
 }
