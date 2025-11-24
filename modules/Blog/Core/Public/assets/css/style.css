@@ -1,0 +1,14 @@
+/* CSS for Blog module */
+body {
+    font-family: sans-serif;
+    background-color: #f0f4f8;
+    color: #333;
+}
+h1 {
+    color: #008037;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+p {
+    font-size: 1rem;
+}

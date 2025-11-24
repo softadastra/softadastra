@@ -9,5 +9,7 @@ return array (
     1 => 'Auth',
     2 => 'User',
     3 => 'Chat',
+    4 => 'Blog',
+    5 => 'Map',
   ),
 );
