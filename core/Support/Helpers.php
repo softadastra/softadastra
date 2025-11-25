@@ -703,3 +703,18 @@ if (!function_exists('log_error')) {
         log_msg($value, $label, 'error');
     }
 }
+
+if (!function_exists('injectSpaScripts')) {
+    /**
+     * Injecte les scripts SPA pour une page.
+     *
+     * @param array $scripts Liste des URLs de scripts
+     */
+    function injectSpaScripts(array $scripts = [])
+    {
+        if (empty($scripts)) return;
+        foreach ($scripts as $src) {
+            echo '<script data-spa-script defer src="' . htmlspecialchars($src) . '"></script>' . PHP_EOL;
+        }
+    }
+}

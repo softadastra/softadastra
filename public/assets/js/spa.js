@@ -144,6 +144,8 @@ const SPA = (function () {
   // fetchFragment
   // =======================
   const fetchFragment = async (url) => {
+    console.log("FETCH →", url);
+
     try {
       const response = await fetch(url, {
         headers: { "X-Requested-With": "XMLHttpRequest" },
@@ -155,10 +157,23 @@ const SPA = (function () {
       }
 
       const html = await response.text();
-      // Lire le header X-Page-Title envoyé par le serveur
+
+      // 🔥 Récupérer le titre de page
       const headerTitle = response.headers.get("X-Page-Title") || null;
 
-      return { html, headerTitle };
+      // 🔥 Récupérer les scripts SPA (JSON list)
+      let pageScripts = [];
+      const rawScripts = response.headers.get("X-Page-Scripts");
+
+      if (rawScripts) {
+        try {
+          pageScripts = JSON.parse(rawScripts);
+        } catch (err) {
+          console.warn("[SPA] Invalid X-Page-Scripts JSON:", rawScripts);
+        }
+      }
+
+      return { html, headerTitle, pageScripts };
     } catch (e) {
       console.error("[SPA] fetchFragment error:", e);
       throw e;
@@ -169,6 +184,7 @@ const SPA = (function () {
     if (!cfg.prefetchOnHover) return;
     url = normalizeUrl(url);
     if (cacheGet(url)) return;
+
     fetchFragment(url).catch((err) => log("prefetch failed", url, err));
   };
 
@@ -844,6 +860,42 @@ const SPA = (function () {
     tryInit();
   }
 
+  // ---------------------------
+  // runDataSpaScripts
+  // ---------------------------
+  /**
+   * Parcourt tous les <script data-spa-script> dans le container injecté,
+   * écoute leur chargement et appelle la fonction init correspondante.
+   */
+  const runDataSpaScripts = (container) => {
+    if (!container) return;
+
+    container.querySelectorAll("script[data-spa-script]").forEach((script) => {
+      // si le script est externe
+      if (script.src) {
+        script.addEventListener("load", () => {
+          const pageName = script.dataset.spaScript; // ex: 'pageUserHome'
+          const initFn = window[pageName + "Init"];
+          if (typeof initFn === "function") {
+            initFn();
+            if (cfg.debug) console.log(`[SPA] Init called for ${pageName}`);
+          } else {
+            console.warn(`[SPA] Page init not found for ${pageName}`);
+          }
+        });
+      } else {
+        // inline script déjà présent → appeler init immédiatement
+        const pageName = script.dataset.spaScript;
+        const initFn = window[pageName + "Init"];
+        if (typeof initFn === "function") {
+          initFn();
+          if (cfg.debug)
+            console.log(`[SPA] Inline init called for ${pageName}`);
+        }
+      }
+    });
+  };
+
   // -----------------------------------------------------
   // loadPage final
   // -----------------------------------------------------
@@ -851,17 +903,19 @@ const SPA = (function () {
     if (!appContainer) return (location.href = url);
 
     try {
-      // 1) récupérer HTML + headerTitle
+      // 1) récupérer HTML + infos headers
       let html,
-        headerTitle = null;
+        headerTitle = null,
+        pageScripts = [];
 
       const cached = cacheGet(url);
       if (cached) {
         html = cached;
       } else {
-        const res = await fetchFragment(url); // { html, headerTitle }
+        const res = await fetchFragment(url); // { html, headerTitle, pageScripts }
         html = res.html;
         headerTitle = res.headerTitle;
+        pageScripts = res.pageScripts || [];
       }
 
       const parser = new DOMParser();
@@ -884,7 +938,6 @@ const SPA = (function () {
           const metaName =
             d.querySelector('meta[name="title"]')?.getAttribute("content") ||
             null;
-
           return { docTitle, og, metaName };
         } catch (e) {
           return { docTitle: null, og: null, metaName: null };
@@ -917,8 +970,23 @@ const SPA = (function () {
       preserveFormState(appContainer, newFragment);
       appContainer.innerHTML = newFragment.innerHTML;
 
-      // mise à jour CSRF
+      // Mise à jour CSRF
       updateCsrfToken();
+
+      // 🔥 9.1 Charger scripts fournis par X-Page-Scripts et attendre load
+      const pageScriptPromises = (pageScripts || []).map((src) => {
+        return new Promise((resolve) => {
+          const s = document.createElement("script");
+          s.src = src;
+          s.defer = true;
+          s.addEventListener("load", () => resolve({ src, ok: true }));
+          s.addEventListener("error", () => {
+            console.warn(`[SPA] failed to load script: ${src}`);
+            resolve({ src, ok: false });
+          });
+          document.body.appendChild(s);
+        });
+      });
 
       // 10) mise à jour data-spa-title
       try {
@@ -942,16 +1010,12 @@ const SPA = (function () {
         if (cfg.debug) console.debug("[SPA] fragment title update failed", e);
       }
 
-      // 11) exécuter scripts fragment
+      // 11) exécuter scripts fragment (inline)
       runPageScripts(appContainer);
 
-      document.dispatchEvent(
-        new CustomEvent("spa:page-ready", { detail: { url } })
-      );
-
-      // -----------------------------------------------------
-      // 11.1) AUTO INIT DE LA PAGE ACTUELLE
-      // -----------------------------------------------------
+      // 11.1 & 11.2) attendre scripts externes puis auto-init
+      await Promise.all(pageScriptPromises);
+      runDataSpaScripts(appContainer);
       callPageInitFromUrl(url);
 
       // copier meta (CSRF...)
