@@ -61,8 +61,10 @@
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
         crossorigin="anonymous"
         defer></script>
+    <!-- Page-level JS -->
+    <?= $scripts ?? '' ?>
+
     <!-- Global JS -->
-    <script src="<?= asset('assets/js/pageUserHome.js') ?>" defer></script>
     <script src="<?= asset('assets/js/spa.js') ?>" defer></script>
     <script src="<?= asset('assets/js/app.js') ?>" defer></script>
     <script src="<?= asset('assets/js/modal.js') ?>" defer></script>
@@ -71,9 +73,6 @@
     <script>
         window.__SPA__ = <?= isset($noSpa) && $noSpa ? 'false' : 'true' ?>;
     </script>
-
-    <!-- Page-level JS -->
-    <?= $scripts ?? '' ?>
 
 </body>
 
