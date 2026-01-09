@@ -112,7 +112,7 @@ See: [`ecosystem/stacks.md`](ecosystem/stacks.md)
 
 ## Products
 
-Products in the Softadastra ecosystem **prove** the foundation — they do not define it.
+Products in the Softadastra ecosystem **prove** the foundation they do not define it.
 
 Example:
 
