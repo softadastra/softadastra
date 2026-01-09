@@ -84,7 +84,7 @@ Four major layers work together:
 
 <p align="center">
   <img 
-    src="URL_DE_TON_IMAGE_ARCHITECTURE"
+    src="https://res.cloudinary.com/dwjbed2xb/image/upload/v1767929305/roadmap_lgiljy.png"
     alt="Softadastra Architecture Overview"
     width="90%"
     style="max-width:1000px;border-radius:12px;"
