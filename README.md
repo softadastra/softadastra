@@ -1,10 +1,8 @@
-# Softadastra
-
 <p align="center">
   <img 
     src="https://res.cloudinary.com/dwjbed2xb/image/upload/v1762624310/logo-softadastra_ksv72b.png" 
     alt="Softadastra Logo" 
-    width="100%"
+    width="50%"
     style="max-width:900px;border-radius:8px;"
   />
 </p>
@@ -83,6 +81,15 @@ Four major layers work together:
 2. **Sync Engine** : WAL, outbox, retries, conflict handling
 3. **Network** : secure P2P transport, routing, relays
 4. **Edge** : caching and store-and-forward nodes
+
+<p align="center">
+  <img 
+    src="URL_DE_TON_IMAGE_ARCHITECTURE"
+    alt="Softadastra Architecture Overview"
+    width="90%"
+    style="max-width:1000px;border-radius:12px;"
+  />
+</p>
 
 Start here: [`architecture/overview.md`](architecture/overview.md)
 
