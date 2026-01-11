@@ -67,7 +67,7 @@ Applications built on Softadastra continue to function **offline**, accept **loc
 - a cloud-first SaaS platform
 - a degraded version of the web
 
-See explicit boundaries: [`foundation/non-goals.md`](foundation/non-goals.md)
+See explicit boundaries: [`docs/foundation/non-goals.md`](foundation/non-goals.md)
 
 ---
 
@@ -91,7 +91,7 @@ Four major layers work together:
   />
 </p>
 
-Start here: [`architecture/overview.md`](architecture/overview.md)
+Start here: [`docs/architecture/overview.md`](architecture/overview.md)
 
 ---
 
@@ -106,7 +106,7 @@ Current reference stacks include:
 
 Other stacks may exist, as long as they respect the same primitives.
 
-See: [`ecosystem/stacks.md`](ecosystem/stacks.md)
+See: [`docs/ecosystem/stacks.md`](ecosystem/stacks.md)
 
 ---
 
@@ -120,16 +120,77 @@ Example:
 
 Products are intentionally constrained and replaceable.
 
-See: [`ecosystem/products.md`](ecosystem/products.md)
+See: [`docs/ecosystem/products.md`](ecosystem/products.md)
 
----
+## Build
+
+Softadastra is an umbrella workspace that mounts its modules as Git submodules.
+You clone once, initialize submodules, then build only the modules you need.
+
+### Requirements
+
+- Git
+- CMake 3.20 or newer
+- A C++20 compiler (GCC, Clang, or MSVC)
+
+### Quick start
+
+```bash
+git clone https://github.com/softadastra/softadastra.git
+cd softadastra
+git submodule update --init --recursive
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+### Configure modules
+
+Modules are enabled explicitly via CMake options.
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DSA_ENABLE_SYNC=ON \
+  -DSA_ENABLE_NET=ON \
+  -DSA_ENABLE_EDGE=OFF \
+  -DSA_ENABLE_ADAPTER_DESKTOP=OFF \
+  -DSA_ENABLE_ADAPTER_WEB=OFF \
+  -DSA_ENABLE_ADAPTER_BACKEND=OFF
+```
+
+### Build examples and tests
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+  -DSA_BUILD_EXAMPLES=ON \
+  -DSA_BUILD_TESTS=ON
+
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+
+### Common issues
+
+Missing submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Clean rebuild:
+
+```bash
+rm -rf build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
 
 ## Governance & roadmap
 
 Softadastra is a **long-term foundation effort**.
 
-- Roadmap: [`governance/roadmap.md`](governance/roadmap.md)
-- Contributions: [`governance/contribution.md`](governance/contribution.md)
+- Roadmap: [`docs/governance/roadmap.md`](governance/roadmap.md)
+- Contributions: [`docs/governance/contribution.md`](governance/contribution.md)
 
 Architectural correctness comes before growth.
 
@@ -139,11 +200,15 @@ Architectural correctness comes before growth.
 
 Softadastra values depth, clarity, and technical rigor.
 
-- Communication: [`community/communication.md`](community/communication.md)
-- Events: [`community/events.md`](community/events.md)
+- Communication: [`docs/community/communication.md`](community/communication.md)
+- Events: [`docs/community/events.md`](community/events.md)
 
 ---
 
 ## License
 
 This repository is licensed under the Apache License 2.0.
+
+```
+
+```
