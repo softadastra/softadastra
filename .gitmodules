@@ -1,0 +1,30 @@
+[submodule "modules/core"]
+	path = modules/core
+	url = https://github.com/softadastra/softadastra-core.git
+
+[submodule "modules/sync"]
+	path = modules/sync
+	url = https://github.com/softadastra/softadastra-sync.git
+
+[submodule "modules/net"]
+	path = modules/net
+	url = https://github.com/softadastra/softadastra-net.git
+
+[submodule "modules/edge"]
+	path = modules/edge
+	url = https://github.com/softadastra/softadastra-edge.git
+
+[submodule "modules/adapters/desktop"]
+	path = modules/adapters/desktop
+	url = https://github.com/softadastra/softadastra-adapter-desktop.git
+
+[submodule "modules/adapters/web"]
+	path = modules/adapters/web
+	url = https://github.com/softadastra/softadastra-adapter-web.git
+
+[submodule "modules/adapters/backend"]
+	path = modules/adapters/backend
+	url = https://github.com/softadastra/softadastra-adapter-backend.git
+[submodule "tools"]
+	path = tools
+	url = https://github.com/softadastra/softadastra-tools.git
