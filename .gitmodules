@@ -1,0 +1,32 @@
+[submodule "modules/core"]
+	path = modules/core
+	url = git@github.com:softadastra/core.git
+	branch = dev
+[submodule "modules/fs"]
+	path = modules/fs
+	url = git@github.com:softadastra/fs.git
+	branch = dev
+[submodule "modules/wal"]
+	path = modules/wal
+	url = git@github.com:softadastra/wal.git
+	branch = dev
+[submodule "modules/metadata"]
+	path = modules/metadata
+	url = git@github.com:softadastra/metadata.git
+	branch = dev
+[submodule "modules/transport"]
+	path = modules/transport
+	url = git@github.com:softadastra/transport.git
+	branch = dev
+[submodule "modules/sync"]
+	path = modules/sync
+	url = git@github.com:softadastra/sync.git
+	branch = dev
+[submodule "modules/app"]
+	path = modules/app
+	url = git@github.com:softadastra/app.git
+	branch = dev
+[submodule "apps/drive-cli"]
+	path = apps/drive-cli
+	url = git@github.com:softadastra/drive-cli.git
+	branch = dev
