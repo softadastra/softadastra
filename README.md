@@ -1,265 +1,230 @@
-# 🚀 Softadastra Drive — Core Backend (C++ / Vix.cpp)
+# Softadastra Drive
 
-Softadastra Drive is the **foundation of the new Softadastra platform** —  
-a **cloud-first, offline-capable, real-time, AI‑augmented storage engine** designed for developers and modern distributed applications.
+> Local-first file sync that works even when the internet doesn’t.
 
-This repository hosts the **high-performance C++ backend**, powered by **Vix.cpp**, built for:
+Softadastra Drive is a minimal, high-reliability synchronization engine that proves a simple idea:
 
-- Ultra-fast file operations
-- Modern sync mechanisms
-- Durability across devices
-- Local-first behaviour with cloud consistency
-- Integration with a dedicated AI engine (`drive-ai`)
-
-Softadastra Drive is the first brick of the future **Softadastra Global OS + WorldNet**, a unified environment that enables:
-
-- Cloud desktop
-- App studio
-- Marketplace
-- AI-native workflows
-- Peer-to-peer sync
-
-Drive‑core is the **heart** that everything else depends on.
+> A file modified on one machine appears on another
+> even if the internet is down.
 
 ---
 
-# 🌍 Vision
+## Why Softadastra Drive exists
 
-Softadastra Drive aims to redefine what a cloud storage engine can be:
+Modern applications assume:
 
-### **💾 1. Storage that feels local**
+* Stable internet
+* Always-available servers
+* Cloud as the source of truth
 
-Files load fast, sync instantly, and remain available **offline**, thanks to IndexedDB and a local-first sync algorithm.
+That assumption breaks in the real world.
 
-### **🔄 2. Real-time sync like Apple iCloud — but open**
+Softadastra Drive is built on a different model:
 
-Every update triggers instant events:
-
-- `file_created`
-- `file_updated`
-- `file_deleted`
-- `folder_changed`
-
-All exposed via WebSocket for any client, SDK, or app.
-
-### **🧠 3. AI-Native storage**
-
-Every file can be:
-
-- summarized,
-- OCR‑processed,
-- semantically indexed,
-- explored via natural language.
-
-A PDF becomes searchable.  
-An image becomes tagged.  
-A folder becomes intelligent.
-
-### **🧩 4. Open SDK ecosystem**
-
-Developers can integrate Softadastra Drive via:
-
-- **JavaScript SDK**
-- **C++ SDK**
-- **Python SDK**
-
-No vendor lock-in — everything is open-source.
-
-### **⚡ 5. Powered by C++ for true performance**
-
-Unlike Firebase or Supabase, Softadastra Drive uses a custom C++ engine designed for:
-
-- low latency
-- high throughput
-- minimal memory usage
-- efficient concurrency
-
-This backend scales **vertically and horizontally** while keeping predictable performance.
+* Local is the source of truth
+* The network is optional
+* Sync is eventual, deterministic, and resilient
 
 ---
 
-# 🏗️ Architecture Overview
+## What this project is
 
-```
-drive-core (C++)
-│
-├── HTTP API (REST/JSON)
-├── WebSocket Sync Engine
-├── File Metadata, Versions, Trees
-├── Authentication & Sessions
-├── AI Integration Gateway → drive-ai (Python)
-└── MySQL Storage
-```
+Softadastra Drive is **not** a cloud storage product.
 
-Supporting repositories:
+It is:
 
-- **drive-frontend** → PWA + offline + UI
-- **drive-ai** → AI microservice (FastAPI, OCR, summaries, embeddings)
-- **sdk-js / sdk-cpp / sdk-python** → Official SDKs
-- **docs** → Documentation site
+* A **local-first sync engine**
+* A **proof of reliable synchronization without cloud dependency**
+* A **foundation for building offline-capable applications**
 
 ---
 
-# 📦 Project Structure
+## Core idea
 
-```
-drive-core/
-├── CMakeLists.txt
-├── CMakePresets.json
-├── README.md
-├── CHANGELOG.md
-├── include/
-│   └── softadastra/drive/
-│       ├── app/
-│       │   └── App.hpp
-│       ├── http/
-│       ├── service/
-│       ├── repository/
-│       ├── ws/
-│       └── utils/
-├── src/
-│   ├── main.cpp
-│   ├── app/App.cpp
-│   ├── http/
-│   ├── service/
-│   ├── repository/
-│   ├── ws/
-│   └── utils/
-└── tests/
-    ├── CMakeLists.txt
-    └── *.cpp
-```
+> Write locally. Persist first. Sync later.
+
+Every operation:
+
+1. Is accepted locally
+2. Is persisted durably (WAL)
+3. Is synchronized when possible
+
+No operation depends on the network to succeed.
 
 ---
 
-# ⚙️ Build Requirements
+## Key Features
 
-- **C++20 compiler**
-  - GCC ≥ 11, Clang ≥ 15, MSVC 2022+
-- **CMake ≥ 3.20**
-- **Vix.cpp installed** (core-only)
-- **Boost**
-- **OpenSSL**
-- **MySQL Connector/C++**
-- **Ninja** (recommended)
+### Local-first writes
+
+All file operations are accepted instantly without waiting for network confirmation.
+
+### Durable WAL (Write-Ahead Log)
+
+Every change is recorded before any network activity.
+
+### LAN-based sync
+
+Devices discover each other and synchronize over the local network.
+
+### Recovery after interruption
+
+If a device goes offline, it catches up when it reconnects.
+
+### Deterministic convergence
+
+All peers eventually reach the same state.
 
 ---
 
-# 🚀 Building & Running
+## What this is NOT
 
-### Using Vix CLI (recommended)
+* Not Google Drive
+* Not Dropbox
+* Not a cloud storage clone
+* Not a collaboration suite
+* Not a file explorer UI
+
+This is the **sync engine** behind future applications.
+
+---
+
+## Demo scenario
+
+This is the only thing that must work:
+
+1. Start Softadastra Drive on two machines (same LAN)
+2. Create or modify a file on Machine A
+3. Machine B receives the update
+4. Disconnect internet (keep LAN)
+5. Modify the file again on A
+6. B still receives the update
+7. Turn B off, modify files on A
+8. Turn B back on → it catches up
+
+If this works, the system is valid.
+
+---
+
+## Architecture (MVP)
+
+The system is intentionally minimal.
+
+### 1. Watched Folder
+
+A local directory monitored for changes.
+
+### 2. Local Metadata Store
+
+Tracks file state, versions, and sync status (SQLite).
+
+### 3. WAL (Write-Ahead Log)
+
+Persists all operations before sync.
+
+### 4. Peer Discovery
+
+Detects other devices on the LAN.
+
+### 5. Sync Engine
+
+Transfers missing operations between peers.
+
+### 6. Replay / Recovery
+
+Rebuilds state after disconnection.
+
+---
+
+## Guarantees
+
+Softadastra Drive is built around strict invariants:
+
+* No accepted write is ever lost
+* Every operation is persisted before sync
+* Offline peers do not break system consistency
+* All peers converge after reconnection
+* Cloud is never required
+
+---
+
+## Scope (MVP)
+
+* 2 devices
+* 1 shared folder
+* LAN only
+* Basic file operations
+* No complex conflict resolution
+
+---
+
+## Philosophy
+
+Softadastra is the **Sync OS of the real internet**.
+
+This means:
+
+* Systems must work under failure
+* Connectivity is unreliable by default
+* The network is an optimization, not a dependency
+
+---
+
+## Installation (coming soon)
 
 ```bash
-vix build
-vix run
-```
-
-### Or manually:
-
-```bash
-cmake --preset dev-ninja
-cmake --build --preset dev-ninja
-./build-ninja/drive-core
-```
-
-Visit:
-
-- **http://localhost:8080/**
-- **http://localhost:8080/health**
-
----
-
-# 🔌 API (Early Preview)
-
-### `GET /health`
-
-Returns service health.
-
-### `GET /`
-
-Returns service status.
-
-More routes will follow:
-
-- `/auth/signup`
-- `/auth/login`
-- `/files/upload`
-- `/files/:id`
-- `/folders/...`
-- `/sync/index`
-- `/sync/changes`
-
----
-
-# 🧪 Tests
-
-Softadastra Drive uses **Catch2 v3** via FetchContent.
-
-Run tests:
-
-```bash
-ctest
+# example (future CLI)
+vix add @softadastra/drive
+vix run drive --folder ~/SoftadastraDrive
 ```
 
 ---
 
-# 🧭 Roadmap (Core)
+## Roadmap
 
-### Phase 1 — Backend Foundation
-
-- [x] Project skeleton
-- [ ] Auth system
-- [ ] File metadata engine
-- [ ] Folder system
-- [ ] Sync event model
-
-### Phase 2 — File Engine
-
-- [ ] Upload / download
-- [ ] Versions
-- [ ] Previews / thumbnails
-
-### Phase 3 — Sync Engine
-
-- [ ] Change cursors
-- [ ] Real-time WebSocket sync
-- [ ] Conflict resolution
-
-### Phase 4 — AI Engine Gateway
-
-- [ ] Summaries
-- [ ] OCR
-- [ ] Semantic search
-
-### Phase 5 — SDK ecosystem
-
-- [ ] JS SDK
-- [ ] C++ SDK
-- [ ] Python SDK
+* Multi-device sync
+* Delta-based transfer
+* Conflict resolution strategies
+* Encryption layer
+* SDK integration
+* Cross-platform support
 
 ---
 
-# 🪪 License
+## Vision
 
-MIT © Softadastra / Vixcpp authors
+Softadastra Drive is not the product.
 
----
+It is the **proof**.
 
-# 💬 Contributing
+From this proof will emerge:
 
-Softadastra Drive is open-source and welcomes contributions:
-
-- features
-- bug fixes
-- documentation
-- performance improvements
+* SDKs
+* Platforms
+* Offline-first applications
+* A new standard for synchronization
 
 ---
 
-# 🌟 Final Note
+## Contributing
 
-Softadastra Drive is more than a storage backend.  
-It is the **core building block of the future Softadastra OS**, where apps, AI, sync, identity, and cloud-native workflows merge into a unified ecosystem.
+This project is early and focused.
 
-You're not just storing files —  
-**you're building the foundation of a global distributed system.**
+Contributions should prioritize:
+
+* Correctness under failure
+* Simplicity over features
+* Deterministic behavior
+
+---
+
+## License
+
+TBD
+
+---
+
+## Final note
+
+> Softadastra Drive is not trying to replace the cloud.
+> It is proving that the cloud is optional.
