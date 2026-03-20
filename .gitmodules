@@ -30,3 +30,15 @@
 	path = apps/drive-cli
 	url = git@github.com:softadastra/drive-cli.git
 	branch = dev
+[submodule "modules/store"]
+	path = modules/store
+	url = git@github.com:softadastra/store.git
+	branch = dev
+[submodule "modules/cli"]
+	path = modules/cli
+	url = git@github.com:softadastra/cli.git
+	branch = dev
+[submodule "modules/discovery"]
+	path = modules/discovery
+	url = git@github.com:softadastra/discovery.git
+	branch = dev
