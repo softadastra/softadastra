@@ -1,0 +1,32 @@
+{
+  "name": "softadastra",
+  "namespace": "softadastra",
+  "version": "0.1.0",
+  "type": "project",
+  "license": "MIT",
+  "description": "Softadastra umbrella project for building core modules, optional apps, and top-level examples.",
+  "keywords": [
+    "softadastra",
+    "umbrella",
+    "offline-first",
+    "distributed-systems",
+    "p2p",
+    "sync",
+    "wal",
+    "filesystem",
+    "metadata",
+    "transport",
+    "discovery",
+    "c++",
+    "cpp",
+    "c++20",
+    "project"
+  ],
+  "repository": "https://github.com/softadastra/softadastra",
+  "authors": [
+    {
+      "name": "Gaspard Kirira",
+      "github": "Gaspardkirira"
+    }
+  ]
+}

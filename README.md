@@ -175,7 +175,7 @@ This means:
 ```bash
 # example (future CLI)
 vix add @softadastra/drive
-vix run drive --folder ~/SoftadastraDrive
+## vix run drive --folder ~/SoftadastraDrive
 ```
 
 ---
