@@ -19,7 +19,7 @@ set(SOFTADASTRA_UMBRELLA_BUILD ON)
 option(SOFTADASTRA_BUILD_EXAMPLES "Build umbrella examples" OFF)
 option(SOFTADASTRA_BUILD_TESTS "Build umbrella tests" OFF)
 option(SOFTADASTRA_BUILD_APP "Build app module" OFF)
-option(SOFTADASTRA_BUILD_CLI "Build cli module" OFF)
+option(SOFTADASTRA_BUILD_CLI "Build cli module" ON)
 option(SOFTADASTRA_INSTALL "Install Softadastra umbrella package" ON)
 option(SOFTADASTRA_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 

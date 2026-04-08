@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.10.0]
+
+### Improvements
+
+- add command options support (`CliOption`)
+- improve help system:
+  - `help` lists commands dynamically
+  - `help <command>` shows detailed command usage
+  - support `--help` on commands
+- remove hardcoded logic for `help` and `version` (now context-driven)
+- improve input handling with `std::optional` (EOF-safe)
+- stabilize interactive CLI loop
+
+### Fixes
+
+- fix missing CLI symbols (InputReader implementation)
+- ensure CLI module is correctly integrated in umbrella builds
+
+
 ## [v0.9.5]
 
 ### Breaking Changes
