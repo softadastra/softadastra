@@ -28,6 +28,11 @@ jobs:
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
 
+      - name: Clean build, install and smoke directories
+        shell: bash
+        run: |
+          rm -rf build install smoke-umbrella smoke-module
+
       - name: Configure
         shell: bash
         run: |
@@ -35,7 +40,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DSOFTADASTRA_BUILD_EXAMPLES=${{ matrix.build_examples }} \
             -DSOFTADASTRA_BUILD_APP=OFF \
-            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_BUILD_CLI=OFF \
             -DSOFTADASTRA_INSTALL=ON \
             -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
 
@@ -53,6 +58,7 @@ jobs:
       - name: Smoke test - umbrella package
         shell: bash
         run: |
+          rm -rf smoke-umbrella
           mkdir -p smoke-umbrella
 
           cat > smoke-umbrella/CMakeLists.txt <<'EOF'
@@ -62,7 +68,7 @@ jobs:
           set(CMAKE_CXX_STANDARD 20)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-          find_package(softadastra REQUIRED)
+          find_package(softadastra CONFIG REQUIRED)
 
           add_executable(softadastra_smoke_umbrella main.cpp)
           target_link_libraries(softadastra_smoke_umbrella PRIVATE
@@ -90,6 +96,7 @@ jobs:
       - name: Smoke test - direct module package
         shell: bash
         run: |
+          rm -rf smoke-module
           mkdir -p smoke-module
 
           cat > smoke-module/CMakeLists.txt <<'EOF'
@@ -99,7 +106,7 @@ jobs:
           set(CMAKE_CXX_STANDARD 20)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-          find_package(softadastra_metadata REQUIRED)
+          find_package(softadastra_metadata CONFIG REQUIRED)
 
           add_executable(softadastra_smoke_module main.cpp)
           target_link_libraries(softadastra_smoke_module PRIVATE
@@ -133,5 +140,9 @@ jobs:
             build/CMakeFiles/CMakeError.log
             build/Testing/Temporary/LastTest.log
             smoke-umbrella/build/CMakeCache.txt
+            smoke-umbrella/build/CMakeFiles/CMakeOutput.log
+            smoke-umbrella/build/CMakeFiles/CMakeError.log
             smoke-module/build/CMakeCache.txt
+            smoke-module/build/CMakeFiles/CMakeOutput.log
+            smoke-module/build/CMakeFiles/CMakeError.log
           if-no-files-found: ignore

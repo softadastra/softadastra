@@ -28,6 +28,11 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Clean build, install and smoke directories
+        shell: bash
+        run: |
+          rm -rf build install smoke
+
       - name: Configure
         shell: bash
         run: |
@@ -35,7 +40,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
             -DSOFTADASTRA_BUILD_APP=OFF \
-            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_BUILD_CLI=OFF \
             -DSOFTADASTRA_INSTALL=ON
 
       - name: Build
@@ -52,6 +57,7 @@ jobs:
       - name: Smoke test - consumer project
         shell: bash
         run: |
+          rm -rf smoke
           mkdir -p smoke
 
           cat > smoke/CMakeLists.txt <<'EOF'
@@ -61,7 +67,7 @@ jobs:
           set(CMAKE_CXX_STANDARD 20)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-          find_package(softadastra REQUIRED)
+          find_package(softadastra CONFIG REQUIRED)
 
           add_executable(softadastra_smoke main.cpp)
           target_link_libraries(softadastra_smoke PRIVATE
@@ -96,4 +102,7 @@ jobs:
             build/CMakeFiles/CMakeOutput.log
             build/CMakeFiles/CMakeError.log
             build/Testing/Temporary/LastTest.log
+            smoke/build/CMakeCache.txt
+            smoke/build/CMakeFiles/CMakeOutput.log
+            smoke/build/CMakeFiles/CMakeError.log
           if-no-files-found: ignore

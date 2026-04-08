@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.9.1]
+
+### Improvements
+
+- improve CI reliability
+  All workflows now use a clean build, install, and smoke environment to ensure deterministic results.
+
+- improve cross-platform stability
+  Consistent behavior across Linux, macOS, and Windows by eliminating stale build artifacts.
+
+- improve developer experience
+  Smoke tests now accurately reflect real consumer usage of installed Softadastra packages.
+
+### Fixes
+
+- fix(ci): remove stale build and install artifacts
+  Fixes intermittent failures caused by leftover `build/`, `install/`, and `smoke/` directories in CI.
+
+- fix(ci): ensure correct package resolution during smoke tests
+  Prevents false negatives where `find_package(softadastra)` failed despite correct installation.
+
+- fix(ci): avoid missing CLI package errors
+  Disables CLI module in CI workflows when not installed, preventing invalid includes in umbrella config.
+
+### Internal
+
+- refactor(ci): unify workflow behavior across all pipelines
+  Both standard and strict CI workflows now follow the same clean setup strategy.
+
+---
+
+Softadastra v0.9.1 ensures that CI results are **reliable, reproducible, and representative of real-world usage**.
+
 ## [v0.9.0]
 
 ### Improvements

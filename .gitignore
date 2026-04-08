@@ -16,3 +16,9 @@ CMakeCache.txt
 cmake-build-*/
 cmd.md
 .vix/
+# Build artifacts
+build/
+install/
+smoke/
+smoke-umbrella/
+smoke-module/
