@@ -38,6 +38,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
             -DSOFTADASTRA_BUILD_APP=OFF \
             -DSOFTADASTRA_BUILD_CLI=OFF \
@@ -52,7 +53,7 @@ jobs:
       - name: Install
         shell: bash
         run: |
-          cmake --install build --prefix "${{ github.workspace }}/install"
+          cmake --install build
 
       - name: Smoke test - consumer project
         shell: bash

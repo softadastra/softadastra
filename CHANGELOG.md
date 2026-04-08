@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.9.2]
+
+### Improvements
+
+- improve CI package consistency
+  Build and install now use a unified install prefix, ensuring consistent package layout across all environments.
+
+- improve cross-platform reliability
+  Eliminates discrepancies between configure-time and install-time paths in CI workflows.
+
+- improve developer experience
+  Ensures `find_package(softadastra CONFIG)` works reliably in automated pipelines and real consumer scenarios.
+
+### Fixes
+
+- fix(ci): resolve missing module config files in smoke tests
+  Fixes failures where installed module configs (`softadastra_core`, `fs`, `wal`, etc.) could not be found during CI runs.
+
+- fix(ci): align configure and install prefixes
+  Prevents mismatch between generated package paths and actual install locations.
+
+### Internal
+
+- refactor(ci): simplify install step
+  Removed redundant `--prefix` override and rely on a single source of truth (`CMAKE_INSTALL_PREFIX`).
+
+---
+
+Softadastra v0.9.2 stabilizes CI behavior and guarantees reliable package consumption across all platforms.
+
 ## [v0.9.1]
 
 ### Improvements
