@@ -7,6 +7,8 @@ project(softadastra
 )
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(CTest)
 
 # Build context
 set(SOFTADASTRA_UMBRELLA_BUILD ON)
@@ -15,9 +17,24 @@ set(SOFTADASTRA_UMBRELLA_BUILD ON)
 # Options
 # ========================
 option(SOFTADASTRA_BUILD_EXAMPLES "Build umbrella examples" OFF)
+option(SOFTADASTRA_BUILD_TESTS "Build umbrella tests" OFF)
 option(SOFTADASTRA_BUILD_APP "Build app module" OFF)
 option(SOFTADASTRA_BUILD_CLI "Build cli module" OFF)
-option(SOFTADASTRA_INSTALL "Install Softadastra umbrella targets" ON)
+option(SOFTADASTRA_INSTALL "Install Softadastra umbrella package" ON)
+option(SOFTADASTRA_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
+
+# ========================
+# Propagate global options to submodules
+# ========================
+set(SOFTADASTRA_BUILD_TESTS
+    ${SOFTADASTRA_BUILD_TESTS}
+    CACHE BOOL "Build umbrella tests" FORCE
+)
+
+set(SOFTADASTRA_WARNINGS_AS_ERRORS
+    ${SOFTADASTRA_WARNINGS_AS_ERRORS}
+    CACHE BOOL "Treat warnings as errors" FORCE
+)
 
 # ========================
 # Global settings
@@ -79,20 +96,40 @@ if(SOFTADASTRA_BUILD_EXAMPLES)
 endif()
 
 # ========================
-# Installation
+# Umbrella package config
 # ========================
 if(SOFTADASTRA_INSTALL)
-    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/softadastra/modules"
-        FILES_MATCHING
-            PATTERN "include/*"
-            PATTERN "*.hpp"
-            PATTERN "*.h"
+    if(SOFTADASTRA_BUILD_CLI)
+        set(SOFTADASTRA_UMBRELLA_FIND_CLI
+            "find_dependency(softadastra_cli CONFIG)"
+        )
+    else()
+        set(SOFTADASTRA_UMBRELLA_FIND_CLI "")
+    endif()
+
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/softadastraConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
     )
 
-    install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-        "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/softadastraConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/softadastraConfig.cmake"
+        INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/softadastra"
+    )
+
+    install(
+        FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/softadastraConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/softadastraConfigVersion.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/softadastra"
+    )
+
+    install(
+        FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/softadastra"
         OPTIONAL
     )
@@ -104,8 +141,11 @@ endif()
 message(STATUS "------------------------------------------------------")
 message(STATUS "Softadastra umbrella configured (${PROJECT_VERSION})")
 message(STATUS "Build examples: ${SOFTADASTRA_BUILD_EXAMPLES}")
+message(STATUS "Build tests:    ${SOFTADASTRA_BUILD_TESTS}")
 message(STATUS "Build app:      ${SOFTADASTRA_BUILD_APP}")
 message(STATUS "Build cli:      ${SOFTADASTRA_BUILD_CLI}")
 message(STATUS "Install:        ${SOFTADASTRA_INSTALL}")
+message(STATUS "Warnings=error: ${SOFTADASTRA_WARNINGS_AS_ERRORS}")
 message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
+message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "------------------------------------------------------")

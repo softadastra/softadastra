@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main", "dev"]
+
+jobs:
+  build-test-install:
+    name: ${{ matrix.os }} / ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        build_type: [Release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
+            -DSOFTADASTRA_BUILD_APP=OFF \
+            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_INSTALL=ON
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Test
+        run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
+
+      - name: Install
+        shell: bash
+        run: |
+          cmake --install build --prefix "${{ github.workspace }}/install"
+
+      - name: Smoke test - consumer project
+        shell: bash
+        run: |
+          mkdir -p smoke
+
+          cat > smoke/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(softadastra_smoke LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          find_package(softadastra REQUIRED)
+
+          add_executable(softadastra_smoke main.cpp)
+          target_link_libraries(softadastra_smoke PRIVATE
+            softadastra::core
+            softadastra::metadata
+          )
+          EOF
+
+          cat > smoke/main.cpp <<'EOF'
+          #include <softadastra/core/time/Timestamp.hpp>
+
+          int main()
+          {
+            auto now = softadastra::core::time::Timestamp::now();
+            return now.is_valid() ? 0 : 1;
+          }
+          EOF
+
+          cmake -S smoke -B smoke/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+
+          cmake --build smoke/build --config ${{ matrix.build_type }}
+
+      - name: Upload CMake logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.os }}-${{ matrix.build_type }}
+          path: |
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+            build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore

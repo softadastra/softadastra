@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(softadastra_core CONFIG)
+find_dependency(softadastra_fs CONFIG)
+find_dependency(softadastra_wal CONFIG)
+find_dependency(softadastra_store CONFIG)
+find_dependency(softadastra_sync CONFIG)
+find_dependency(softadastra_transport CONFIG)
+find_dependency(softadastra_discovery CONFIG)
+find_dependency(softadastra_metadata CONFIG)
+
+@SOFTADASTRA_UMBRELLA_FIND_CLI@

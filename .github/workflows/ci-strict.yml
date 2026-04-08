@@ -1,0 +1,137 @@
+name: CI Strict
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main", "dev"]
+
+jobs:
+  linux-strict:
+    name: ubuntu-latest / ${{ matrix.build_type }} / strict
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+        build_examples: [OFF, ON]
+
+    env:
+      CXX: g++
+      CC: gcc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DSOFTADASTRA_BUILD_EXAMPLES=${{ matrix.build_examples }} \
+            -DSOFTADASTRA_BUILD_APP=OFF \
+            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_INSTALL=ON \
+            -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Test
+        run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
+
+      - name: Install
+        shell: bash
+        run: |
+          cmake --install build --prefix "${{ github.workspace }}/install"
+
+      - name: Smoke test - umbrella package
+        shell: bash
+        run: |
+          mkdir -p smoke-umbrella
+
+          cat > smoke-umbrella/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(softadastra_smoke_umbrella LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          find_package(softadastra REQUIRED)
+
+          add_executable(softadastra_smoke_umbrella main.cpp)
+          target_link_libraries(softadastra_smoke_umbrella PRIVATE
+            softadastra::core
+            softadastra::metadata
+          )
+          EOF
+
+          cat > smoke-umbrella/main.cpp <<'EOF'
+          #include <softadastra/core/time/Timestamp.hpp>
+
+          int main()
+          {
+            auto now = softadastra::core::time::Timestamp::now();
+            return now.is_valid() ? 0 : 1;
+          }
+          EOF
+
+          cmake -S smoke-umbrella -B smoke-umbrella/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+
+          cmake --build smoke-umbrella/build --config ${{ matrix.build_type }}
+
+      - name: Smoke test - direct module package
+        shell: bash
+        run: |
+          mkdir -p smoke-module
+
+          cat > smoke-module/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(softadastra_smoke_module LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          find_package(softadastra_metadata REQUIRED)
+
+          add_executable(softadastra_smoke_module main.cpp)
+          target_link_libraries(softadastra_smoke_module PRIVATE
+            softadastra::metadata
+          )
+          EOF
+
+          cat > smoke-module/main.cpp <<'EOF'
+          #include <softadastra/core/time/Timestamp.hpp>
+
+          int main()
+          {
+            return softadastra::core::time::Timestamp::now().is_valid() ? 0 : 1;
+          }
+          EOF
+
+          cmake -S smoke-module -B smoke-module/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+
+          cmake --build smoke-module/build --config ${{ matrix.build_type }}
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-logs-${{ matrix.build_type }}-examples-${{ matrix.build_examples }}
+          path: |
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+            build/Testing/Temporary/LastTest.log
+            smoke-umbrella/build/CMakeCache.txt
+            smoke-module/build/CMakeCache.txt
+          if-no-files-found: ignore

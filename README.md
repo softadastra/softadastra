@@ -9,8 +9,6 @@ It guarantees a simple outcome:
 > Data written on one machine becomes available on another,
 > even when the internet is unstable or unavailable.
 
----
-
 ## What Softadastra is
 
 Softadastra is a **real system**, not a concept. It is:
@@ -20,8 +18,6 @@ Softadastra is a **real system**, not a concept. It is:
 - a **foundation for building resilient applications**
 
 It works across machines, over unreliable networks, without depending on the cloud.
-
----
 
 ## Why Softadastra exists
 
@@ -39,8 +35,6 @@ Softadastra is built for:
 - intermittent networks
 - offline-first environments
 
----
-
 ## Core model
 
 > *Write locally. Persist first. Sync later.*
@@ -52,8 +46,6 @@ Every operation:
 3. is synchronized **when possible**
 
 The network is **never required for correctness**.
-
----
 
 ## What makes it different
 
@@ -77,8 +69,6 @@ Nodes can disconnect, restart, or fail without breaking the system.
 
 All peers converge to the same state after synchronization.
 
----
-
 ## What this is NOT
 
 - not a cloud storage product
@@ -86,8 +76,6 @@ All peers converge to the same state after synchronization.
 - not a UI or application
 
 Softadastra is the **engine underneath applications**.
-
----
 
 ## Real-world behavior
 
@@ -101,8 +89,6 @@ Softadastra is designed for real conditions:
 6. Synchronization resumes when connectivity is restored
 7. System converges automatically
 
----
-
 ## Architecture
 
 ```
@@ -113,8 +99,6 @@ Transport layer        →  network abstraction (LAN, future P2P)
 Discovery              →  finds peers
 Recovery engine        →  rebuilds state after interruptions
 ```
-
----
 
 ## Guarantees
 
@@ -127,8 +111,6 @@ Softadastra is built on strict invariants:
 | **Convergence** | All peers converge after reconnection |
 | **Network-optional** | The network is never required for correctness |
 
----
-
 ## Philosophy
 
 Softadastra is the **Sync OS of the real internet**.
@@ -137,8 +119,6 @@ Softadastra is the **Sync OS of the real internet**.
 - the network is an optimization
 - systems must work under failure
 
----
-
 ## Installation
 
 ```bash
@@ -146,8 +126,6 @@ vix add @softadastra/sync
 ```
 
 > Full installation guide coming soon.
-
----
 
 ## Roadmap
 
@@ -158,8 +136,6 @@ vix add @softadastra/sync
 - [ ] SDK and APIs
 - [ ] Cross-platform support
 
----
-
 ## Vision
 
 Softadastra is not an application. It is a **foundational layer** — a system that enables:
@@ -167,8 +143,6 @@ Softadastra is not an application. It is a **foundational layer** — a system t
 - offline-first applications
 - resilient infrastructure
 - decentralized data systems
-
----
 
 ## Contributing
 
@@ -178,12 +152,8 @@ Focus areas:
 - **deterministic** behavior
 - **simplicity**
 
----
-
 ## License
 
 MIT
-
----
 
 > *The network is unreliable. Systems should not be.*
