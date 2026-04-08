@@ -2,6 +2,18 @@
 
 include(CMakeFindDependencyMacro)
 
+set(_softadastra_saved_prefix_path "${CMAKE_PREFIX_PATH}")
+list(PREPEND CMAKE_PREFIX_PATH "${PACKAGE_PREFIX_DIR}")
+
+set(softadastra_core_DIR       "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_core")
+set(softadastra_fs_DIR         "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_fs")
+set(softadastra_wal_DIR        "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_wal")
+set(softadastra_store_DIR      "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_store")
+set(softadastra_sync_DIR       "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_sync")
+set(softadastra_transport_DIR  "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_transport")
+set(softadastra_discovery_DIR  "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_discovery")
+set(softadastra_metadata_DIR   "${PACKAGE_PREFIX_DIR}/@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake/softadastra_metadata")
+
 find_dependency(softadastra_core CONFIG)
 find_dependency(softadastra_fs CONFIG)
 find_dependency(softadastra_wal CONFIG)
@@ -12,3 +24,6 @@ find_dependency(softadastra_discovery CONFIG)
 find_dependency(softadastra_metadata CONFIG)
 
 @SOFTADASTRA_UMBRELLA_FIND_CLI@
+
+set(CMAKE_PREFIX_PATH "${_softadastra_saved_prefix_path}")
+unset(_softadastra_saved_prefix_path)

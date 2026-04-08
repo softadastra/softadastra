@@ -1,4 +1,44 @@
-# Softadastra
+<table>
+  <tr>
+    <td valign="top" width="65%">
+
+<h1>Softadastra</h1>
+
+<p>
+  <a href="https://github.com/softadastra">
+    <img src="https://img.shields.io/badge/GitHub-Follow-black?logo=github" />
+  </a>
+</p>
+
+<p>
+  <b>The sync engine for the real world.</b>
+</p>
+
+<p>
+  Softadastra is a <b>local-first, offline-capable synchronization system</b>
+  built to remain correct under unstable networks, intermittent connectivity,
+  and real-world failure conditions.
+</p>
+
+<p>
+  🌍 <a href="https://softadastra.com">Website</a> ·
+  📘 <a href="https://docs.softadastra.com">Docs</a> ·
+  ⬇️ <a href="https://github.com/softadastra">Source</a>
+</p>
+
+</td>
+
+<td valign="middle" width="25%" align="right">
+
+<img
+  src="https://res.cloudinary.com/dwjbed2xb/image/upload/v1767987144/android-chrome-512x512_yjmz55.png"
+  width="260"
+  style="border-radius:50%; object-fit:cover;"
+/>
+
+</td>
+  </tr>
+</table>
 
 > **The sync engine for the real world.**
 
@@ -91,13 +131,13 @@ Softadastra is designed for real conditions:
 
 ## Architecture
 
-```
-Local state (store)    →  source of truth
-WAL                    →  durability layer
-Sync engine            →  propagates operations
-Transport layer        →  network abstraction (LAN, future P2P)
-Discovery              →  finds peers
-Recovery engine        →  rebuilds state after interruptions
+```text
+Local state (store)    -> source of truth
+WAL                    -> durability layer
+Sync engine            -> propagates operations
+Transport layer        -> network abstraction (LAN, future P2P)
+Discovery              -> finds peers
+Recovery engine        -> rebuilds state after interruptions
 ```
 
 ## Guarantees

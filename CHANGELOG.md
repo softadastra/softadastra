@@ -3,6 +3,80 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.7.0]
+
+### 🔧 Critical Fixes
+
+- Fix umbrella package dependency resolution.
+  `find_package(softadastra)` now correctly resolves all module dependencies:
+  - `core`
+  - `fs`
+  - `wal`
+  - `store`
+  - `sync`
+  - `transport`
+  - `discovery`
+  - `metadata`
+
+- Fix CMake package lookup in installed environments.
+  Properly sets `*_DIR` variables and `CMAKE_PREFIX_PATH` to ensure:
+  - CI compatibility (GitHub Actions)
+  - reliable external consumption
+
+---
+
+### 🛠 Build System
+
+- Improve umbrella `Config.cmake` generation:
+  - use `PATH_VARS` with `configure_package_config_file`
+  - inject correct install paths via `PACKAGE_PREFIX_DIR`
+
+- Stabilize multi-module package resolution:
+  - all modules now discoverable from a single install prefix
+  - eliminates manual `CMAKE_PREFIX_PATH` hacks
+
+---
+
+### 📦 Packaging
+
+- Make umbrella package fully functional as entry point:
+
+  ```cmake
+  find_package(softadastra REQUIRED)
+  ```
+
+- Ensure transitive dependency resolution works out-of-the-box.
+  Modules are now correctly chained during `find_dependency`.
+
+---
+
+### 🧪 CI
+
+- Fix CI failure on smoke test (consumer project)
+- Validate installation + usage in isolated environment
+
+---
+
+### 📚 Developer Experience
+
+- Improved reliability when using Softadastra as external SDK
+- Consistent behavior between:
+  - local builds
+  - CI environments
+  - installed packages
+
+---
+
+### 🎯 Summary
+
+This release fixes a critical issue in the umbrella CMake package and ensures that Softadastra can be reliably:
+
+- installed
+- discovered via `find_package`
+- consumed as a modular C++ SDK
+
+> Softadastra is now **production-ready** from a CMake integration perspective.
+
 ## [v0.6.0]
 
 ### 🚀 Major Improvements
