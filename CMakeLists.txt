@@ -17,6 +17,7 @@ set(SOFTADASTRA_UMBRELLA_BUILD ON)
 option(SOFTADASTRA_BUILD_EXAMPLES "Build umbrella examples" OFF)
 option(SOFTADASTRA_BUILD_APP "Build app module" OFF)
 option(SOFTADASTRA_BUILD_CLI "Build cli module" OFF)
+option(SOFTADASTRA_INSTALL "Install Softadastra umbrella targets" ON)
 
 # ========================
 # Global settings
@@ -78,6 +79,26 @@ if(SOFTADASTRA_BUILD_EXAMPLES)
 endif()
 
 # ========================
+# Installation
+# ========================
+if(SOFTADASTRA_INSTALL)
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/softadastra/modules"
+        FILES_MATCHING
+            PATTERN "include/*"
+            PATTERN "*.hpp"
+            PATTERN "*.h"
+    )
+
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+        "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/softadastra"
+        OPTIONAL
+    )
+endif()
+
+# ========================
 # Summary
 # ========================
 message(STATUS "------------------------------------------------------")
@@ -85,5 +106,6 @@ message(STATUS "Softadastra umbrella configured (${PROJECT_VERSION})")
 message(STATUS "Build examples: ${SOFTADASTRA_BUILD_EXAMPLES}")
 message(STATUS "Build app:      ${SOFTADASTRA_BUILD_APP}")
 message(STATUS "Build cli:      ${SOFTADASTRA_BUILD_CLI}")
+message(STATUS "Install:        ${SOFTADASTRA_INSTALL}")
 message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "------------------------------------------------------")

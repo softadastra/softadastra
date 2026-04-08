@@ -1,160 +1,131 @@
-# Softadastra Drive
+# Softadastra
 
-> Local-first file sync that works even when the internet doesn’t.
+> **The sync engine for the real world.**
 
-Softadastra Drive is a minimal, high-reliability synchronization engine that proves a simple idea:
+Softadastra is a **local-first, offline-capable synchronization system** designed to work reliably under real network conditions.
 
-> A file modified on one machine appears on another
-> even if the internet is down.
+It guarantees a simple outcome:
 
----
-
-## Why Softadastra Drive exists
-
-Modern applications assume:
-
-* Stable internet
-* Always-available servers
-* Cloud as the source of truth
-
-That assumption breaks in the real world.
-
-Softadastra Drive is built on a different model:
-
-* Local is the source of truth
-* The network is optional
-* Sync is eventual, deterministic, and resilient
+> Data written on one machine becomes available on another,
+> even when the internet is unstable or unavailable.
 
 ---
 
-## What this project is
+## What Softadastra is
 
-Softadastra Drive is **not** a cloud storage product.
+Softadastra is a **real system**, not a concept. It is:
 
-It is:
+- a **synchronization engine**
+- a **local-first data layer**
+- a **foundation for building resilient applications**
 
-* A **local-first sync engine**
-* A **proof of reliable synchronization without cloud dependency**
-* A **foundation for building offline-capable applications**
+It works across machines, over unreliable networks, without depending on the cloud.
 
 ---
 
-## Core idea
+## Why Softadastra exists
 
-> Write locally. Persist first. Sync later.
+Most systems assume:
+
+- stable internet
+- always-available servers
+- cloud as the source of truth
+
+This assumption fails in the real world.
+
+Softadastra is built for:
+
+- unstable connectivity
+- intermittent networks
+- offline-first environments
+
+---
+
+## Core model
+
+> *Write locally. Persist first. Sync later.*
 
 Every operation:
 
-1. Is accepted locally
-2. Is persisted durably (WAL)
-3. Is synchronized when possible
+1. is accepted **locally**
+2. is persisted **durably** (WAL)
+3. is synchronized **when possible**
 
-No operation depends on the network to succeed.
+The network is **never required for correctness**.
 
 ---
 
-## Key Features
+## What makes it different
 
-### Local-first writes
+### Local-first by design
 
-All file operations are accepted instantly without waiting for network confirmation.
+All writes succeed instantly without waiting for the network.
 
-### Durable WAL (Write-Ahead Log)
+### Durable by default
 
-Every change is recorded before any network activity.
+Every operation is persisted before any sync attempt.
 
-### LAN-based sync
+### Network-optional synchronization
 
-Devices discover each other and synchronize over the local network.
+Devices synchronize when connectivity is available, but never depend on it.
 
-### Recovery after interruption
+### Resilient to failure
 
-If a device goes offline, it catches up when it reconnects.
+Nodes can disconnect, restart, or fail without breaking the system.
 
 ### Deterministic convergence
 
-All peers eventually reach the same state.
+All peers converge to the same state after synchronization.
 
 ---
 
 ## What this is NOT
 
-* Not Google Drive
-* Not Dropbox
-* Not a cloud storage clone
-* Not a collaboration suite
-* Not a file explorer UI
+- not a cloud storage product
+- not Google Drive or Dropbox
+- not a UI or application
 
-This is the **sync engine** behind future applications.
+Softadastra is the **engine underneath applications**.
 
 ---
 
-## Demo scenario
+## Real-world behavior
 
-This is the only thing that must work:
+Softadastra is designed for real conditions:
 
-1. Start Softadastra Drive on two machines (same LAN)
-2. Create or modify a file on Machine A
-3. Machine B receives the update
-4. Disconnect internet (keep LAN)
-5. Modify the file again on A
-6. B still receives the update
-7. Turn B off, modify files on A
-8. Turn B back on → it catches up
-
-If this works, the system is valid.
+1. Two machines start on the same network
+2. Data is written on Machine A
+3. Machine B receives updates
+4. Network becomes unstable or disconnected
+5. Writes continue locally on each node
+6. Synchronization resumes when connectivity is restored
+7. System converges automatically
 
 ---
 
-## Architecture (MVP)
+## Architecture
 
-The system is intentionally minimal.
-
-### 1. Watched Folder
-
-A local directory monitored for changes.
-
-### 2. Local Metadata Store
-
-Tracks file state, versions, and sync status (SQLite).
-
-### 3. WAL (Write-Ahead Log)
-
-Persists all operations before sync.
-
-### 4. Peer Discovery
-
-Detects other devices on the LAN.
-
-### 5. Sync Engine
-
-Transfers missing operations between peers.
-
-### 6. Replay / Recovery
-
-Rebuilds state after disconnection.
+```
+Local state (store)    →  source of truth
+WAL                    →  durability layer
+Sync engine            →  propagates operations
+Transport layer        →  network abstraction (LAN, future P2P)
+Discovery              →  finds peers
+Recovery engine        →  rebuilds state after interruptions
+```
 
 ---
 
 ## Guarantees
 
-Softadastra Drive is built around strict invariants:
+Softadastra is built on strict invariants:
 
-* No accepted write is ever lost
-* Every operation is persisted before sync
-* Offline peers do not break system consistency
-* All peers converge after reconnection
-* Cloud is never required
-
----
-
-## Scope (MVP)
-
-* 2 devices
-* 1 shared folder
-* LAN only
-* Basic file operations
-* No complex conflict resolution
+| Guarantee | Description |
+|-----------|-------------|
+| **No write is ever lost** | Every accepted write is persisted before sync |
+| **Offline safety** | Offline nodes do not break consistency |
+| **Convergence** | All peers converge after reconnection |
+| **Network-optional** | The network is never required for correctness |
 
 ---
 
@@ -162,69 +133,57 @@ Softadastra Drive is built around strict invariants:
 
 Softadastra is the **Sync OS of the real internet**.
 
-This means:
-
-* Systems must work under failure
-* Connectivity is unreliable by default
-* The network is an optimization, not a dependency
+- local is the source of truth
+- the network is an optimization
+- systems must work under failure
 
 ---
 
-## Installation (coming soon)
+## Installation
 
 ```bash
-# example (future CLI)
-vix add @softadastra/drive
-## vix run drive --folder ~/SoftadastraDrive
+vix add @softadastra/sync
 ```
+
+> Full installation guide coming soon.
 
 ---
 
 ## Roadmap
 
-* Multi-device sync
-* Delta-based transfer
-* Conflict resolution strategies
-* Encryption layer
-* SDK integration
-* Cross-platform support
+- [ ] Multi-device synchronization
+- [ ] Delta-based replication
+- [ ] Conflict resolution strategies
+- [ ] Encryption layer
+- [ ] SDK and APIs
+- [ ] Cross-platform support
 
 ---
 
 ## Vision
 
-Softadastra Drive is not the product.
+Softadastra is not an application. It is a **foundational layer** — a system that enables:
 
-It is the **proof**.
-
-From this proof will emerge:
-
-* SDKs
-* Platforms
-* Offline-first applications
-* A new standard for synchronization
+- offline-first applications
+- resilient infrastructure
+- decentralized data systems
 
 ---
 
 ## Contributing
 
-This project is early and focused.
+Focus areas:
 
-Contributions should prioritize:
-
-* Correctness under failure
-* Simplicity over features
-* Deterministic behavior
+- **correctness** under failure
+- **deterministic** behavior
+- **simplicity**
 
 ---
 
 ## License
 
-TBD
+MIT
 
 ---
 
-## Final note
-
-> Softadastra Drive is not trying to replace the cloud.
-> It is proving that the cloud is optional.
+> *The network is unreliable. Systems should not be.*
