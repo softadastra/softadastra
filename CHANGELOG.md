@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.9.4]
+
+### Fixes
+
+- fix(wal): include missing `<cstddef>` for `std::size_t`
+  Resolves compilation errors on AppleClang and other strict toolchains where `std::size_t` was not available through `<cstdint>`.
+
+- fix(wal): restore cross-platform build compatibility
+  Ensures WAL encoding/decoding components compile correctly on macOS, Linux, and Windows.
+
+### Improvements
+
+- improve portability of WAL module
+  Aligns header includes with standard C++ requirements for better compiler compatibility.
+
+### Internal
+
+- refactor(wal): clarify header dependencies
+  Explicitly include required standard headers instead of relying on indirect includes.
+
+---
+
+Softadastra v0.9.4 fixes a critical cross-platform compilation issue and improves standard compliance of the WAL module.
+
 ## [v0.9.3]
 
 ### Improvements
