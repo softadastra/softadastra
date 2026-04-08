@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.9.0]
+
+### Improvements
+
+- improve CMake package correctness
+  Fixed path resolution in the umbrella package to ensure correct loading of module configurations across all platforms.
+
+- improve installation portability
+  The umbrella config now resolves installed module paths reliably without duplicating the install prefix.
+
+- improve cross-platform compatibility
+  Consistent behavior for package loading on Linux, macOS, and Windows.
+
+- improve developer experience
+  `find_package(softadastra CONFIG)` now works out-of-the-box without requiring manual path fixes.
+
+### Fixes
+
+- fix(cmake): resolve invalid include paths in umbrella config
+  Fixes duplicated install prefix issue that caused invalid paths such as:
+  `install//install/lib/cmake/...`
+
+- fix(cmake): restore proper module config loading
+  Ensures all module configs (`core`, `fs`, `wal`, `store`, `sync`, etc.) are correctly included after installation.
+
+### Internal
+
+- refactor(cmake): simplify path resolution in config template
+  Removed incorrect prefix concatenation using `PACKAGE_PREFIX_DIR`.
+
+---
+
+Softadastra v0.9.0 stabilizes the CMake ecosystem and ensures reliable package usage in real-world environments.
+
 ## [v0.8.0]
 
 ### Improvements
