@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.9.5]
+
+### Breaking Changes
+
+- remove app module from core
+  The `modules/app` submodule has been removed from the Softadastra core repository.
+  Softadastra is now strictly a foundation layer and no longer includes any application entry point.
+
+- remove drive-cli from core
+  The `apps/drive-cli` submodule has been removed.
+  Product-level implementations are now separated from the core infrastructure.
+
+### Improvements
+
+- clarify architecture boundaries
+  Softadastra is now fully defined as a pure infrastructure layer:
+  - core modules (wal, sync, transport, etc.)
+  - reusable CLI engine
+  - no product logic
+
+- improve repository structure
+  The repository now focuses exclusively on:
+  - synchronization engine
+  - offline-first primitives
+  - developer-facing modules
+
+- align with platform vision
+  This change prepares Softadastra to act as a foundation similar to:
+  - Stripe (payments infrastructure)
+  - Firebase (backend platform)
+  - Supabase (data infrastructure)
+
+  Products such as Softadastra Drive will live in separate repositories.
+
+### Internal
+
+- clean submodule configuration
+  Removed unused submodules and simplified `.gitmodules`.
+
+- reduce conceptual complexity
+  Eliminated ambiguity between infrastructure and product layers.
+
+
 ## [v0.9.4]
 
 ### Fixes

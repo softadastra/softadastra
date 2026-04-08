@@ -22,14 +22,6 @@
 	path = modules/sync
 	url = git@github.com:softadastra/sync.git
 	branch = dev
-[submodule "modules/app"]
-	path = modules/app
-	url = git@github.com:softadastra/app.git
-	branch = dev
-[submodule "apps/drive-cli"]
-	path = apps/drive-cli
-	url = git@github.com:softadastra/drive-cli.git
-	branch = dev
 [submodule "modules/store"]
 	path = modules/store
 	url = git@github.com:softadastra/store.git
