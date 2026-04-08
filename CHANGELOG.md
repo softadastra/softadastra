@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.9.3]
+
+### Improvements
+
+- improve CI reliability with submodule support
+  CI workflows now fetch all required submodules recursively, ensuring full project structure is available during builds.
+
+- improve build consistency
+  Umbrella build now correctly includes all modules (`core`, `fs`, `wal`, `store`, `sync`, etc.) in CI environments.
+
+- improve cross-environment reproducibility
+  Aligns CI behavior with local development by ensuring modules are always present during configuration.
+
+### Fixes
+
+- fix(ci): resolve missing module targets in CI
+  Fixes failures where modules were skipped (`missing CMakeLists.txt`) due to submodules not being fetched.
+
+- fix(ci): restore correct target resolution in examples
+  Fixes errors like `softadastra::core not found` during example builds and smoke tests.
+
+### Internal
+
+- refactor(ci): enable recursive submodule checkout
+  Updated GitHub Actions checkout step to include:
+  `submodules: recursive`
+
+---
+
+Softadastra v0.9.3 fixes a critical CI issue and ensures all modules are correctly included during automated builds.
+
+
 ## [v0.9.2]
 
 ### Improvements
