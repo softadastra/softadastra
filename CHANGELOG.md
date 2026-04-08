@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [v0.8.0]
+
+### Improvements
+
+- improve CMake umbrella reliability
+  The umbrella package now loads module configurations directly from the install prefix instead of relying on `find_dependency()`.
+  This ensures deterministic behavior across platforms (Linux, macOS, Windows).
+
+- improve package resolution stability
+  Eliminates dependency lookup issues during `find_package(softadastra CONFIG)` in CI and external projects.
+
+- improve cross-platform consistency
+  Unified behavior for package discovery across AppleClang, GCC, and MSVC environments.
+
+- improve developer experience
+  Simplified integration: consumers no longer need to configure `CMAKE_PREFIX_PATH` manually for submodules.
+
+### Fixes
+
+- fix(cmake): resolve missing `softadastra_core` package error
+  Fixes failure where CMake could not locate module configs (`softadastra_coreConfig.cmake`, etc.) during umbrella usage.
+
+- fix(cmake): eliminate fragile dependency resolution
+  Removes indirect dependency resolution via `find_dependency()` which caused inconsistent results depending on environment.
+
+### Internal
+
+- refactor(cmake): switch to direct inclusion of module config files
+  The umbrella now explicitly includes installed module configs from:
+  `lib/cmake/softadastra_*`
+
+- refactor(cmake): simplify CLI module integration
+  CLI config is now conditionally included using the same deterministic mechanism.
+
+---
+
+Softadastra v0.8.0 marks a key milestone toward a **fully deterministic, installable, and portable CMake ecosystem**.
+
 ## [v0.7.0]
 
 ### 🔧 Critical Fixes

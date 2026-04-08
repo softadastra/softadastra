@@ -100,11 +100,11 @@ endif()
 # ========================
 if(SOFTADASTRA_INSTALL)
     if(SOFTADASTRA_BUILD_CLI)
-        set(SOFTADASTRA_UMBRELLA_FIND_CLI
-            "find_dependency(softadastra_cli CONFIG)"
+        set(SOFTADASTRA_UMBRELLA_INCLUDE_CLI
+            "include(\"\${_softadastra_cmake_dir}/softadastra_cli/softadastra_cliConfig.cmake\")"
         )
     else()
-        set(SOFTADASTRA_UMBRELLA_FIND_CLI "")
+        set(SOFTADASTRA_UMBRELLA_INCLUDE_CLI "")
     endif()
 
     write_basic_package_version_file(
@@ -114,10 +114,10 @@ if(SOFTADASTRA_INSTALL)
     )
 
     configure_package_config_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/softadastraConfig.cmake.in"
-      "${CMAKE_CURRENT_BINARY_DIR}/softadastraConfig.cmake"
-      INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/softadastra"
-      PATH_VARS CMAKE_INSTALL_LIBDIR
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/softadastraConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/softadastraConfig.cmake"
+        INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/softadastra"
+        PATH_VARS CMAKE_INSTALL_LIBDIR
     )
 
     install(
