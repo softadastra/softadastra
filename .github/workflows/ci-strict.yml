@@ -42,8 +42,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=${{ matrix.build_examples }} \
-            -DSOFTADASTRA_BUILD_APP=OFF \
-            -DSOFTADASTRA_BUILD_CLI=OFF \
+            -DSOFTADASTRA_BUILD_TESTS=OFF \
+            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_BUILD_APPS=ON \
+            -DSOFTADASTRA_BUILD_CLI_APP=ON \
+            -DSOFTADASTRA_BUILD_NODE_APP=OFF \
             -DSOFTADASTRA_INSTALL=ON \
             -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
 
@@ -57,6 +60,16 @@ jobs:
         shell: bash
         run: |
           cmake --install build
+
+      - name: Smoke test - CLI binary
+        shell: bash
+        run: |
+          "${{ github.workspace }}/install/bin/softadastra" version
+          "${{ github.workspace }}/install/bin/softadastra" help
+          "${{ github.workspace }}/install/bin/softadastra" status
+          "${{ github.workspace }}/install/bin/softadastra" store-put name gaspard
+          "${{ github.workspace }}/install/bin/softadastra" store-get name
+          "${{ github.workspace }}/install/bin/softadastra" sync-status
 
       - name: Smoke test - umbrella package
         shell: bash
@@ -76,12 +89,20 @@ jobs:
           add_executable(softadastra_smoke_umbrella main.cpp)
           target_link_libraries(softadastra_smoke_umbrella PRIVATE
             softadastra::core
+            softadastra::store
+            softadastra::sync
+            softadastra::transport
+            softadastra::discovery
             softadastra::metadata
+            softadastra::cli
           )
           EOF
 
           cat > smoke-umbrella/main.cpp <<'EOF'
           #include <softadastra/core/time/Timestamp.hpp>
+          #include <softadastra/store/core/StoreConfig.hpp>
+          #include <softadastra/sync/core/SyncConfig.hpp>
+          #include <softadastra/cli/cli.hpp>
 
           int main()
           {
@@ -119,9 +140,18 @@ jobs:
 
           cat > smoke-module/main.cpp <<'EOF'
           #include <softadastra/core/time/Timestamp.hpp>
+          #include <softadastra/metadata/core/NodeIdentity.hpp>
 
           int main()
           {
+            softadastra::metadata::core::NodeIdentity identity;
+            identity.node_id = "node-1";
+
+            if (!identity.valid())
+            {
+              return 1;
+            }
+
             return softadastra::core::time::Timestamp::now().is_valid() ? 0 : 1;
           }
           EOF

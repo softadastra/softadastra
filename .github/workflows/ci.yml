@@ -42,8 +42,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
-            -DSOFTADASTRA_BUILD_APP=OFF \
-            -DSOFTADASTRA_BUILD_CLI=OFF \
+            -DSOFTADASTRA_BUILD_TESTS=OFF \
+            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_BUILD_APPS=ON \
+            -DSOFTADASTRA_BUILD_CLI_APP=ON \
+            -DSOFTADASTRA_BUILD_NODE_APP=OFF \
             -DSOFTADASTRA_INSTALL=ON
 
       - name: Build
@@ -56,6 +59,22 @@ jobs:
         shell: bash
         run: |
           cmake --install build
+
+      - name: Smoke test - CLI binary
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            CLI="${{ github.workspace }}/install/bin/softadastra.exe"
+          else
+            CLI="${{ github.workspace }}/install/bin/softadastra"
+          fi
+
+          "$CLI" version
+          "$CLI" help
+          "$CLI" status
+          "$CLI" store-put name gaspard
+          "$CLI" store-get name
+          "$CLI" sync-status
 
       - name: Smoke test - consumer project
         shell: bash
@@ -75,12 +94,20 @@ jobs:
           add_executable(softadastra_smoke main.cpp)
           target_link_libraries(softadastra_smoke PRIVATE
             softadastra::core
+            softadastra::store
+            softadastra::sync
+            softadastra::transport
+            softadastra::discovery
             softadastra::metadata
+            softadastra::cli
           )
           EOF
 
           cat > smoke/main.cpp <<'EOF'
           #include <softadastra/core/time/Timestamp.hpp>
+          #include <softadastra/store/core/StoreConfig.hpp>
+          #include <softadastra/sync/core/SyncConfig.hpp>
+          #include <softadastra/cli/cli.hpp>
 
           int main()
           {
