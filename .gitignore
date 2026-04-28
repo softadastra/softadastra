@@ -1,0 +1,24 @@
+/build*/
+out/
+.vscode/
+.idea/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+compile_commands.json
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+cmd.md
+.vix/
+# Build artifacts
+build/
+install/
+smoke/
+smoke-umbrella/
+smoke-module/

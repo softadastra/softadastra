@@ -1,0 +1,16 @@
+@PACKAGE_INIT@
+
+set(_softadastra_cmake_dir "@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake")
+
+include("${_softadastra_cmake_dir}/softadastra_core/softadastra_coreConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_fs/softadastra_fsConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_wal/softadastra_walConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_store/softadastra_storeConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_sync/softadastra_syncConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_transport/softadastra_transportConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_discovery/softadastra_discoveryConfig.cmake")
+include("${_softadastra_cmake_dir}/softadastra_metadata/softadastra_metadataConfig.cmake")
+
+@SOFTADASTRA_UMBRELLA_INCLUDE_CLI@
+
+unset(_softadastra_cmake_dir)
