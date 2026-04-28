@@ -1,0 +1,272 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional tag to build/release (e.g. v0.1.0). If empty, uses the current ref."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    name: build (${{ matrix.softadastraos }} / ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            softadastraos: linux
+            arch: x86_64
+
+          - os: macos-14
+            softadastraos: macos
+            arch: aarch64
+
+          - os: windows-2022
+            softadastraos: windows
+            arch: x86_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Checkout tag (manual input)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git fetch --tags --force
+          git checkout "tags/${{ github.event.inputs.tag }}"
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/install" \
+            -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
+            -DSOFTADASTRA_BUILD_TESTS=OFF \
+            -DSOFTADASTRA_BUILD_CLI=ON \
+            -DSOFTADASTRA_BUILD_APPS=ON \
+            -DSOFTADASTRA_BUILD_CLI_APP=ON \
+            -DSOFTADASTRA_BUILD_NODE_APP=OFF \
+            -DSOFTADASTRA_INSTALL=ON
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --build build -j2
+
+      - name: Install (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install build
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE\install" `
+            -DSOFTADASTRA_BUILD_EXAMPLES=OFF `
+            -DSOFTADASTRA_BUILD_TESTS=OFF `
+            -DSOFTADASTRA_BUILD_CLI=ON `
+            -DSOFTADASTRA_BUILD_APPS=ON `
+            -DSOFTADASTRA_BUILD_CLI_APP=ON `
+            -DSOFTADASTRA_BUILD_NODE_APP=OFF `
+            -DSOFTADASTRA_INSTALL=ON
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build build --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --install build --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate installed CLI (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f install/bin/softadastra
+          install/bin/softadastra version
+          install/bin/softadastra help
+          install/bin/softadastra status
+
+      - name: Validate installed CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (!(Test-Path "install\bin\softadastra.exe")) {
+            Write-Host "softadastra.exe not found"
+            Get-ChildItem -Recurse install | Select-Object FullName
+            exit 1
+          }
+
+          .\install\bin\softadastra.exe version
+          .\install\bin\softadastra.exe help
+          .\install\bin\softadastra.exe status
+
+      - name: Package binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p dist/pkg/bin
+          cp install/bin/softadastra dist/pkg/bin/softadastra
+          chmod +x dist/pkg/bin/softadastra
+
+          cat > dist/pkg/README.txt <<'EOF'
+          Softadastra CLI
+
+          Add bin/ to your PATH or copy bin/softadastra to a directory already in PATH.
+
+          Example:
+            softadastra version
+            softadastra status
+          EOF
+
+          ASSET="softadastra-${{ matrix.softadastraos }}-${{ matrix.arch }}.tar.gz"
+          tar -C dist/pkg -czf "dist/$ASSET" .
+
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\pkg\bin | Out-Null
+          Copy-Item install\bin\softadastra.exe dist\pkg\bin\softadastra.exe
+
+          @"
+          Softadastra CLI
+
+          Add bin\ to your PATH or copy bin\softadastra.exe to a directory already in PATH.
+
+          Example:
+            softadastra version
+            softadastra status
+          "@ | Out-File -FilePath dist\pkg\README.txt -Encoding utf8
+
+          $asset = "softadastra-windows-${{ matrix.arch }}.zip"
+          Compress-Archive -Path dist\pkg\* -DestinationPath "dist\$asset" -Force
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.softadastraos }}-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.softadastraos }}-${{ matrix.arch }}
+          path: |
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+          if-no-files-found: ignore
+
+  publish:
+    name: publish
+    needs: build-release
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-all
+
+      - name: Flatten dist
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p dist
+
+          find dist-all -type f \( -name "softadastra-*.tar.gz" -o -name "softadastra-*.zip" \) -print0 |
+            while IFS= read -r -d '' f; do
+              base="$(basename "$f")"
+              if [ -f "dist/$base" ]; then
+                echo "Asset collision: $base" >&2
+                exit 1
+              fi
+              cp -f "$f" "dist/$base"
+            done
+
+          ls -la dist
+          test "$(ls -A dist | wc -l)" -gt 0
+
+      - name: Generate sha256 files
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cd dist
+          for f in softadastra-*; do
+            [ -f "$f" ] || continue
+            sha256sum "$f" > "$f.sha256"
+          done
+
+          ls -la
+
+      - name: Determine tag
+        id: tag
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: dist/*
