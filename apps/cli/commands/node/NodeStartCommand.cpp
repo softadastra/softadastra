@@ -47,7 +47,7 @@ namespace softadastra::app::cli::commands::node
 
     ui::ok_line(
         std::cout,
-        "Softadastra node started.");
+        "Softadastra node services started for this CLI session.");
 
     ui::kv(
         std::cout,
@@ -68,6 +68,10 @@ namespace softadastra::app::cli::commands::node
         std::cout,
         "metadata",
         runtime_.metadata().running() ? "running" : "stopped");
+
+    ui::tip_line(
+        std::cout,
+        "Use the Softadastra node app for a long-running daemon.");
 
     return cli_types::CliErrorCode::None;
   }

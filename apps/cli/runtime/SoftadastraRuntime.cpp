@@ -12,6 +12,9 @@
 #include "commands/store/StorePutCommand.hpp"
 #include "commands/sync/SyncStatusCommand.hpp"
 #include "commands/sync/SyncTickCommand.hpp"
+#include "commands/node/NodeCommand.hpp"
+#include "commands/store/StoreCommand.hpp"
+#include "commands/sync/SyncCommand.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -306,81 +309,33 @@ namespace softadastra::app::cli
 
     cli_.register_command(
         cli_command::CliCommand{
-            "node-info",
-            "Show local node information",
-            "node-info",
-            cli_types::CliCommandType::Info,
-            {"node"},
-            {}},
-        std::make_shared<node_commands::NodeInfoCommand>(*this));
-
-    cli_.register_command(
-        cli_command::CliCommand{
-            "node-start",
-            "Start local Softadastra node services",
-            "node-start",
-            cli_types::CliCommandType::Admin,
-            {"start"},
-            {}},
-        std::make_shared<node_commands::NodeStartCommand>(*this));
-
-    cli_.register_command(
-        cli_command::CliCommand{
-            "store-put",
-            "Write a key/value pair into the local store",
-            "store-put <key> <value>",
-            cli_types::CliCommandType::Admin,
-            {"put"},
-            {
-                {
-                    "help",
-                    "h",
-                    "Show help for this command",
-                    "",
-                    false,
-                    false,
-                },
-            }},
-        std::make_shared<store_commands::StorePutCommand>(*this));
-
-    cli_.register_command(
-        cli_command::CliCommand{
-            "store-get",
-            "Read one key from the local store",
-            "store-get <key>",
-            cli_types::CliCommandType::Info,
-            {"get"},
-            {
-                {
-                    "help",
-                    "h",
-                    "Show help for this command",
-                    "",
-                    false,
-                    false,
-                },
-            }},
-        std::make_shared<store_commands::StoreGetCommand>(*this));
-
-    cli_.register_command(
-        cli_command::CliCommand{
-            "sync-status",
-            "Show current sync engine state",
-            "sync-status",
-            cli_types::CliCommandType::Info,
-            {},
-            {}},
-        std::make_shared<sync_commands::SyncStatusCommand>(*this));
-
-    cli_.register_command(
-        cli_command::CliCommand{
-            "sync-tick",
-            "Run one manual sync scheduler cycle",
-            "sync-tick",
+            "node",
+            "Manage the local Softadastra node",
+            "node <info|start>",
             cli_types::CliCommandType::Admin,
             {},
             {}},
-        std::make_shared<sync_commands::SyncTickCommand>(*this));
+        std::make_shared<node_commands::NodeCommand>(*this));
+
+    cli_.register_command(
+        cli_command::CliCommand{
+            "store",
+            "Read and write local store values",
+            "store <put|get> [arguments]",
+            cli_types::CliCommandType::Admin,
+            {},
+            {}},
+        std::make_shared<store_commands::StoreCommand>(*this));
+
+    cli_.register_command(
+        cli_command::CliCommand{
+            "sync",
+            "Inspect and run local sync",
+            "sync <status|tick>",
+            cli_types::CliCommandType::Admin,
+            {},
+            {}},
+        std::make_shared<sync_commands::SyncCommand>(*this));
 
     cli_.register_command(
         cli_command::CliCommand{
@@ -392,5 +347,4 @@ namespace softadastra::app::cli
             {}},
         std::make_shared<peers_commands::PeersCommand>(*this));
   }
-
 } // namespace softadastra::app::cli

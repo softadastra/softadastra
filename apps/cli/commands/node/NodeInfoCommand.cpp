@@ -41,11 +41,36 @@ namespace softadastra::app::cli::commands::node
 
     if (!metadata.has_value())
     {
-      ui::err_line(
-          std::cerr,
-          "Unable to read local node metadata.");
+      ui::section(std::cout, "Softadastra node");
 
-      return cli_types::CliErrorCode::CommandExecutionFailed;
+      const std::vector<std::string> headers{
+          "Field",
+          "Value",
+      };
+
+      const std::vector<std::vector<std::string>> rows{
+          {
+              "node_id",
+              runtime_.node_id(),
+          },
+          {
+              "node_running",
+              yes_no(runtime_.node_running()),
+          },
+          {
+              "metadata",
+              "unavailable",
+          },
+      };
+
+      std::cout << "\n"
+                << cli_utils::TableFormatter::format(headers, rows);
+
+      ui::tip_line(
+          std::cout,
+          "Run 'node start' first in interactive mode to refresh live metadata.");
+
+      return cli_types::CliErrorCode::None;
     }
 
     ui::section(std::cout, "Softadastra node");
