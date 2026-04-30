@@ -2,68 +2,71 @@
  * basic_sync.cpp
  */
 
+#include <filesystem>
 #include <iostream>
 
-#include <softadastra/store/core/Operation.hpp>
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-#include <softadastra/store/types/Key.hpp>
-#include <softadastra/store/types/OperationType.hpp>
-#include <softadastra/store/types/Value.hpp>
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
+#include <softadastra/store/Store.hpp>
+#include <softadastra/sync/Sync.hpp>
 
 using namespace softadastra;
 
-store::types::Value make_value(const std::string &s)
-{
-  store::types::Value v;
-  v.data.assign(s.begin(), s.end());
-  return v;
-}
-
 int main()
 {
-  // 1. Store
-  store::core::StoreConfig store_cfg;
-  store_cfg.enable_wal = false;
+  std::cout << "== BASIC SYNC EXAMPLE ==\n";
 
-  store::engine::StoreEngine store(store_cfg);
+  const std::string wal_path = "basic_sync_store.wal";
+  std::filesystem::remove(wal_path);
 
-  // 2. Sync config
-  sync::core::SyncConfig sync_cfg;
-  sync_cfg.node_id = "node-a";
-  sync_cfg.auto_queue = true;
-  sync_cfg.require_ack = true;
+  store::engine::StoreEngine store{
+      store::core::StoreConfig::durable(wal_path)};
 
-  sync::core::SyncContext ctx;
-  ctx.store = &store;
-  ctx.config = &sync_cfg;
+  auto config =
+      sync::core::SyncConfig::durable("node-a");
 
-  sync::engine::SyncEngine engine(ctx);
+  sync::core::SyncContext context{store, config};
 
-  // 3. Create operation
-  store::core::Operation op;
-  op.type = store::types::OperationType::Put;
-  op.key = {"user:1"};
-  op.value = make_value("alice");
-  op.timestamp = 1000;
+  if (!context.is_valid())
+  {
+    std::cerr << "invalid sync context\n";
+    return 1;
+  }
 
-  // 4. Submit
-  auto sync_op = engine.submit_local_operation(op);
+  sync::engine::SyncEngine engine{context};
 
-  std::cout << "Submitted sync_id: " << sync_op.sync_id << "\n";
+  auto operation = store::core::Operation::put(
+      store::types::Key{"user:1"},
+      store::types::Value::from_string("Gaspard"));
 
-  // 5. Get batch
+  auto submitted = engine.submit_local_operation(operation);
+
+  if (submitted.is_err())
+  {
+    std::cerr << "submit failed: "
+              << submitted.error().message()
+              << "\n";
+    return 1;
+  }
+
+  std::cout << "Submitted sync id: "
+            << submitted.value().sync_id
+            << "\n";
+
   auto batch = engine.next_batch();
 
-  std::cout << "Batch size: " << batch.size() << "\n";
+  std::cout << "Batch size: "
+            << batch.size()
+            << "\n";
 
-  // 6. Simulate ack
-  engine.receive_ack(batch[0].operation.sync_id);
+  for (const auto &envelope : batch)
+  {
+    std::cout << "Ready to send: "
+              << envelope.operation.sync_id
+              << " version="
+              << envelope.operation.version
+              << "\n";
+  }
 
-  std::cout << "Ack received\n";
+  std::filesystem::remove(wal_path);
 
   return 0;
 }

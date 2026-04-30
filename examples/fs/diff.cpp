@@ -5,9 +5,7 @@
 #include <iostream>
 #include <thread>
 
-#include <softadastra/fs/snapshot/SnapshotBuilder.hpp>
-#include <softadastra/fs/snapshot/SnapshotDiff.hpp>
-#include <softadastra/fs/types/FileEventType.hpp>
+#include <softadastra/fs/Fs.hpp>
 
 using namespace softadastra::fs;
 
@@ -30,7 +28,7 @@ int main()
     return 1;
   }
 
-  auto before = before_result.value();
+  auto before = std::move(before_result.value());
 
   std::cout << "Modify files now...\n";
   std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -42,32 +40,28 @@ int main()
     return 1;
   }
 
-  auto after = after_result.value();
+  auto after = std::move(after_result.value());
 
-  auto diff = snapshot::SnapshotDiff::compute(
+  auto events = snapshot::SnapshotDiff::compute(
       before.all(),
       after.all());
 
-  for (const auto &c : diff)
+  for (const auto &e : events)
   {
-    std::cout << "Change: ";
+    std::cout << "Change: "
+              << types::to_string(e.type) << " ";
 
-    switch (c.type)
+    // Deleted → current = previous
+    if (e.is_deleted())
     {
-    case types::FileEventType::Created:
-      std::cout << "Created ";
-      break;
-    case types::FileEventType::Updated:
-      std::cout << "Updated ";
-      break;
-    case types::FileEventType::Deleted:
-      std::cout << "Deleted ";
-      break;
+      std::cout << e.current.path.str();
+    }
+    else
+    {
+      std::cout << e.current.path.str();
     }
 
-    std::cout << c.current.path.str();
-
-    std::cout << std::endl;
+    std::cout << "\n";
   }
 
   return 0;

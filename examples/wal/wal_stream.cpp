@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-#include <softadastra/wal/reader/WalReader.hpp>
+#include <softadastra/wal/Wal.hpp>
 
 using namespace softadastra::wal;
 
@@ -14,13 +14,26 @@ int main()
 
   const std::string path = "example_wal.log";
 
-  reader::WalReader reader(path);
+  reader::WalReader reader{path};
 
-  reader.for_each([](const core::WalRecord &r)
-                  { std::cout << "[record] seq=" << r.sequence
-                              << " timestamp=" << r.timestamp
-                              << " payload_size=" << r.payload.size()
-                              << "\n"; });
+  auto result = reader.for_each(
+      [](const core::WalRecord &record)
+      {
+        std::cout << "[record] seq=" << record.sequence
+                  << " type=" << types::to_string(record.type)
+                  << " status=" << types::to_string(record.status)
+                  << " timestamp=" << record.timestamp.millis()
+                  << " payload_size=" << record.payload.size()
+                  << "\n";
+      });
+
+  if (result.is_err())
+  {
+    std::cerr << "Failed to stream WAL: "
+              << result.error().message()
+              << "\n";
+    return 1;
+  }
 
   return 0;
 }

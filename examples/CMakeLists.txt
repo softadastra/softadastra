@@ -8,24 +8,6 @@ function(softadastra_add_example target source_file)
 endfunction()
 
 # ======================================================
-# local_recovery.cpp
-# ======================================================
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/local_recovery.cpp")
-    softadastra_add_example(
-        softadastra_example_local_recovery
-        "${CMAKE_CURRENT_SOURCE_DIR}/local_recovery.cpp"
-    )
-
-    target_link_libraries(softadastra_example_local_recovery
-        PRIVATE
-            softadastra::core
-            softadastra::fs
-            softadastra::wal
-            softadastra::store
-    )
-endif()
-
-# ======================================================
 # Per-module example folders
 # ======================================================
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/CMakeLists.txt")
@@ -58,4 +40,8 @@ endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metadata/CMakeLists.txt")
     add_subdirectory(metadata)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cli/CMakeLists.txt")
+    add_subdirectory(cli)
 endif()

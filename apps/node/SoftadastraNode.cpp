@@ -5,33 +5,49 @@
 #include "SoftadastraNode.hpp"
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <thread>
 
 namespace softadastra::app::node
 {
   namespace fs = std::filesystem;
+  namespace core_time = softadastra::core::time;
+
+  namespace
+  {
+    constexpr const char *DEFAULT_NODE_ID = "node-1";
+    constexpr const char *DEFAULT_VERSION = "0.1.0";
+    constexpr const char *DEFAULT_DISPLAY_NAME = "Softadastra Node";
+
+    constexpr const char *DATA_DIRECTORY = "data";
+    constexpr const char *STORE_WAL_PATH = "data/wal.log";
+
+    constexpr std::uint16_t DISCOVERY_PORT = 9400;
+    constexpr std::uint16_t TRANSPORT_PORT = 9500;
+
+    constexpr std::size_t SYNC_BATCH_SIZE = 64;
+    constexpr std::uint32_t SYNC_MAX_RETRIES = 5;
+
+    constexpr std::size_t TRANSPORT_MAX_FRAME_SIZE = 1024 * 1024;
+    constexpr std::size_t TRANSPORT_MAX_PENDING_MESSAGES = 1024;
+
+    constexpr std::size_t DISCOVERY_POLL_LIMIT = 32;
+    constexpr std::size_t TRANSPORT_POLL_LIMIT = 32;
+  }
 
   SoftadastraNode::SoftadastraNode()
       : store_config_(make_store_config()),
         store_(store_config_),
-        sync_config_(make_sync_config()),
-        sync_context_{},
-        sync_([&]() -> sync_core::SyncContext &
-              {
-                sync_context_.store = &store_;
-                sync_context_.config = &sync_config_;
-                return sync_context_; }()),
+        sync_config_(make_sync_config(DEFAULT_NODE_ID)),
+        sync_context_(store_, sync_config_),
+        sync_(sync_context_),
         scheduler_(sync_),
         transport_config_(make_transport_config()),
-        transport_context_{},
+        transport_context_(transport_config_, sync_),
         transport_backend_(transport_config_),
-        transport_([&]() -> transport_core::TransportContext &
-                   {
-                     transport_context_.config = &transport_config_;
-                     transport_context_.sync = &sync_;
-                     return transport_context_; }(),
-                   transport_backend_),
+        transport_(transport_context_, transport_backend_),
         discovery_options_(make_discovery_options(sync_config_.node_id)),
         discovery_(discovery_options_, transport_),
         metadata_options_(make_metadata_options(sync_config_.node_id)),
@@ -40,10 +56,10 @@ namespace softadastra::app::node
         running_(false)
   {
     valid_ =
-        sync_context_.valid() &&
-        transport_context_.valid() &&
-        discovery_options_.valid() &&
-        metadata_options_.valid();
+        sync_context_.is_valid() &&
+        transport_config_.is_valid() &&
+        discovery_options_.is_valid() &&
+        metadata_options_.is_valid();
   }
 
   SoftadastraNode::~SoftadastraNode()
@@ -51,7 +67,7 @@ namespace softadastra::app::node
     stop();
   }
 
-  bool SoftadastraNode::valid() const noexcept
+  bool SoftadastraNode::is_valid() const noexcept
   {
     return valid_;
   }
@@ -104,7 +120,7 @@ namespace softadastra::app::node
     running_ = false;
   }
 
-  bool SoftadastraNode::running() const noexcept
+  bool SoftadastraNode::is_running() const noexcept
   {
     return running_;
   }
@@ -123,128 +139,130 @@ namespace softadastra::app::node
     std::this_thread::sleep_for(tick_interval_);
   }
 
-  const std::string &SoftadastraNode::node_id() const
+  const std::string &SoftadastraNode::node_id() const noexcept
   {
     return sync_config_.node_id;
   }
 
   store_core::StoreConfig SoftadastraNode::make_store_config()
   {
-    fs::create_directories("data");
+    fs::create_directories(DATA_DIRECTORY);
 
-    store_core::StoreConfig config;
-    config.wal_path = "data/wal.log";
-    config.enable_wal = true;
-    config.initial_capacity = 1024;
-    config.auto_flush = true;
-
-    return config;
+    return store_core::StoreConfig::durable(STORE_WAL_PATH);
   }
 
-  sync_core::SyncConfig SoftadastraNode::make_sync_config()
+  sync_core::SyncConfig SoftadastraNode::make_sync_config(
+      const std::string &node_id)
   {
-    sync_core::SyncConfig config;
+    auto config =
+        sync_core::SyncConfig::durable(node_id);
 
-    config.node_id = "node-1";
-    config.batch_size = 64;
-    config.max_retries = 5;
-    config.retry_interval_ms = 5000;
-    config.ack_timeout_ms = 10000;
+    config.batch_size = SYNC_BATCH_SIZE;
+    config.max_retries = SYNC_MAX_RETRIES;
+    config.retry_interval = core_time::Duration::from_seconds(5);
+    config.ack_timeout = core_time::Duration::from_seconds(10);
     config.auto_queue = true;
     config.require_ack = true;
 
     return config;
   }
 
-  transport_core::TransportConfig SoftadastraNode::make_transport_config()
+  transport_core::TransportConfig
+  SoftadastraNode::make_transport_config()
   {
-    transport_core::TransportConfig config;
+    auto config =
+        transport_core::TransportConfig::local(TRANSPORT_PORT);
 
     config.bind_host = "0.0.0.0";
-    config.bind_port = 9500;
-    config.connect_timeout_ms = 5000;
-    config.read_timeout_ms = 5000;
-    config.write_timeout_ms = 5000;
-    config.max_frame_size = 1024 * 1024;
-    config.max_pending_messages = 1024;
+    config.connect_timeout = core_time::Duration::from_seconds(5);
+    config.read_timeout = core_time::Duration::from_seconds(5);
+    config.write_timeout = core_time::Duration::from_seconds(5);
+    config.max_frame_size = TRANSPORT_MAX_FRAME_SIZE;
+    config.max_pending_messages = TRANSPORT_MAX_PENDING_MESSAGES;
     config.enable_keepalive = true;
-    config.keepalive_interval_ms = 10000;
+    config.keepalive_interval = core_time::Duration::from_seconds(10);
 
     return config;
   }
 
   discovery_service::DiscoveryOptions
-  SoftadastraNode::make_discovery_options(const std::string &node_id)
+  SoftadastraNode::make_discovery_options(
+      const std::string &node_id)
   {
-    discovery_service::DiscoveryOptions options;
+    auto options =
+        discovery_service::DiscoveryOptions::lan(
+            node_id,
+            DISCOVERY_PORT,
+            TRANSPORT_PORT);
 
-    options.node_id = node_id;
-    options.bind_host = "0.0.0.0";
-    options.bind_port = 9400;
-    options.broadcast_host = "255.255.255.255";
-    options.broadcast_port = 9400;
     options.announce_host = "127.0.0.1";
-    options.announce_port = 9500;
-    options.announce_interval_ms = 3000;
-    options.peer_ttl_ms = 15000;
+    options.announce_interval = core_time::Duration::from_seconds(3);
+    options.peer_ttl = core_time::Duration::from_seconds(15);
     options.enable_broadcast = true;
 
     return options;
   }
 
   metadata_service::MetadataOptions
-  SoftadastraNode::make_metadata_options(const std::string &node_id)
+  SoftadastraNode::make_metadata_options(
+      const std::string &node_id)
   {
-    metadata_service::MetadataOptions options;
+    auto options =
+        metadata_service::MetadataOptions::local(
+            node_id,
+            DEFAULT_VERSION);
 
-    options.node_id = node_id;
-    options.display_name = "Softadastra Node";
-    options.version = "0.1.0";
+    options.display_name = DEFAULT_DISPLAY_NAME;
     options.auto_refresh = true;
-    options.refresh_interval_ms = 5000;
+    options.refresh_interval = core_time::Duration::from_seconds(5);
 
     return options;
   }
 
   void SoftadastraNode::tick_discovery()
   {
-    if (!discovery_.running())
+    if (!discovery_.is_running())
     {
       return;
     }
 
-    discovery_.poll_many(32);
+    discovery_.poll_many(DISCOVERY_POLL_LIMIT);
   }
 
   void SoftadastraNode::tick_transport()
   {
-    if (!transport_.running())
+    if (!transport_.is_running())
     {
       return;
     }
 
-    transport_.poll_many(32);
+    transport_.poll_many(TRANSPORT_POLL_LIMIT);
   }
 
   void SoftadastraNode::tick_sync()
   {
-    const auto tick_result = scheduler_.tick(false);
+    const auto tick_result =
+        scheduler_.tick(false);
 
     if (tick_result.batch.empty())
     {
       return;
     }
 
-    const auto peers = transport_.peers().connected_peers();
+    const auto peers =
+        transport_.peers().connected_peers();
 
     for (const auto &peer_session : peers)
     {
-      if (!peer_session.valid() || !peer_session.connected())
+      if (!peer_session.is_valid() ||
+          !peer_session.connected())
       {
         continue;
       }
 
-      transport_.send_sync_batch(peer_session.peer, tick_result.batch);
+      (void)transport_.send_sync_batch(
+          peer_session.peer,
+          tick_result.batch);
     }
   }
 

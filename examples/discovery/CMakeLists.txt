@@ -32,3 +32,23 @@ softadastra_discovery_add_example(
     softadastra_discovery_example_roundtrip_demo
     "${CMAKE_CURRENT_SOURCE_DIR}/discovery_roundtrip_demo.cpp"
 )
+
+softadastra_discovery_add_example(
+    softadastra_discovery_example_codec
+    "${CMAKE_CURRENT_SOURCE_DIR}/discovery_codec.cpp"
+)
+
+softadastra_discovery_add_example(
+    softadastra_discovery_example_engine_setup
+    "${CMAKE_CURRENT_SOURCE_DIR}/discovery_engine_setup.cpp"
+)
+
+softadastra_discovery_add_example(
+    softadastra_discovery_example_registry
+    "${CMAKE_CURRENT_SOURCE_DIR}/discovery_registry.cpp"
+)
+
+softadastra_discovery_add_example(
+    softadastra_discovery_example_service
+    "${CMAKE_CURRENT_SOURCE_DIR}/discovery_service.cpp"
+)

@@ -1,5 +1,16 @@
-/*
- * StatusCommand.hpp
+/**
+ *
+ *  @file StatusCommand.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *
+ *  Softadastra CLI App
+ *
  */
 
 #ifndef SOFTADASTRA_APPS_CLI_STATUS_COMMAND_HPP
@@ -18,25 +29,39 @@ namespace softadastra::app::cli::commands::status
   namespace cli_types = softadastra::cli::types;
 
   /**
-   * @brief Shows the current Softadastra runtime status
+   * @brief Displays the current Softadastra runtime status.
    *
-   * This command inspects the composed runtime:
+   * StatusCommand inspects the composed local runtime and prints a readable
+   * operational summary for developers and operators.
+   *
+   * It reports:
    * - node identity
+   * - runtime health
    * - store state
    * - sync state
-   * - transport peers
-   * - discovery peers
+   * - transport state
+   * - discovery state
    * - metadata state
+   *
+   * The command is read-only. It must not mutate runtime state.
    */
   class StatusCommand final : public cli_command::ICommandHandler
   {
   public:
+    /**
+     * @brief Creates a status command bound to a runtime instance.
+     *
+     * @param runtime Softadastra runtime to inspect.
+     */
     explicit StatusCommand(SoftadastraRuntime &runtime);
 
     /**
-     * @brief Execute the status command
+     * @brief Executes the status command.
+     *
+     * @param command Parsed CLI command.
+     * @return CLI error code.
      */
-    cli_types::CliErrorCode handle(
+    [[nodiscard]] cli_types::CliErrorCode handle(
         const cli_parser::ParsedCommand &command) override;
 
   private:
@@ -45,4 +70,4 @@ namespace softadastra::app::cli::commands::status
 
 } // namespace softadastra::app::cli::commands::status
 
-#endif
+#endif // SOFTADASTRA_APPS_CLI_STATUS_COMMAND_HPP

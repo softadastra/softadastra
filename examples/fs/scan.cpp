@@ -3,7 +3,8 @@
  */
 
 #include <iostream>
-#include <softadastra/fs/scanner/Scanner.hpp>
+
+#include <softadastra/fs/Fs.hpp>
 
 using namespace softadastra::fs;
 
@@ -19,21 +20,23 @@ int main()
 
   auto root = root_result.value();
 
-  scanner::Scanner scanner;
-
-  auto result = scanner.scan(root);
+  auto result = scanner::Scanner::scan(root);
 
   if (result.is_err())
   {
-    std::cerr << "Error\n";
+    std::cerr << "Error: "
+              << result.error().message() << "\n";
     return 1;
   }
 
   const auto &snapshot = result.value();
 
-  for (const auto &[path, file] : snapshot.all())
+  for (const auto &[_, file] : snapshot.all())
   {
-    std::cout << file.path.str() << std::endl;
+    std::cout
+        << types::to_string(file.metadata.type) << " | "
+        << file.path.str() << " | "
+        << file.metadata.size << " bytes\n";
   }
 
   return 0;

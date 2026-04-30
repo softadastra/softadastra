@@ -9,17 +9,10 @@
 #include <string>
 #include <vector>
 
-#include <softadastra/wal/core/WalConfig.hpp>
-#include <softadastra/wal/core/WalRecord.hpp>
-#include <softadastra/wal/reader/WalReader.hpp>
-#include <softadastra/wal/writer/WalWriter.hpp>
+#include <softadastra/wal/Wal.hpp>
 
 using namespace softadastra::wal;
 
-/*
- * Small demo store:
- * key -> raw bytes
- */
 class DemoStore
 {
 public:
@@ -56,16 +49,18 @@ public:
     for (const auto &[key, value] : data_)
     {
       std::cout << key << " => [ ";
+
       for (auto byte : value)
       {
         std::cout << static_cast<int>(byte) << ' ';
       }
+
       std::cout << "]\n";
     }
   }
 
 private:
-  std::map<std::string, std::vector<std::uint8_t>> data_;
+  std::map<std::string, std::vector<std::uint8_t>> data_{};
 };
 
 int main()
@@ -75,55 +70,66 @@ int main()
   const std::string wal_path = "replay_store_example.log";
   std::filesystem::remove(wal_path);
 
-  // 1. Write some records
-  core::WalConfig config;
-  config.path = wal_path;
-  config.auto_flush = true;
+  writer::WalWriter writer{
+      core::WalConfig::durable(wal_path)};
 
-  writer::WalWriter writer(config);
+  auto r1 = writer.append(
+      types::WalRecordType::Put,
+      core::WalRecord::Payload{10, 20, 30});
 
-  core::WalRecord r1;
-  r1.type = types::WalRecordType::Put;
-  r1.timestamp = 1001;
-  r1.payload = {10, 20, 30};
-  writer.append(r1);
+  auto r2 = writer.append(
+      types::WalRecordType::Update,
+      core::WalRecord::Payload{99, 88});
 
-  core::WalRecord r2;
-  r2.type = types::WalRecordType::Update;
-  r2.timestamp = 1002;
-  r2.payload = {99, 88};
-  writer.append(r2);
+  auto r3 = writer.append(
+      types::WalRecordType::Put,
+      core::WalRecord::Payload{7, 8, 9, 10});
 
-  core::WalRecord r3;
-  r3.type = types::WalRecordType::Put;
-  r3.timestamp = 1003;
-  r3.payload = {7, 8, 9, 10};
-  writer.append(r3);
+  if (r1.is_err() || r2.is_err() || r3.is_err())
+  {
+    std::cerr << "Failed to write WAL records\n";
+    return 1;
+  }
 
-  writer.flush();
+  auto flushed = writer.flush();
+
+  if (flushed.is_err())
+  {
+    std::cerr << "Failed to flush WAL: "
+              << flushed.error().message()
+              << "\n";
+    return 1;
+  }
 
   std::cout << "WAL written to: " << wal_path << "\n";
 
-  // 2. Replay into a demo store
-  reader::WalReader reader(wal_path);
   DemoStore store;
-
-  const auto records = reader.read_all();
+  replay::WalReplayer replayer{wal_path};
 
   std::cout << "\n== REPLAYING RECORDS ==\n";
-  for (const auto &record : records)
-  {
-    std::cout << "Applying seq=" << record.sequence
-              << " type=" << static_cast<int>(record.type)
-              << " payload_size=" << record.payload.size()
-              << "\n";
 
-    store.apply(record);
+  auto replay_result = replayer.replay(
+      [&](const core::WalRecord &record)
+      {
+        std::cout << "Applying seq=" << record.sequence
+                  << " type=" << types::to_string(record.type)
+                  << " payload_size=" << record.payload.size()
+                  << "\n";
+
+        store.apply(record);
+      });
+
+  if (replay_result.is_err())
+  {
+    std::cerr << "Replay failed: "
+              << replay_result.error().message()
+              << "\n";
+    return 1;
   }
 
-  // 3. Final store state
   store.print();
 
   std::filesystem::remove(wal_path);
+
   return 0;
 }

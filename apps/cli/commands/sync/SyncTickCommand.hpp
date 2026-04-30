@@ -1,5 +1,16 @@
-/*
- * SyncTickCommand.hpp
+/**
+ *
+ *  @file SyncTickCommand.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *
+ *  Softadastra CLI App
+ *
  */
 
 #ifndef SOFTADASTRA_APPS_CLI_SYNC_TICK_COMMAND_HPP
@@ -18,25 +29,41 @@ namespace softadastra::app::cli::commands::sync
   namespace cli_types = softadastra::cli::types;
 
   /**
-   * @brief Executes one manual sync scheduler cycle
+   * @brief Executes one manual sync scheduler cycle.
+   *
+   * SyncTickCommand manually advances the local sync pipeline once.
+   *
+   * It is useful for:
+   * - debugging sync behavior
+   * - manually flushing pending operations
+   * - testing retry behavior
+   * - observing transport delivery
+   *
+   * The command may mutate sync and transport state by retrying expired
+   * operations, collecting ready batches, and sending them to connected peers.
    *
    * Usage:
-   *   sync-tick
-   *
-   * This command:
-   * - retries expired sync operations
-   * - collects the next batch ready for transport
-   * - sends the batch to connected transport peers
+   * @code
+   * sync-tick
+   * @endcode
    */
   class SyncTickCommand final : public cli_command::ICommandHandler
   {
   public:
+    /**
+     * @brief Creates a sync tick command bound to a runtime instance.
+     *
+     * @param runtime Softadastra runtime containing sync and transport state.
+     */
     explicit SyncTickCommand(SoftadastraRuntime &runtime);
 
     /**
-     * @brief Execute the sync tick command
+     * @brief Executes the sync tick command.
+     *
+     * @param command Parsed CLI command.
+     * @return CLI error code.
      */
-    cli_types::CliErrorCode handle(
+    [[nodiscard]] cli_types::CliErrorCode handle(
         const cli_parser::ParsedCommand &command) override;
 
   private:
@@ -45,4 +72,4 @@ namespace softadastra::app::cli::commands::sync
 
 } // namespace softadastra::app::cli::commands::sync
 
-#endif
+#endif // SOFTADASTRA_APPS_CLI_SYNC_TICK_COMMAND_HPP

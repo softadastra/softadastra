@@ -4,55 +4,51 @@
 
 #include <iostream>
 
-#include <softadastra/transport/backend/TcpTransportBackend.hpp>
-#include <softadastra/transport/client/TransportClient.hpp>
-#include <softadastra/transport/core/PeerInfo.hpp>
-#include <softadastra/transport/core/TransportConfig.hpp>
-#include <softadastra/transport/core/TransportMessage.hpp>
-#include <softadastra/transport/types/MessageType.hpp>
+#include <softadastra/transport/Transport.hpp>
 
 using namespace softadastra;
 
 int main()
 {
-  transport::core::TransportConfig cfg;
-  cfg.bind_host = "0.0.0.0";
-  cfg.bind_port = 9002;
+  std::cout << "== TRANSPORT BASIC CLIENT EXAMPLE ==\n";
 
-  transport::backend::TcpTransportBackend backend(cfg);
+  auto config =
+      transport::core::TransportConfig::local(7001);
+
+  transport::backend::TcpTransportBackend backend{config};
 
   if (!backend.start())
   {
-    std::cerr << "Failed to start backend\n";
+    std::cerr << "failed to start local backend\n";
     return 1;
   }
 
-  transport::client::TransportClient client(backend);
+  transport::client::TransportClient client{backend};
 
-  transport::core::PeerInfo server;
-  server.node_id = "node-server";
-  server.host = "127.0.0.1";
-  server.port = 9000;
+  transport::core::PeerInfo peer{
+      "node-server",
+      "127.0.0.1",
+      7000};
 
-  if (!client.connect(server))
+  if (!client.connect(peer))
   {
-    std::cerr << "Failed to connect to server\n";
+    std::cerr << "failed to connect to peer\n";
+    backend.stop();
     return 1;
   }
 
-  transport::core::TransportMessage msg;
-  msg.type = transport::types::MessageType::Ping;
-  msg.from_node_id = "node-client";
-  msg.to_node_id = "node-server";
-  msg.correlation_id = "ping-1";
-
-  if (!client.send_to(server, msg))
+  if (!client.send_hello(peer, "node-client"))
   {
-    std::cerr << "Send failed\n";
+    std::cerr << "failed to send hello\n";
+    backend.stop();
     return 1;
   }
 
-  std::cout << "Ping sent\n";
+  std::cout << "hello sent to "
+            << peer.node_id
+            << "\n";
+
+  backend.stop();
 
   return 0;
 }

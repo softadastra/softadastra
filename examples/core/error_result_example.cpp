@@ -1,24 +1,21 @@
 #include <iostream>
-
-#include <softadastra/core/types/Result.hpp>
-#include <softadastra/core/errors/Error.hpp>
-#include <softadastra/core/errors/ErrorCode.hpp>
-#include <softadastra/core/errors/Severity.hpp>
+#include <softadastra/core/Core.hpp>
 
 using namespace softadastra::core;
 
-types::Result<int, errors::Error> divide(int a, int b)
+using IntResult = types::Result<int, errors::Error>;
+
+IntResult divide(int a, int b)
 {
   if (b == 0)
   {
-    return types::Result<int, errors::Error>::err(
-        errors::Error(
+    return IntResult::err(
+        errors::Error::make(
             errors::ErrorCode::InvalidArgument,
-            errors::Severity::Error,
             "division by zero"));
   }
 
-  return types::Result<int, errors::Error>::ok(a / b);
+  return IntResult::ok(a / b);
 }
 
 int main()
@@ -27,7 +24,9 @@ int main()
 
   if (res.is_err())
   {
-    std::cout << "Error: " << res.error().message() << "\n";
+    const auto &err = res.error();
+
+    std::cout << "Error: " << err.message() << "\n";
     return 1;
   }
 

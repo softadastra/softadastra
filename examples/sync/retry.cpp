@@ -2,59 +2,62 @@
  * retry.cpp
  */
 
+#include <filesystem>
 #include <iostream>
 
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
-#include <softadastra/sync/scheduler/SyncScheduler.hpp>
+#include <softadastra/store/Store.hpp>
+#include <softadastra/sync/Sync.hpp>
 
 using namespace softadastra;
 
-store::types::Value make_value(const std::string &s)
-{
-  store::types::Value v;
-  v.data.assign(s.begin(), s.end());
-  return v;
-}
-
 int main()
 {
-  store::engine::StoreEngine store({.enable_wal = false});
+  std::cout << "== SYNC RETRY EXAMPLE ==\n";
 
-  sync::core::SyncConfig cfg;
-  cfg.node_id = "node-a";
-  cfg.auto_queue = true;
-  cfg.require_ack = true;
-  cfg.ack_timeout_ms = 1; // force timeout
-  cfg.retry_interval_ms = 1;
+  const std::string wal_path = "retry_store.wal";
+  std::filesystem::remove(wal_path);
 
-  sync::core::SyncContext ctx;
-  ctx.store = &store;
-  ctx.config = &cfg;
+  store::engine::StoreEngine store{
+      store::core::StoreConfig::durable(wal_path)};
 
-  sync::engine::SyncEngine engine(ctx);
-  sync::scheduler::SyncScheduler scheduler(engine);
+  auto config = sync::core::SyncConfig::fast("node-a");
+  config.require_ack = true;
+  config.max_retries = 3;
+  config.ack_timeout = core::time::Duration::from_millis(1);
+  config.retry_interval = core::time::Duration::from_millis(1);
 
-  // Submit
-  store::core::Operation op;
-  op.type = store::types::OperationType::Put;
-  op.key = {"k1"};
-  op.value = make_value("v1");
-  op.timestamp = 1000;
+  sync::core::SyncContext context{store, config};
+  sync::engine::SyncEngine engine{context};
 
-  engine.submit_local_operation(op);
+  auto operation = store::core::Operation::put(
+      store::types::Key{"retry:key"},
+      store::types::Value::from_string("retry-value"));
+
+  auto submitted = engine.submit_local_operation(operation);
+
+  if (submitted.is_err())
+  {
+    std::cerr << "submit failed\n";
+    return 1;
+  }
 
   auto batch = engine.next_batch();
 
-  std::cout << "Sent batch: " << batch.size() << "\n";
+  std::cout << "Initial batch size: "
+            << batch.size()
+            << "\n";
 
-  // Simulate timeout
-  auto retried = scheduler.retry_only();
+  auto retried = engine.retry_expired();
 
-  std::cout << "Retried: " << retried << "\n";
+  std::cout << "Retried count: "
+            << retried
+            << "\n";
+
+  std::cout << "Outbox size: "
+            << engine.state().outbox_size
+            << "\n";
+
+  std::filesystem::remove(wal_path);
 
   return 0;
 }

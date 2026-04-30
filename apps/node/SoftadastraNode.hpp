@@ -1,32 +1,29 @@
-/*
- * SoftadastraNode.hpp
+/**
+ *
+ *  @file SoftadastraNode.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *
+ *  Softadastra Node App
+ *
  */
 
 #ifndef SOFTADASTRA_APPS_NODE_SOFTADASTRA_NODE_HPP
 #define SOFTADASTRA_APPS_NODE_SOFTADASTRA_NODE_HPP
 
 #include <chrono>
-#include <cstdint>
 #include <string>
 
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
-#include <softadastra/sync/scheduler/SyncScheduler.hpp>
-
-#include <softadastra/transport/backend/TcpTransportBackend.hpp>
-#include <softadastra/transport/core/TransportConfig.hpp>
-#include <softadastra/transport/core/TransportContext.hpp>
-#include <softadastra/transport/engine/TransportEngine.hpp>
-
-#include <softadastra/discovery/DiscoveryOptions.hpp>
-#include <softadastra/discovery/DiscoveryService.hpp>
-
-#include <softadastra/metadata/MetadataOptions.hpp>
-#include <softadastra/metadata/MetadataService.hpp>
+#include <softadastra/discovery/Discovery.hpp>
+#include <softadastra/metadata/Metadata.hpp>
+#include <softadastra/store/Store.hpp>
+#include <softadastra/sync/Sync.hpp>
+#include <softadastra/transport/Transport.hpp>
 
 namespace softadastra::app::node
 {
@@ -45,72 +42,203 @@ namespace softadastra::app::node
   namespace metadata_service = softadastra::metadata;
 
   /**
-   * @brief Long-running Softadastra node daemon
+   * @brief Long-running Softadastra node daemon.
    *
-   * Owns and drives the runtime modules:
-   * - store
-   * - sync
-   * - transport
-   * - discovery
-   * - metadata
+   * SoftadastraNode owns and drives the runtime modules required by a local
+   * Softadastra node.
+   *
+   * It owns:
+   * - store engine
+   * - sync engine
+   * - sync scheduler
+   * - transport backend and engine
+   * - discovery service
+   * - metadata service
+   *
+   * The node daemon is responsible for lifecycle orchestration and deterministic
+   * ticking. It does not reimplement module business logic.
    */
   class SoftadastraNode
   {
   public:
+    /**
+     * @brief Creates a Softadastra node daemon.
+     */
     SoftadastraNode();
 
+    /**
+     * @brief Copy construction is disabled.
+     */
     SoftadastraNode(const SoftadastraNode &) = delete;
+
+    /**
+     * @brief Copy assignment is disabled.
+     */
     SoftadastraNode &operator=(const SoftadastraNode &) = delete;
 
+    /**
+     * @brief Move construction is disabled.
+     */
     SoftadastraNode(SoftadastraNode &&) = delete;
+
+    /**
+     * @brief Move assignment is disabled.
+     */
     SoftadastraNode &operator=(SoftadastraNode &&) = delete;
 
     /**
-     * @brief Stop services on destruction
+     * @brief Stops services before destroying the node daemon.
      */
     ~SoftadastraNode();
 
     /**
-     * @brief Return true if the node was initialized correctly
+     * @brief Returns true if the node was initialized correctly.
+     *
+     * @return true when all composed modules are usable.
      */
-    bool valid() const noexcept;
+    [[nodiscard]] bool is_valid() const noexcept;
 
     /**
-     * @brief Start node services
+     * @brief Backward-compatible alias for is_valid().
+     *
+     * @return true when the node is valid.
      */
-    bool start();
+    [[nodiscard]] bool valid() const noexcept
+    {
+      return is_valid();
+    }
 
     /**
-     * @brief Stop node services
+     * @brief Starts node services.
+     *
+     * Services are started in dependency order:
+     * - transport
+     * - discovery
+     * - metadata
+     *
+     * @return true on success.
+     */
+    [[nodiscard]] bool start();
+
+    /**
+     * @brief Stops node services.
+     *
+     * Services are stopped in reverse operational order.
      */
     void stop();
 
     /**
-     * @brief Return true if node services are running
+     * @brief Returns true if node services are running.
+     *
+     * @return true when running.
      */
-    bool running() const noexcept;
+    [[nodiscard]] bool is_running() const noexcept;
 
     /**
-     * @brief Execute one deterministic node cycle
+     * @brief Backward-compatible alias for is_running().
+     *
+     * @return true when running.
+     */
+    [[nodiscard]] bool running() const noexcept
+    {
+      return is_running();
+    }
+
+    /**
+     * @brief Executes one deterministic node cycle.
+     *
+     * A cycle may poll discovery, poll transport, retry sync operations, and
+     * send ready sync batches to connected peers.
      */
     void tick();
 
     /**
-     * @brief Return local node id
+     * @brief Returns the local node id.
+     *
+     * @return Node id.
      */
-    const std::string &node_id() const;
+    [[nodiscard]] const std::string &node_id() const noexcept;
+
+    /**
+     * @brief Returns the configured tick interval.
+     *
+     * @return Tick interval.
+     */
+    [[nodiscard]] std::chrono::milliseconds tick_interval() const noexcept
+    {
+      return tick_interval_;
+    }
+
+    /**
+     * @brief Updates the daemon tick interval.
+     *
+     * Non-positive intervals are ignored.
+     *
+     * @param interval New tick interval.
+     */
+    void set_tick_interval(std::chrono::milliseconds interval) noexcept
+    {
+      if (interval.count() > 0)
+      {
+        tick_interval_ = interval;
+      }
+    }
 
   private:
-    static store_core::StoreConfig make_store_config();
-    static sync_core::SyncConfig make_sync_config();
-    static transport_core::TransportConfig make_transport_config();
-    static discovery_service::DiscoveryOptions make_discovery_options(
-        const std::string &node_id);
-    static metadata_service::MetadataOptions make_metadata_options(
+    /**
+     * @brief Creates the store configuration used by the node.
+     *
+     * @return Store configuration.
+     */
+    [[nodiscard]] static store_core::StoreConfig make_store_config();
+
+    /**
+     * @brief Creates sync configuration for a node id.
+     *
+     * @param node_id Local node id.
+     * @return Sync configuration.
+     */
+    [[nodiscard]] static sync_core::SyncConfig make_sync_config(
         const std::string &node_id);
 
+    /**
+     * @brief Creates transport configuration.
+     *
+     * @return Transport configuration.
+     */
+    [[nodiscard]] static transport_core::TransportConfig make_transport_config();
+
+    /**
+     * @brief Creates discovery options.
+     *
+     * @param node_id Local node id.
+     * @return Discovery options.
+     */
+    [[nodiscard]] static discovery_service::DiscoveryOptions make_discovery_options(
+        const std::string &node_id);
+
+    /**
+     * @brief Creates metadata options.
+     *
+     * @param node_id Local node id.
+     * @return Metadata options.
+     */
+    [[nodiscard]] static metadata_service::MetadataOptions make_metadata_options(
+        const std::string &node_id);
+
+    /**
+     * @brief Advances discovery state once.
+     */
     void tick_discovery();
+
+    /**
+     * @brief Advances transport state once.
+     */
     void tick_transport();
+
+    /**
+     * @brief Advances sync state once.
+     */
     void tick_sync();
 
   private:
@@ -141,4 +269,4 @@ namespace softadastra::app::node
 
 } // namespace softadastra::app::node
 
-#endif
+#endif // SOFTADASTRA_APPS_NODE_SOFTADASTRA_NODE_HPP

@@ -2,106 +2,79 @@
  * sync_bridge.cpp
  */
 
+#include <filesystem>
 #include <iostream>
-#include <thread>
-#include <chrono>
 
-#include <softadastra/store/core/Operation.hpp>
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-#include <softadastra/store/types/Key.hpp>
-#include <softadastra/store/types/OperationType.hpp>
-#include <softadastra/store/types/Value.hpp>
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
-#include <softadastra/transport/backend/TcpTransportBackend.hpp>
-#include <softadastra/transport/core/PeerInfo.hpp>
-#include <softadastra/transport/core/TransportConfig.hpp>
-#include <softadastra/transport/core/TransportContext.hpp>
-#include <softadastra/transport/engine/TransportEngine.hpp>
+#include <softadastra/store/Store.hpp>
+#include <softadastra/sync/Sync.hpp>
+#include <softadastra/transport/Transport.hpp>
 
 using namespace softadastra;
 
-store::types::Value make_value(const std::string &s)
-{
-  store::types::Value v;
-  v.data.assign(s.begin(), s.end());
-  return v;
-}
-
 int main()
 {
-  // ===== STORE =====
-  store::engine::StoreEngine store({.enable_wal = false});
+  std::cout << "== TRANSPORT SYNC BRIDGE EXAMPLE ==\n";
 
-  // ===== SYNC =====
-  sync::core::SyncConfig sync_cfg;
-  sync_cfg.node_id = "node-a";
-  sync_cfg.auto_queue = true;
-  sync_cfg.require_ack = true;
+  const std::string wal_path = "sync_bridge_store.wal";
+  std::filesystem::remove(wal_path);
 
-  sync::core::SyncContext sync_ctx;
-  sync_ctx.store = &store;
-  sync_ctx.config = &sync_cfg;
+  store::engine::StoreEngine store{
+      store::core::StoreConfig::durable(wal_path)};
 
-  sync::engine::SyncEngine sync(sync_ctx);
+  auto sync_config =
+      sync::core::SyncConfig::durable("node-a");
 
-  // ===== TRANSPORT =====
-  transport::core::TransportConfig transport_cfg;
-  transport_cfg.bind_host = "0.0.0.0";
-  transport_cfg.bind_port = 9001;
+  sync::core::SyncContext sync_context{store, sync_config};
+  sync::engine::SyncEngine sync_engine{sync_context};
 
-  transport::core::TransportContext transport_ctx;
-  transport_ctx.config = &transport_cfg;
-  transport_ctx.sync = &sync;
+  auto operation = store::core::Operation::put(
+      store::types::Key{"doc:1"},
+      store::types::Value::from_string("hello from node-a"));
 
-  transport::backend::TcpTransportBackend backend(transport_cfg);
-  transport::engine::TransportEngine engine(transport_ctx, backend);
+  auto submitted =
+      sync_engine.submit_local_operation(operation);
 
-  if (!engine.start())
+  if (submitted.is_err())
   {
-    std::cerr << "Transport failed\n";
+    std::cerr << "failed to submit local operation\n";
+    std::filesystem::remove(wal_path);
     return 1;
   }
 
-  // ===== PEER =====
-  transport::core::PeerInfo peer;
-  peer.node_id = "node-b";
-  peer.host = "127.0.0.1";
-  peer.port = 9000;
+  auto batch =
+      sync_engine.next_batch();
 
-  engine.connect_peer(peer);
-  engine.send_hello(peer);
-
-  // ===== LOCAL OPERATION =====
-  store::core::Operation op;
-  op.type = store::types::OperationType::Put;
-  op.key = {"user:1"};
-  op.value = make_value("alice");
-  op.timestamp = 1000;
-
-  auto sync_op = sync.submit_local_operation(op);
-
-  std::cout << "Local operation created: " << sync_op.sync_id << "\n";
-
-  // ===== SEND LOOP =====
-  while (true)
+  if (batch.empty())
   {
-    // send batch
-    auto batch = sync.next_batch();
-
-    if (!batch.empty())
-    {
-      std::size_t sent = engine.send_sync_batch(peer, batch);
-      std::cout << "Sent batch: " << sent << "\n";
-    }
-
-    // receive
-    engine.poll_many(10);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::cerr << "no sync envelope ready\n";
+    std::filesystem::remove(wal_path);
+    return 1;
   }
+
+  auto payload =
+      transport::dispatcher::MessageDispatcher::encode_sync_operation(
+          batch.front().operation);
+
+  auto message =
+      transport::core::TransportMessage::sync_batch(
+          "node-a",
+          payload);
+
+  message.to_node_id = "node-b";
+  message.correlation_id = batch.front().operation.sync_id;
+
+  auto frame =
+      transport::encoding::MessageEncoder::encode_frame(message);
+
+  std::cout << "sync id: "
+            << batch.front().operation.sync_id
+            << "\n";
+
+  std::cout << "encoded transport frame size: "
+            << frame.size()
+            << "\n";
+
+  std::filesystem::remove(wal_path);
 
   return 0;
 }

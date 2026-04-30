@@ -6,14 +6,17 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
+#include <softadastra/cli/utils/TableFormatter.hpp>
+#include <softadastra/cli/utils/Ui.hpp>
 #include <softadastra/store/types/Key.hpp>
-#include <softadastra/store/utils/Serializer.hpp>
 
 namespace softadastra::app::cli::commands::store
 {
   namespace store_types = softadastra::store::types;
-  namespace store_utils = softadastra::store::utils;
+  namespace cli_utils = softadastra::cli::utils;
+  namespace ui = softadastra::cli::utils::ui;
 
   StoreGetCommand::StoreGetCommand(SoftadastraRuntime &runtime)
       : runtime_(runtime)
@@ -25,7 +28,9 @@ namespace softadastra::app::cli::commands::store
   {
     if (command.args.empty())
     {
-      std::cerr << "Usage: store-get <key>\n";
+      ui::err_line(std::cerr, "Missing key argument.");
+      ui::tip_line(std::cerr, "Usage: store-get <key>");
+
       return cli_types::CliErrorCode::MissingArgument;
     }
 
@@ -33,28 +38,55 @@ namespace softadastra::app::cli::commands::store
 
     if (key_arg.empty())
     {
-      std::cerr << "Key cannot be empty.\n";
+      ui::err_line(std::cerr, "Key cannot be empty.");
+
       return cli_types::CliErrorCode::InvalidArguments;
     }
 
-    store_types::Key key;
-    key.value = key_arg;
+    const store_types::Key key{key_arg};
 
-    const auto entry = runtime_.store().get(key);
+    const auto entry =
+        runtime_.store().get(key);
 
     if (!entry.has_value())
     {
-      std::cerr << "Key not found.\n";
+      ui::err_line(
+          std::cerr,
+          "Key not found: " + key_arg);
+
       return cli_types::CliErrorCode::CommandExecutionFailed;
     }
 
-    std::cout << "Store entry\n\n";
-    std::cout << "key: " << entry->key.value << "\n";
-    std::cout << "value: "
-              << store_utils::Serializer::to_string(entry->value.data)
-              << "\n";
-    std::cout << "version: " << entry->version << "\n";
-    std::cout << "timestamp: " << entry->timestamp << "\n";
+    const auto &stored_entry = entry.value();
+
+    ui::section(std::cout, "Store entry");
+
+    const std::vector<std::string> headers{
+        "Field",
+        "Value",
+    };
+
+    const std::vector<std::vector<std::string>> rows{
+        std::vector<std::string>{
+            "key",
+            stored_entry.key.value(),
+        },
+        std::vector<std::string>{
+            "value",
+            stored_entry.value.to_string(),
+        },
+        std::vector<std::string>{
+            "version",
+            std::to_string(stored_entry.version),
+        },
+        std::vector<std::string>{
+            "timestamp",
+            std::to_string(stored_entry.timestamp.millis()),
+        },
+    };
+
+    std::cout << "\n"
+              << cli_utils::TableFormatter::format(headers, rows);
 
     return cli_types::CliErrorCode::None;
   }

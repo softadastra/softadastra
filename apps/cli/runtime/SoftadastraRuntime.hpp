@@ -1,32 +1,30 @@
-/*
- * SoftadastraRuntime.hpp
+/**
+ *
+ *  @file SoftadastraRuntime.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *
+ *  Softadastra CLI App
+ *
  */
 
 #ifndef SOFTADASTRA_APPS_CLI_SOFTADASTRA_RUNTIME_HPP
 #define SOFTADASTRA_APPS_CLI_SOFTADASTRA_RUNTIME_HPP
 
-#include <cstdint>
 #include <string>
 
 #include <softadastra/cli/cli.hpp>
 
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
-
-#include <softadastra/transport/backend/TcpTransportBackend.hpp>
-#include <softadastra/transport/core/TransportConfig.hpp>
-#include <softadastra/transport/core/TransportContext.hpp>
-#include <softadastra/transport/engine/TransportEngine.hpp>
-
-#include <softadastra/discovery/DiscoveryOptions.hpp>
-#include <softadastra/discovery/DiscoveryService.hpp>
-
-#include <softadastra/metadata/MetadataOptions.hpp>
-#include <softadastra/metadata/MetadataService.hpp>
+#include <softadastra/discovery/Discovery.hpp>
+#include <softadastra/metadata/Metadata.hpp>
+#include <softadastra/store/Store.hpp>
+#include <softadastra/sync/Sync.hpp>
+#include <softadastra/transport/Transport.hpp>
 
 namespace softadastra::app::cli
 {
@@ -44,146 +42,248 @@ namespace softadastra::app::cli
   namespace transport_engine = softadastra::transport::engine;
 
   namespace discovery_service = softadastra::discovery;
-
   namespace metadata_service = softadastra::metadata;
 
   /**
-   * @brief Runtime composition layer for the Softadastra CLI application
+   * @brief Composes the runtime used by the Softadastra CLI application.
    *
-   * This class owns and wires the real Softadastra runtime modules:
-   * - store
-   * - sync
-   * - transport
-   * - discovery
-   * - metadata
-   * - cli
+   * SoftadastraRuntime owns and wires the real Softadastra modules used by the
+   * app-level CLI.
    *
-   * apps/cli must not reimplement engine logic.
-   * It only composes modules and exposes them to CLI commands.
+   * It owns:
+   * - store engine
+   * - sync engine
+   * - transport backend and engine
+   * - discovery service
+   * - metadata service
+   * - CLI service
+   *
+   * The runtime is responsible for dependency wiring only. It does not
+   * reimplement business logic from lower-level modules.
+   *
+   * Commands receive a reference to this runtime and call the relevant module
+   * APIs through explicit accessors.
    */
   class SoftadastraRuntime
   {
   public:
     /**
-     * @brief Build a Softadastra runtime from CLI configuration
+     * @brief Builds a Softadastra runtime from CLI configuration.
+     *
+     * @param cli_config CLI configuration.
      */
     explicit SoftadastraRuntime(const cli_core::CliConfig &cli_config);
 
+    /**
+     * @brief Copy construction is disabled.
+     */
     SoftadastraRuntime(const SoftadastraRuntime &) = delete;
+
+    /**
+     * @brief Copy assignment is disabled.
+     */
     SoftadastraRuntime &operator=(const SoftadastraRuntime &) = delete;
 
+    /**
+     * @brief Move construction is disabled.
+     */
     SoftadastraRuntime(SoftadastraRuntime &&) = delete;
+
+    /**
+     * @brief Move assignment is disabled.
+     */
     SoftadastraRuntime &operator=(SoftadastraRuntime &&) = delete;
 
     /**
-     * @brief Stop runtime services if needed
+     * @brief Stops node services before destroying the runtime.
      */
     ~SoftadastraRuntime();
 
     /**
-     * @brief Return true if the runtime was initialized correctly
+     * @brief Returns true if the runtime was initialized correctly.
+     *
+     * @return true when all composed modules are usable.
      */
-    bool valid() const noexcept;
+    [[nodiscard]] bool is_valid() const noexcept;
 
     /**
-     * @brief Start node-level services
+     * @brief Backward-compatible alias for is_valid().
      *
-     * Starts sync-facing runtime services:
+     * @return true when the runtime is valid.
+     */
+    [[nodiscard]] bool valid() const noexcept
+    {
+      return is_valid();
+    }
+
+    /**
+     * @brief Starts node-level services.
+     *
+     * Services are started in dependency order:
      * - transport
      * - discovery
      * - metadata
+     *
+     * @return true on success.
      */
-    bool start_node();
+    [[nodiscard]] bool start_node();
 
     /**
-     * @brief Stop node-level services
+     * @brief Stops node-level services.
+     *
+     * Services are stopped in reverse operational order.
      */
     void stop_node();
 
     /**
-     * @brief Return true if node-level services are running
+     * @brief Returns true if node-level services are considered running.
+     *
+     * @return true when node services are running.
      */
-    bool node_running() const noexcept;
+    [[nodiscard]] bool node_running() const noexcept;
 
     /**
-     * @brief Return configured local node id
+     * @brief Returns the configured local node id.
+     *
+     * @return Node id.
      */
-    const std::string &node_id() const;
+    [[nodiscard]] const std::string &node_id() const noexcept;
 
     /**
-     * @brief Access CLI service
+     * @brief Returns the CLI service.
+     *
+     * @return CLI service.
      */
-    cli_service::CliService &cli() noexcept;
+    [[nodiscard]] cli_service::CliService &cli() noexcept;
 
     /**
-     * @brief Access CLI service
+     * @brief Returns the CLI service.
+     *
+     * @return CLI service.
      */
-    const cli_service::CliService &cli() const noexcept;
+    [[nodiscard]] const cli_service::CliService &cli() const noexcept;
 
     /**
-     * @brief Access store engine
+     * @brief Returns the local store engine.
+     *
+     * @return Store engine.
      */
-    store_engine::StoreEngine &store() noexcept;
+    [[nodiscard]] store_engine::StoreEngine &store() noexcept;
 
     /**
-     * @brief Access store engine
+     * @brief Returns the local store engine.
+     *
+     * @return Store engine.
      */
-    const store_engine::StoreEngine &store() const noexcept;
+    [[nodiscard]] const store_engine::StoreEngine &store() const noexcept;
 
     /**
-     * @brief Access sync engine
+     * @brief Returns the local sync engine.
+     *
+     * @return Sync engine.
      */
-    sync_engine::SyncEngine &sync() noexcept;
+    [[nodiscard]] sync_engine::SyncEngine &sync() noexcept;
 
     /**
-     * @brief Access sync engine
+     * @brief Returns the local sync engine.
+     *
+     * @return Sync engine.
      */
-    const sync_engine::SyncEngine &sync() const noexcept;
+    [[nodiscard]] const sync_engine::SyncEngine &sync() const noexcept;
 
     /**
-     * @brief Access transport engine
+     * @brief Returns the transport engine.
+     *
+     * @return Transport engine.
      */
-    transport_engine::TransportEngine &transport() noexcept;
+    [[nodiscard]] transport_engine::TransportEngine &transport() noexcept;
 
     /**
-     * @brief Access transport engine
+     * @brief Returns the transport engine.
+     *
+     * @return Transport engine.
      */
-    const transport_engine::TransportEngine &transport() const noexcept;
+    [[nodiscard]] const transport_engine::TransportEngine &transport() const noexcept;
 
     /**
-     * @brief Access discovery service
+     * @brief Returns the discovery service.
+     *
+     * @return Discovery service.
      */
-    discovery_service::DiscoveryService &discovery() noexcept;
+    [[nodiscard]] discovery_service::DiscoveryService &discovery() noexcept;
 
     /**
-     * @brief Access discovery service
+     * @brief Returns the discovery service.
+     *
+     * @return Discovery service.
      */
-    const discovery_service::DiscoveryService &discovery() const noexcept;
+    [[nodiscard]] const discovery_service::DiscoveryService &discovery() const noexcept;
 
     /**
-     * @brief Access metadata service
+     * @brief Returns the metadata service.
+     *
+     * @return Metadata service.
      */
-    metadata_service::MetadataService &metadata() noexcept;
+    [[nodiscard]] metadata_service::MetadataService &metadata() noexcept;
 
     /**
-     * @brief Access metadata service
+     * @brief Returns the metadata service.
+     *
+     * @return Metadata service.
      */
-    const metadata_service::MetadataService &metadata() const noexcept;
+    [[nodiscard]] const metadata_service::MetadataService &metadata() const noexcept;
 
   private:
-    static store_core::StoreConfig make_store_config();
-    static sync_core::SyncConfig make_sync_config();
-    static transport_core::TransportConfig make_transport_config();
-    static discovery_service::DiscoveryOptions make_discovery_options(
+    /**
+     * @brief Creates the store configuration used by the CLI runtime.
+     *
+     * @return Store configuration.
+     */
+    [[nodiscard]] static store_core::StoreConfig make_store_config();
+
+    /**
+     * @brief Creates the sync configuration for a node id.
+     *
+     * @param node_id Local node id.
+     * @return Sync configuration.
+     */
+    [[nodiscard]] static sync_core::SyncConfig make_sync_config(
         const std::string &node_id);
-    static metadata_service::MetadataOptions make_metadata_options(
+
+    /**
+     * @brief Creates the transport configuration used by the CLI runtime.
+     *
+     * @return Transport configuration.
+     */
+    [[nodiscard]] static transport_core::TransportConfig make_transport_config();
+
+    /**
+     * @brief Creates discovery service options.
+     *
+     * @param node_id Local node id.
+     * @return Discovery options.
+     */
+    [[nodiscard]] static discovery_service::DiscoveryOptions make_discovery_options(
+        const std::string &node_id);
+
+    /**
+     * @brief Creates metadata service options.
+     *
+     * @param node_id Local node id.
+     * @param version Runtime version.
+     * @return Metadata options.
+     */
+    [[nodiscard]] static metadata_service::MetadataOptions make_metadata_options(
         const std::string &node_id,
         const std::string &version);
 
+    /**
+     * @brief Registers all app-level commands into the CLI service.
+     */
     void register_commands();
 
   private:
-    cli_core::CliConfig cli_config_;
+    cli_core::CliConfig cli_config_{};
 
     store_core::StoreConfig store_config_;
     store_engine::StoreEngine store_;
@@ -211,4 +311,4 @@ namespace softadastra::app::cli
 
 } // namespace softadastra::app::cli
 
-#endif
+#endif // SOFTADASTRA_APPS_CLI_SOFTADASTRA_RUNTIME_HPP

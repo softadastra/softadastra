@@ -2,60 +2,68 @@
  * remote_apply.cpp
  */
 
+#include <filesystem>
 #include <iostream>
 
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/core/SyncOperation.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
+#include <softadastra/store/Store.hpp>
+#include <softadastra/sync/Sync.hpp>
 
 using namespace softadastra;
 
-store::types::Value make_value(const std::string &s)
-{
-  store::types::Value v;
-  v.data.assign(s.begin(), s.end());
-  return v;
-}
-
 int main()
 {
-  // Node A (receiver)
-  store::engine::StoreEngine store({.enable_wal = false});
+  std::cout << "== REMOTE APPLY EXAMPLE ==\n";
 
-  sync::core::SyncConfig cfg;
-  cfg.node_id = "node-a";
+  const std::string wal_path = "remote_apply_store.wal";
+  std::filesystem::remove(wal_path);
 
-  sync::core::SyncContext ctx;
-  ctx.store = &store;
-  ctx.config = &cfg;
+  store::engine::StoreEngine store{
+      store::core::StoreConfig::durable(wal_path)};
 
-  sync::engine::SyncEngine engine(ctx);
+  auto config =
+      sync::core::SyncConfig::durable("node-local");
 
-  // Simulate remote op from node-b
-  sync::core::SyncOperation remote;
+  sync::core::SyncContext context{store, config};
+  sync::engine::SyncEngine engine{context};
 
-  remote.sync_id = "node-b-1";
-  remote.origin_node_id = "node-b";
-  remote.direction = sync::types::SyncDirection::RemoteToLocal;
+  auto remote_store_operation = store::core::Operation::put(
+      store::types::Key{"remote:user:1"},
+      store::types::Value::from_string("Remote value"));
 
-  remote.op.type = store::types::OperationType::Put;
-  remote.op.key = {"user:42"};
-  remote.op.value = make_value("bob");
-  remote.op.timestamp = 2000;
+  auto remote_sync_operation =
+      sync::core::SyncOperation::remote(
+          "node-remote-1",
+          "node-remote",
+          1,
+          remote_store_operation);
 
-  auto result = engine.receive_remote_operation(remote);
+  auto result =
+      engine.receive_remote_operation(remote_sync_operation);
 
-  std::cout << "Applied: " << result.applied << "\n";
-
-  auto entry = store.get({"user:42"});
-
-  if (entry)
+  if (result.is_err())
   {
-    std::cout << "Value size: " << entry->value.size() << "\n";
+    std::cerr << "remote apply failed: "
+              << result.error().message()
+              << "\n";
+    return 1;
   }
+
+  if (result.value().applied)
+  {
+    std::cout << "Remote operation applied\n";
+  }
+
+  auto entry = store.get(
+      store::types::Key{"remote:user:1"});
+
+  if (entry.has_value())
+  {
+    std::cout << "Stored value: "
+              << entry->value.to_string()
+              << "\n";
+  }
+
+  std::filesystem::remove(wal_path);
 
   return 0;
 }

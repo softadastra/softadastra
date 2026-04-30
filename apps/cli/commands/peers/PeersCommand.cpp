@@ -5,9 +5,33 @@
 #include "commands/peers/PeersCommand.hpp"
 
 #include <iostream>
+#include <string>
+#include <vector>
+
+#include <softadastra/cli/utils/TableFormatter.hpp>
+#include <softadastra/cli/utils/Ui.hpp>
+#include <softadastra/transport/types/PeerState.hpp>
 
 namespace softadastra::app::cli::commands::peers
 {
+  namespace cli_utils = softadastra::cli::utils;
+  namespace ui = softadastra::cli::utils::ui;
+  namespace transport_types = softadastra::transport::types;
+
+  namespace
+  {
+    [[nodiscard]] std::string yes_no(bool value)
+    {
+      return value ? "yes" : "no";
+    }
+
+    template <typename Timestamp>
+    [[nodiscard]] std::string timestamp_to_string(const Timestamp &timestamp)
+    {
+      return std::to_string(timestamp.millis());
+    }
+  }
+
   PeersCommand::PeersCommand(SoftadastraRuntime &runtime)
       : runtime_(runtime)
   {
@@ -29,52 +53,92 @@ namespace softadastra::app::cli::commands::peers
     const auto discovery_peers = runtime_.discovery().peers();
     const auto transport_peers = runtime_.transport().peers().all();
 
-    std::cout << "Softadastra peers\n\n";
+    ui::section(std::cout, "Softadastra peers");
 
-    std::cout << "discovery_running: "
-              << (runtime_.discovery().running() ? "yes" : "no")
-              << "\n";
+    ui::kv(
+        std::cout,
+        "discovery",
+        yes_no(runtime_.discovery().running()));
 
-    std::cout << "transport_running: "
-              << (runtime_.transport().running() ? "yes" : "no")
-              << "\n\n";
+    ui::kv(
+        std::cout,
+        "transport",
+        yes_no(runtime_.transport().running()));
 
-    std::cout << "Discovery peers: "
-              << discovery_peers.size()
-              << "\n";
+    std::cout << "\n";
 
-    for (const auto &peer : discovery_peers)
     {
-      std::cout << "- "
-                << peer.node_id
-                << " "
-                << peer.host
-                << ":"
-                << peer.port
-                << " last_seen_at="
-                << peer.last_seen_at
-                << "\n";
+      ui::section(std::cout, "Discovery peers");
+
+      const std::vector<std::string> headers{
+          "Node",
+          "Host",
+          "Port",
+          "Last seen",
+      };
+
+      std::vector<std::vector<std::string>> rows;
+      rows.reserve(discovery_peers.size());
+
+      for (const auto &peer : discovery_peers)
+      {
+        rows.push_back(std::vector<std::string>{
+            peer.node_id,
+            peer.host,
+            std::to_string(peer.port),
+            timestamp_to_string(peer.last_seen_at),
+        });
+      }
+
+      if (rows.empty())
+      {
+        ui::info_line(std::cout, "No discovery peers found.");
+      }
+      else
+      {
+        std::cout << cli_utils::TableFormatter::format(headers, rows);
+      }
     }
 
-    std::cout << "\nTransport peers: "
-              << transport_peers.size()
-              << "\n";
+    std::cout << "\n";
 
-    for (const auto &session : transport_peers)
     {
-      std::cout << "- "
-                << session.peer.node_id
-                << " "
-                << session.peer.host
-                << ":"
-                << session.peer.port
-                << " connected="
-                << (session.connected() ? "yes" : "no")
-                << " last_seen_at="
-                << session.last_seen_at
-                << " errors="
-                << session.error_count
-                << "\n";
+      ui::section(std::cout, "Transport peers");
+
+      const std::vector<std::string> headers{
+          "Node",
+          "Host",
+          "Port",
+          "State",
+          "Connected",
+          "Last seen",
+          "Errors",
+      };
+
+      std::vector<std::vector<std::string>> rows;
+      rows.reserve(transport_peers.size());
+
+      for (const auto &session : transport_peers)
+      {
+        rows.push_back(std::vector<std::string>{
+            session.peer.node_id,
+            session.peer.host,
+            std::to_string(session.peer.port),
+            std::string(transport_types::to_string(session.state)),
+            yes_no(session.connected()),
+            timestamp_to_string(session.last_seen_at),
+            std::to_string(session.error_count),
+        });
+      }
+
+      if (rows.empty())
+      {
+        ui::info_line(std::cout, "No transport peers found.");
+      }
+      else
+      {
+        std::cout << cli_utils::TableFormatter::format(headers, rows);
+      }
     }
 
     return cli_types::CliErrorCode::None;

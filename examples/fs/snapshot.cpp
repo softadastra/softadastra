@@ -3,7 +3,8 @@
  */
 
 #include <iostream>
-#include <softadastra/fs/snapshot/SnapshotBuilder.hpp>
+
+#include <softadastra/fs/Fs.hpp>
 
 using namespace softadastra::fs;
 
@@ -23,7 +24,7 @@ int main()
 
   if (result.is_err())
   {
-    std::cerr << "Error: " << result.error().message() << std::endl;
+    std::cerr << "Error: " << result.error().message() << "\n";
     return 1;
   }
 
@@ -31,7 +32,10 @@ int main()
 
   for (const auto &[_, state] : snap.all())
   {
-    std::cout << state.path.str() << std::endl;
+    std::cout
+        << types::to_string(state.metadata.type) << " | "
+        << state.path.str() << " | "
+        << state.metadata.size << " bytes\n";
   }
 
   return 0;

@@ -2,16 +2,11 @@
  * wal_event.cpp
  */
 
-#include <iostream>
 #include <filesystem>
+#include <iostream>
+#include <optional>
 
-#include <softadastra/fs/events/FileEvent.hpp>
-#include <softadastra/fs/path/Path.hpp>
-#include <softadastra/fs/state/FileMetadata.hpp>
-#include <softadastra/fs/types/FileType.hpp>
-
-#include <softadastra/wal/writer/WalWriter.hpp>
-#include <softadastra/wal/utils/FileEventSerializer.hpp>
+#include <softadastra/wal/Wal.hpp>
 
 using namespace softadastra;
 
@@ -22,34 +17,45 @@ int main()
   const std::string path = "event_wal.log";
   std::filesystem::remove(path);
 
-  wal::core::WalConfig config;
-  config.path = path;
-  config.auto_flush = true;
+  wal::writer::WalWriter writer{
+      wal::core::WalConfig::durable(path)};
 
-  wal::writer::WalWriter writer(config);
+  auto path_result = fs::path::Path::from("docs/file.txt");
 
-  auto p = fs::path::Path::from("docs/file.txt").value();
+  if (path_result.is_err())
+  {
+    std::cerr << "Invalid path: "
+              << path_result.error().message()
+              << "\n";
+    return 1;
+  }
 
-  fs::state::FileMetadata meta;
-  meta.type = fs::types::FileType::File;
+  fs::state::FileMetadata metadata{};
+  metadata.type = fs::types::FileType::File;
+  metadata.size = 128;
+  metadata.modified = core::time::Timestamp::now();
 
-  fs::state::FileState state{p, meta, std::nullopt};
+  fs::state::FileState state{
+      path_result.value(),
+      metadata,
+      std::nullopt};
 
   fs::events::FileEvent event{
       fs::types::FileEventType::Created,
       state,
       std::nullopt};
 
-  wal::core::WalRecord record;
-  record.type = wal::types::WalRecordType::Put;
-  record.timestamp = 123456;
+  auto result = writer.append_event(event);
 
-  record.payload =
-      wal::utils::FileEventSerializer::serialize(event);
+  if (result.is_err())
+  {
+    std::cerr << "Failed to append event: "
+              << result.error().message()
+              << "\n";
+    return 1;
+  }
 
-  auto seq = writer.append(record);
-
-  std::cout << "Event written with seq=" << seq << "\n";
+  std::cout << "Event written with seq=" << result.value() << "\n";
 
   return 0;
 }

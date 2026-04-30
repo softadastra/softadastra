@@ -24,3 +24,18 @@ softadastra_store_add_example(
     softadastra_store_example_wal_usage
     "${CMAKE_CURRENT_SOURCE_DIR}/wal_usage.cpp"
 )
+
+softadastra_store_add_example(
+    softadastra_store_example_memory_only
+    "${CMAKE_CURRENT_SOURCE_DIR}/memory_only.cpp"
+)
+
+softadastra_store_add_example(
+    softadastra_store_example_operation_codec
+    "${CMAKE_CURRENT_SOURCE_DIR}/operation_codec.cpp"
+)
+
+softadastra_store_add_example(
+    softadastra_store_example_snapshot_from_wal
+    "${CMAKE_CURRENT_SOURCE_DIR}/snapshot_from_wal.cpp"
+)

@@ -1,5 +1,16 @@
-/*
- * PeersCommand.hpp
+/**
+ *
+ *  @file PeersCommand.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *
+ *  Softadastra CLI App
+ *
  */
 
 #ifndef SOFTADASTRA_APPS_CLI_PEERS_COMMAND_HPP
@@ -18,20 +29,42 @@ namespace softadastra::app::cli::commands::peers
   namespace cli_types = softadastra::cli::types;
 
   /**
-   * @brief Lists peers known by discovery and transport
+   * @brief Lists peers known by the local Softadastra runtime.
+   *
+   * PeersCommand inspects both discovery and transport peer state and prints a
+   * readable peer summary for operators.
+   *
+   * It reports:
+   * - discovered peers
+   * - transport peers
+   * - peer node ids
+   * - host and port information when available
+   * - peer state when available
+   *
+   * The command is read-only. It must not mutate runtime state.
    *
    * Usage:
-   *   peers
+   * @code
+   * peers
+   * @endcode
    */
   class PeersCommand final : public cli_command::ICommandHandler
   {
   public:
+    /**
+     * @brief Creates a peers command bound to a runtime instance.
+     *
+     * @param runtime Softadastra runtime to inspect.
+     */
     explicit PeersCommand(SoftadastraRuntime &runtime);
 
     /**
-     * @brief Execute the peers command
+     * @brief Executes the peers command.
+     *
+     * @param command Parsed CLI command.
+     * @return CLI error code.
      */
-    cli_types::CliErrorCode handle(
+    [[nodiscard]] cli_types::CliErrorCode handle(
         const cli_parser::ParsedCommand &command) override;
 
   private:
@@ -40,4 +73,4 @@ namespace softadastra::app::cli::commands::peers
 
 } // namespace softadastra::app::cli::commands::peers
 
-#endif
+#endif // SOFTADASTRA_APPS_CLI_PEERS_COMMAND_HPP

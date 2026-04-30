@@ -25,3 +25,23 @@ softadastra_sync_add_example(
     softadastra_sync_example_retry
     "${CMAKE_CURRENT_SOURCE_DIR}/retry.cpp"
 )
+
+softadastra_sync_add_example(
+    softadastra_sync_example_ack_tracker
+    "${CMAKE_CURRENT_SOURCE_DIR}/ack_tracker.cpp"
+)
+
+softadastra_sync_add_example(
+    softadastra_sync_example_conflict_policy
+    "${CMAKE_CURRENT_SOURCE_DIR}/conflict_policy.cpp"
+)
+
+softadastra_sync_add_example(
+    softadastra_sync_example_manual_queue
+    "${CMAKE_CURRENT_SOURCE_DIR}/manual_queue.cpp"
+)
+
+softadastra_sync_add_example(
+    softadastra_sync_example_scheduler_tick
+    "${CMAKE_CURRENT_SOURCE_DIR}/scheduler_tick.cpp"
+)

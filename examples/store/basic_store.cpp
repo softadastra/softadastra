@@ -2,39 +2,71 @@
  * basic_store.cpp
  */
 
+#include <filesystem>
 #include <iostream>
 
-#include <softadastra/store/engine/StoreEngine.hpp>
+#include <softadastra/store/Store.hpp>
 
-using namespace softadastra::store;
+using namespace softadastra;
 
 int main()
 {
-  core::StoreConfig config;
-  config.wal_path = "example.log";
+  std::cout << "== STORE BASIC EXAMPLE ==\n";
 
-  engine::StoreEngine store(config);
+  const std::string wal_path = "basic_store.wal";
+  std::filesystem::remove(wal_path);
 
-  types::Key key;
-  key.value = "username";
+  store::engine::StoreEngine engine{
+      store::core::StoreConfig::durable(wal_path)};
 
-  types::Value value;
-  value.data = {'g', 'a', 's', 'p', 'a', 'r', 'd'};
+  auto put_result = engine.put(
+      store::types::Key{"user:1"},
+      store::types::Value::from_string("Gaspard"));
 
-  // PUT
-  auto res = store.put(key, value);
-  std::cout << "PUT success: " << res.success << "\n";
-
-  // GET
-  auto entry = store.get(key);
-  if (entry)
+  if (put_result.is_err())
   {
-    std::string name(entry->value.data.begin(), entry->value.data.end());
-    std::cout << "GET: " << name << "\n";
+    std::cerr << "put failed: "
+              << put_result.error().message()
+              << "\n";
+    return 1;
   }
 
-  // DELETE
-  store.remove(key);
+  std::cout << "Put version="
+            << put_result.value().version
+            << "\n";
 
-  std::cout << "Example done\n";
+  auto entry = engine.get(store::types::Key{"user:1"});
+
+  if (!entry.has_value())
+  {
+    std::cerr << "entry not found\n";
+    return 1;
+  }
+
+  std::cout << "Entry key="
+            << entry->key.str()
+            << " value="
+            << entry->value.to_string()
+            << " version="
+            << entry->version
+            << "\n";
+
+  auto remove_result = engine.remove(
+      store::types::Key{"user:1"});
+
+  if (remove_result.is_err())
+  {
+    std::cerr << "remove failed: "
+              << remove_result.error().message()
+              << "\n";
+    return 1;
+  }
+
+  std::cout << "Removed="
+            << remove_result.value().deleted
+            << "\n";
+
+  std::filesystem::remove(wal_path);
+
+  return 0;
 }

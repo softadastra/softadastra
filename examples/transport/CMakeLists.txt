@@ -46,3 +46,18 @@ softadastra_transport_add_example(
     softadastra_transport_example_sync_bridge
     "${CMAKE_CURRENT_SOURCE_DIR}/sync_bridge.cpp"
 )
+
+softadastra_transport_add_example(
+    softadastra_transport_example_dispatcher_ping
+    "${CMAKE_CURRENT_SOURCE_DIR}/dispatcher_ping.cpp"
+)
+
+softadastra_transport_add_example(
+    softadastra_transport_example_message_codec
+    "${CMAKE_CURRENT_SOURCE_DIR}/message_codec.cpp"
+)
+
+softadastra_transport_add_example(
+    softadastra_transport_example_peer_registry
+    "${CMAKE_CURRENT_SOURCE_DIR}/peer_registry.cpp"
+)

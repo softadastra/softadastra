@@ -8,14 +8,36 @@
 #include <string>
 #include <vector>
 
+#include <softadastra/cli/utils/TableFormatter.hpp>
+#include <softadastra/cli/utils/Ui.hpp>
 #include <softadastra/store/types/Key.hpp>
 #include <softadastra/store/types/Value.hpp>
-#include <softadastra/store/utils/Serializer.hpp>
 
 namespace softadastra::app::cli::commands::store
 {
   namespace store_types = softadastra::store::types;
-  namespace store_utils = softadastra::store::utils;
+  namespace cli_utils = softadastra::cli::utils;
+  namespace ui = softadastra::cli::utils::ui;
+
+  namespace
+  {
+    [[nodiscard]] std::string mutation_status(
+        bool created,
+        bool updated)
+    {
+      if (created)
+      {
+        return "created";
+      }
+
+      if (updated)
+      {
+        return "updated";
+      }
+
+      return "unchanged";
+    }
+  }
 
   StorePutCommand::StorePutCommand(SoftadastraRuntime &runtime)
       : runtime_(runtime)
@@ -27,7 +49,9 @@ namespace softadastra::app::cli::commands::store
   {
     if (command.args.size() < 2)
     {
-      std::cerr << "Usage: store-put <key> <value>\n";
+      ui::err_line(std::cerr, "Missing key or value argument.");
+      ui::tip_line(std::cerr, "Usage: store-put <key> <value>");
+
       return cli_types::CliErrorCode::MissingArgument;
     }
 
@@ -36,40 +60,64 @@ namespace softadastra::app::cli::commands::store
 
     if (key_arg.empty())
     {
-      std::cerr << "Key cannot be empty.\n";
+      ui::err_line(std::cerr, "Key cannot be empty.");
+
       return cli_types::CliErrorCode::InvalidArguments;
     }
 
-    store_types::Key key;
-    key.value = key_arg;
+    const store_types::Key key{key_arg};
+    const store_types::Value value =
+        store_types::Value::from_string(value_arg);
 
-    store_types::Value value;
-    value.data = store_utils::Serializer::to_bytes(value_arg);
+    const auto result =
+        runtime_.store().put(key, value);
 
-    const auto result = runtime_.store().put(key, value);
-
-    if (!result.success)
+    if (result.is_err())
     {
-      std::cerr << "Failed to write value into store.\n";
+      ui::err_line(
+          std::cerr,
+          "Failed to write value into store.");
+
       return cli_types::CliErrorCode::CommandExecutionFailed;
     }
 
-    std::cout << "Stored value.\n";
-    std::cout << "key: " << key.value << "\n";
-    std::cout << "version: " << result.version << "\n";
+    const auto &apply_result = result.value();
 
-    if (result.created)
+    if (!apply_result.success)
     {
-      std::cout << "status: created\n";
+      ui::err_line(
+          std::cerr,
+          "Store operation was not applied.");
+
+      return cli_types::CliErrorCode::CommandExecutionFailed;
     }
-    else if (result.updated)
-    {
-      std::cout << "status: updated\n";
-    }
-    else
-    {
-      std::cout << "status: unchanged\n";
-    }
+
+    ui::ok_line(std::cout, "Stored value.");
+
+    const std::vector<std::string> headers{
+        "Field",
+        "Value",
+    };
+
+    const std::vector<std::vector<std::string>> rows{
+        {
+            "key",
+            key.value(),
+        },
+        {
+            "version",
+            std::to_string(apply_result.version),
+        },
+        {
+            "status",
+            mutation_status(
+                apply_result.created,
+                apply_result.updated),
+        },
+    };
+
+    std::cout << "\n"
+              << cli_utils::TableFormatter::format(headers, rows);
 
     return cli_types::CliErrorCode::None;
   }

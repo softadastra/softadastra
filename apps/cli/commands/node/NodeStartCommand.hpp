@@ -1,5 +1,16 @@
-/*
- * NodeStartCommand.hpp
+/**
+ *
+ *  @file NodeStartCommand.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *
+ *  Softadastra CLI App
+ *
  */
 
 #ifndef SOFTADASTRA_APPS_CLI_NODE_START_COMMAND_HPP
@@ -18,22 +29,41 @@ namespace softadastra::app::cli::commands::node
   namespace cli_types = softadastra::cli::types;
 
   /**
-   * @brief Starts the local Softadastra node services
+   * @brief Starts the local Softadastra node services.
    *
-   * Starts:
-   * - transport
-   * - discovery
-   * - metadata
+   * NodeStartCommand starts the composed local runtime services required for a
+   * Softadastra node to participate in the local-first infrastructure.
+   *
+   * It starts:
+   * - transport service
+   * - discovery service
+   * - metadata service
+   *
+   * The command is operational and may mutate runtime state by transitioning
+   * services from stopped to running.
+   *
+   * Usage:
+   * @code
+   * node-start
+   * @endcode
    */
   class NodeStartCommand final : public cli_command::ICommandHandler
   {
   public:
+    /**
+     * @brief Creates a node start command bound to a runtime instance.
+     *
+     * @param runtime Softadastra runtime to start.
+     */
     explicit NodeStartCommand(SoftadastraRuntime &runtime);
 
     /**
-     * @brief Execute the node start command
+     * @brief Executes the node start command.
+     *
+     * @param command Parsed CLI command.
+     * @return CLI error code.
      */
-    cli_types::CliErrorCode handle(
+    [[nodiscard]] cli_types::CliErrorCode handle(
         const cli_parser::ParsedCommand &command) override;
 
   private:
@@ -42,4 +72,4 @@ namespace softadastra::app::cli::commands::node
 
 } // namespace softadastra::app::cli::commands::node
 
-#endif
+#endif // SOFTADASTRA_APPS_CLI_NODE_START_COMMAND_HPP

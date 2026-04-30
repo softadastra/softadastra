@@ -2,11 +2,10 @@
  * wal_write.cpp
  */
 
-#include <iostream>
 #include <filesystem>
+#include <iostream>
 
-#include <softadastra/wal/writer/WalWriter.hpp>
-#include <softadastra/wal/core/WalRecord.hpp>
+#include <softadastra/wal/Wal.hpp>
 
 using namespace softadastra::wal;
 
@@ -17,33 +16,46 @@ int main()
   const std::string path = "example_wal.log";
   std::filesystem::remove(path);
 
-  core::WalConfig config;
-  config.path = path;
-  config.auto_flush = true;
+  writer::WalWriter writer{
+      core::WalConfig::durable(path)};
 
-  writer::WalWriter writer(config);
+  auto first = writer.append(
+      types::WalRecordType::Put,
+      core::WalRecord::Payload{1, 2, 3});
 
-  // Record 1
-  core::WalRecord r1;
-  r1.type = types::WalRecordType::Put;
-  r1.timestamp = 1000;
-  r1.payload = {1, 2, 3};
+  if (first.is_err())
+  {
+    std::cerr << "Failed to write first record: "
+              << first.error().message()
+              << "\n";
+    return 1;
+  }
 
-  auto seq1 = writer.append(r1);
+  std::cout << "Written record seq=" << first.value() << "\n";
 
-  std::cout << "Written record seq=" << seq1 << "\n";
+  auto second = writer.append(
+      types::WalRecordType::Update,
+      core::WalRecord::Payload{4, 5});
 
-  // Record 2
-  core::WalRecord r2;
-  r2.type = types::WalRecordType::Update;
-  r2.timestamp = 2000;
-  r2.payload = {4, 5};
+  if (second.is_err())
+  {
+    std::cerr << "Failed to write second record: "
+              << second.error().message()
+              << "\n";
+    return 1;
+  }
 
-  auto seq2 = writer.append(r2);
+  std::cout << "Written record seq=" << second.value() << "\n";
 
-  std::cout << "Written record seq=" << seq2 << "\n";
+  auto flushed = writer.flush();
 
-  writer.flush();
+  if (flushed.is_err())
+  {
+    std::cerr << "Failed to flush WAL: "
+              << flushed.error().message()
+              << "\n";
+    return 1;
+  }
 
   std::cout << "WAL written to: " << path << "\n";
 

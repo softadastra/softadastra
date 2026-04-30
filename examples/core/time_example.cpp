@@ -1,17 +1,20 @@
 #include <iostream>
 
-#include <softadastra/core/time/Timestamp.hpp>
-#include <softadastra/core/time/Duration.hpp>
+#include <softadastra/core/Core.hpp>
 
 using namespace softadastra::core::time;
 
 int main()
 {
-  Timestamp now = Timestamp::now();
-  Duration d = Duration::from_seconds(2);
+  auto now = Timestamp::now();
+  auto d = Duration::from_seconds(2);
 
-  std::cout << "Now: " << now.value() << "\n";
-  std::cout << "Duration(ms): " << d.millis() << "\n";
+  if (now.is_valid())
+  {
+    std::cout << "Now (ms): " << now.millis() << "\n";
+  }
+
+  std::cout << "Duration (ms): " << d.millis() << "\n";
 
   return 0;
 }

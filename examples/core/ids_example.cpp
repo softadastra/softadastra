@@ -1,14 +1,17 @@
 #include <iostream>
 
-#include <softadastra/core/ids/FileId.hpp>
+#include <softadastra/core/Core.hpp>
 
 using namespace softadastra::core::ids;
 
 int main()
 {
-  FileId id = FileId::generate();
+  auto id = FileId::generate();
 
-  std::cout << "FileId: " << id.str() << "\n";
+  if (id.is_valid())
+  {
+    std::cout << "FileId: " << id.str() << "\n";
+  }
 
   return 0;
 }

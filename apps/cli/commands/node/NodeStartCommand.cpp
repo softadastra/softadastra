@@ -6,8 +6,12 @@
 
 #include <iostream>
 
+#include <softadastra/cli/utils/Ui.hpp>
+
 namespace softadastra::app::cli::commands::node
 {
+  namespace ui = softadastra::cli::utils::ui;
+
   NodeStartCommand::NodeStartCommand(SoftadastraRuntime &runtime)
       : runtime_(runtime)
   {
@@ -18,21 +22,52 @@ namespace softadastra::app::cli::commands::node
   {
     if (runtime_.node_running())
     {
-      std::cout << "Softadastra node already running.\n";
+      ui::warn_line(
+          std::cout,
+          "Softadastra node is already running.");
+
+      ui::kv(
+          std::cout,
+          "node_id",
+          runtime_.node_id());
+
       return cli_types::CliErrorCode::None;
     }
 
+    ui::section(std::cout, "Starting Softadastra node");
+
     if (!runtime_.start_node())
     {
-      std::cerr << "Failed to start Softadastra node.\n";
+      ui::err_line(
+          std::cerr,
+          "Failed to start Softadastra node.");
+
       return cli_types::CliErrorCode::CommandExecutionFailed;
     }
 
-    std::cout << "Softadastra node started.\n";
-    std::cout << "node_id: " << runtime_.node_id() << "\n";
-    std::cout << "transport: running\n";
-    std::cout << "discovery: running\n";
-    std::cout << "metadata: running\n";
+    ui::ok_line(
+        std::cout,
+        "Softadastra node started.");
+
+    ui::kv(
+        std::cout,
+        "node_id",
+        runtime_.node_id());
+
+    ui::kv(
+        std::cout,
+        "transport",
+        runtime_.transport().running() ? "running" : "stopped");
+
+    ui::kv(
+        std::cout,
+        "discovery",
+        runtime_.discovery().running() ? "running" : "stopped");
+
+    ui::kv(
+        std::cout,
+        "metadata",
+        runtime_.metadata().running() ? "running" : "stopped");
 
     return cli_types::CliErrorCode::None;
   }

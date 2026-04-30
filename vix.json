@@ -1,7 +1,7 @@
 {
   "name": "softadastra",
   "namespace": "softadastra",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "project",
   "license": "MIT",
   "description": "Softadastra umbrella project for building core modules, optional apps, and top-level examples.",

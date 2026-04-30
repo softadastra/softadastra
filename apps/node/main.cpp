@@ -15,12 +15,17 @@ namespace
   {
     g_stop_requested = 1;
   }
+
+  void install_signal_handlers()
+  {
+    static_cast<void>(std::signal(SIGINT, handle_signal));
+    static_cast<void>(std::signal(SIGTERM, handle_signal));
+  }
 }
 
 int main()
 {
-  std::signal(SIGINT, handle_signal);
-  std::signal(SIGTERM, handle_signal);
+  install_signal_handlers();
 
   softadastra::app::node::SoftadastraNode node;
 
@@ -37,6 +42,7 @@ int main()
   }
 
   std::cout << "Softadastra node running.\n";
+  std::cout << "node_id: " << node.node_id() << "\n";
   std::cout << "Press Ctrl+C to stop.\n";
 
   while (g_stop_requested == 0)
@@ -44,9 +50,11 @@ int main()
     node.tick();
   }
 
+  std::cout << "\nStopping Softadastra node...\n";
+
   node.stop();
 
-  std::cout << "\nSoftadastra node stopped.\n";
+  std::cout << "Softadastra node stopped.\n";
 
   return 0;
 }

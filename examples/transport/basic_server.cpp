@@ -4,57 +4,52 @@
 
 #include <iostream>
 
-#include <softadastra/store/core/StoreConfig.hpp>
-#include <softadastra/store/engine/StoreEngine.hpp>
-#include <softadastra/sync/core/SyncConfig.hpp>
-#include <softadastra/sync/core/SyncContext.hpp>
-#include <softadastra/sync/engine/SyncEngine.hpp>
-#include <softadastra/transport/backend/TcpTransportBackend.hpp>
-#include <softadastra/transport/core/TransportConfig.hpp>
-#include <softadastra/transport/core/TransportContext.hpp>
-#include <softadastra/transport/engine/TransportEngine.hpp>
+#include <softadastra/transport/Transport.hpp>
 
 using namespace softadastra;
 
 int main()
 {
-  // Store
-  store::engine::StoreEngine store({.enable_wal = false});
+  std::cout << "== TRANSPORT BASIC SERVER EXAMPLE ==\n";
 
-  // Sync
-  sync::core::SyncConfig sync_cfg;
-  sync_cfg.node_id = "node-server";
+  auto config =
+      transport::core::TransportConfig::local(7000);
 
-  sync::core::SyncContext sync_ctx;
-  sync_ctx.store = &store;
-  sync_ctx.config = &sync_cfg;
+  transport::backend::TcpTransportBackend backend{config};
+  transport::server::TransportServer server{backend};
 
-  sync::engine::SyncEngine sync(sync_ctx);
-
-  // Transport
-  transport::core::TransportConfig transport_cfg;
-  transport_cfg.bind_host = "0.0.0.0";
-  transport_cfg.bind_port = 9000;
-
-  transport::core::TransportContext transport_ctx;
-  transport_ctx.config = &transport_cfg;
-  transport_ctx.sync = &sync;
-
-  transport::backend::TcpTransportBackend backend(transport_cfg);
-  transport::engine::TransportEngine engine(transport_ctx, backend);
-
-  if (!engine.start())
+  if (!server.start())
   {
-    std::cerr << "Failed to start server\n";
+    std::cerr << "failed to start server\n";
     return 1;
   }
 
-  std::cout << "Server listening on port 9000...\n";
+  std::cout << "server running on "
+            << config.bind_host
+            << ":"
+            << config.bind_port
+            << "\n";
 
-  while (true)
+  std::cout << "polling once...\n";
+
+  auto inbound = server.poll();
+
+  if (inbound.has_value())
   {
-    engine.poll_many(10);
+    std::cout << "received message from: "
+              << inbound->message.from_node_id
+              << "\n";
+
+    std::cout << "message type: "
+              << transport::types::to_string(inbound->message.type)
+              << "\n";
   }
+  else
+  {
+    std::cout << "no inbound message available\n";
+  }
+
+  server.stop();
 
   return 0;
 }

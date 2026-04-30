@@ -2,56 +2,76 @@
  * recovery_demo.cpp
  */
 
+#include <filesystem>
 #include <iostream>
 
-#include <softadastra/store/engine/StoreEngine.hpp>
+#include <softadastra/store/Store.hpp>
 
-using namespace softadastra::store;
+using namespace softadastra;
 
 int main()
 {
-  std::cout << "=== First run ===\n";
+  std::cout << "== STORE RECOVERY DEMO ==\n";
+
+  const std::string wal_path = "store_recovery_demo.wal";
+  std::filesystem::remove(wal_path);
 
   {
-    core::StoreConfig config;
-    config.wal_path = "recovery.log";
+    store::engine::StoreEngine engine{
+        store::core::StoreConfig::durable(wal_path)};
 
-    engine::StoreEngine store(config);
+    auto a = engine.put(
+        store::types::Key{"user:1"},
+        store::types::Value::from_string("Gaspard"));
 
-    types::Key key;
-    key.value = "session";
+    auto b = engine.put(
+        store::types::Key{"user:2"},
+        store::types::Value::from_string("Softadastra"));
 
-    types::Value value;
-    value.data = {42};
+    auto c = engine.put(
+        store::types::Key{"user:1"},
+        store::types::Value::from_string("Gaspard Kirira"));
 
-    store.put(key, value);
+    if (a.is_err() || b.is_err() || c.is_err())
+    {
+      std::cerr << "initial writes failed\n";
+      return 1;
+    }
 
-    std::cout << "Data written\n";
+    std::cout << "Before restart size: "
+              << engine.size()
+              << "\n";
   }
-
-  std::cout << "\n=== Simulating restart ===\n";
 
   {
-    core::StoreConfig config;
-    config.wal_path = "recovery.log";
+    store::engine::StoreEngine recovered{
+        store::core::StoreConfig::durable(wal_path)};
 
-    engine::StoreEngine store(config);
+    std::cout << "After recovery size: "
+              << recovered.size()
+              << "\n";
 
-    types::Key key;
-    key.value = "session";
+    auto entry = recovered.get(
+        store::types::Key{"user:1"});
 
-    auto entry = store.get(key);
-
-    if (entry)
+    if (!entry.has_value())
     {
-      std::cout << "Recovered value: "
-                << (int)entry->value.data[0] << "\n";
+      std::cerr << "recovered entry missing\n";
+      return 1;
     }
-    else
-    {
-      std::cout << "Recovery failed\n";
-    }
+
+    std::cout << "Recovered user:1 => "
+              << entry->value.to_string()
+              << " version="
+              << entry->version
+              << "\n";
+
+    std::cout << "Last recovered sequence: "
+              << recovered.last_recovered_sequence()
+              << "\n";
   }
 
-  std::cout << "Recovery demo done\n";
+  std::filesystem::remove(wal_path);
+
+  return 0;
 }

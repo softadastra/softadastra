@@ -2,33 +2,57 @@
  * wal_usage.cpp
  */
 
+#include <filesystem>
 #include <iostream>
 
-#include <softadastra/wal/writer/WalWriter.hpp>
-#include <softadastra/wal/reader/WalReader.hpp>
+#include <softadastra/store/Store.hpp>
 
-using namespace softadastra::wal;
+using namespace softadastra;
 
 int main()
 {
-  core::WalConfig config;
-  config.path = "wal_example.log";
+  std::cout << "== STORE WAL USAGE EXAMPLE ==\n";
 
-  writer::WalWriter writer(config);
+  const std::string wal_path = "store_wal_usage.wal";
+  std::filesystem::remove(wal_path);
 
-  core::WalRecord record;
-  record.type = types::WalRecordType::Put;
-  record.timestamp = 123;
+  auto config = store::core::StoreConfig::durable(wal_path);
 
-  record.payload = {1, 2, 3, 4};
+  store::engine::StoreEngine engine{config};
 
-  writer.append(record);
+  auto first = engine.put(
+      store::types::Key{"product:1"},
+      store::types::Value::from_string("Laptop"));
 
-  reader::WalReader reader("wal_example.log");
+  auto second = engine.put(
+      store::types::Key{"product:2"},
+      store::types::Value::from_string("Phone"));
 
-  reader.for_each([](const core::WalRecord &r)
-                  { std::cout << "Record seq=" << r.sequence
-                              << " payload size=" << r.payload.size() << "\n"; });
+  auto third = engine.put(
+      store::types::Key{"product:1"},
+      store::types::Value::from_string("Laptop Pro"));
 
-  std::cout << "WAL example done\n";
+  if (first.is_err() || second.is_err() || third.is_err())
+  {
+    std::cerr << "failed to write one or more entries\n";
+    return 1;
+  }
+
+  std::cout << "Current store size: "
+            << engine.size()
+            << "\n";
+
+  for (const auto &[key, entry] : engine.entries())
+  {
+    std::cout << key
+              << " => "
+              << entry.value.to_string()
+              << " version="
+              << entry.version
+              << "\n";
+  }
+
+  std::filesystem::remove(wal_path);
+
+  return 0;
 }

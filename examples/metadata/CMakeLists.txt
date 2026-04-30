@@ -33,3 +33,23 @@ softadastra_metadata_add_example(
     softadastra_metadata_example_registry_demo
     "${CMAKE_CURRENT_SOURCE_DIR}/metadata_registry_demo.cpp"
 )
+
+softadastra_metadata_add_example(
+    softadastra_metadata_example_capabilities
+    "${CMAKE_CURRENT_SOURCE_DIR}/metadata_capabilities.cpp"
+)
+
+softadastra_metadata_add_example(
+    softadastra_metadata_example_custom_provider
+    "${CMAKE_CURRENT_SOURCE_DIR}/metadata_custom_provider.cpp"
+)
+
+softadastra_metadata_add_example(
+    softadastra_metadata_example_registry_filter
+    "${CMAKE_CURRENT_SOURCE_DIR}/metadata_registry_filter.cpp"
+)
+
+softadastra_metadata_add_example(
+    softadastra_metadata_example_service_demo
+    "${CMAKE_CURRENT_SOURCE_DIR}/metadata_service_demo.cpp"
+)
