@@ -67,9 +67,9 @@ jobs:
           "${{ github.workspace }}/install/bin/softadastra" version
           "${{ github.workspace }}/install/bin/softadastra" help
           "${{ github.workspace }}/install/bin/softadastra" status
-          "${{ github.workspace }}/install/bin/softadastra" store-put name gaspard
-          "${{ github.workspace }}/install/bin/softadastra" store-get name
-          "${{ github.workspace }}/install/bin/softadastra" sync-status
+          "${{ github.workspace }}/install/bin/softadastra" store put name gaspard
+          "${{ github.workspace }}/install/bin/softadastra" store get name
+          "${{ github.workspace }}/install/bin/softadastra" sync status
 
       - name: Smoke test - umbrella package
         shell: bash

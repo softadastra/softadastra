@@ -72,9 +72,9 @@ jobs:
           "$CLI" version
           "$CLI" help
           "$CLI" status
-          "$CLI" store-put name gaspard
-          "$CLI" store-get name
-          "$CLI" sync-status
+          "$CLI" store put name gaspard
+          "$CLI" store get name
+          "$CLI" sync status
 
       - name: Smoke test - consumer project
         shell: bash
