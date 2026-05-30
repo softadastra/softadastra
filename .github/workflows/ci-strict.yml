@@ -33,16 +33,55 @@ jobs:
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
 
-      - name: Clean build, install and smoke directories
+      - name: Install Linux dependencies
         shell: bash
         run: |
-          rm -rf build install smoke-umbrella smoke-module
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            ca-certificates \
+            libasio-dev
+
+      - name: Clean build, install, deps and smoke directories
+        shell: bash
+        run: |
+          rm -rf build install deps smoke-umbrella smoke-module
+
+      - name: Fetch vix async dependency
+        shell: bash
+        run: |
+          git clone --depth 1 --branch dev --recurse-submodules https://github.com/vixcpp/async.git deps/async
+          git -C deps/async submodule update --init --recursive --depth 1 || true
+
+      - name: Prepare Asio for async
+        shell: bash
+        run: |
+          mkdir -p deps/async/third_party/asio/include
+          cp -r /usr/include/asio* deps/async/third_party/asio/include/ || true
+          test -f deps/async/third_party/asio/include/asio.hpp
+
+      - name: Build and install vix async dependency
+        shell: bash
+        run: |
+          cmake -S deps/async -B deps/async/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/deps/install" \
+            -DVIX_ASYNC_BUILD_TESTS=OFF \
+            -DVIX_ASYNC_BUILD_EXAMPLES=OFF \
+            -DVIX_ENABLE_SANITIZERS=OFF
+
+          cmake --build deps/async/build -j2
+          cmake --install deps/async/build
 
       - name: Configure
         shell: bash
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/deps/install" \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=${{ matrix.build_examples }} \
             -DSOFTADASTRA_BUILD_TESTS=OFF \
@@ -118,7 +157,7 @@ jobs:
 
           cmake -S smoke-umbrella -B smoke-umbrella/build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install;${{ github.workspace }}/deps/install"
 
           cmake --build smoke-umbrella/build --config ${{ matrix.build_type }}
 
@@ -163,7 +202,7 @@ jobs:
 
           cmake -S smoke-module -B smoke-module/build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install;${{ github.workspace }}/deps/install"
 
           cmake --build smoke-module/build --config ${{ matrix.build_type }}
 

@@ -53,6 +53,60 @@ jobs:
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
 
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            ca-certificates \
+            libasio-dev
+
+      - name: Clean build, install, deps and dist directories
+        shell: bash
+        run: |
+          rm -rf build install deps dist dist-all
+
+      - name: Fetch vix async dependency
+        shell: bash
+        run: |
+          git clone --depth 1 --branch dev --recurse-submodules https://github.com/vixcpp/async.git deps/async
+          git -C deps/async submodule update --init --recursive --depth 1 || true
+
+      - name: Prepare Asio for async
+        shell: bash
+        run: |
+          mkdir -p deps/async/third_party/asio/include
+
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            cp -r /usr/include/asio* deps/async/third_party/asio/include/ || true
+          fi
+
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            curl -L https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz -o asio.tar.gz
+            tar -xzf asio.tar.gz
+            cp -r asio-asio-1-30-2/asio/include/* deps/async/third_party/asio/include/
+          fi
+
+          test -f deps/async/third_party/asio/include/asio.hpp
+
+      - name: Build and install vix async dependency
+        shell: bash
+        run: |
+          cmake -S deps/async -B deps/async/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/deps/install" \
+            -DVIX_ASYNC_BUILD_TESTS=OFF \
+            -DVIX_ASYNC_BUILD_EXAMPLES=OFF \
+            -DVIX_ENABLE_SANITIZERS=OFF
+
+          cmake --build deps/async/build -j2
+          cmake --install deps/async/build
+
       - name: Configure
         shell: bash
         run: |
@@ -60,6 +114,7 @@ jobs:
 
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/deps/install" \
             -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
             -DSOFTADASTRA_BUILD_TESTS=OFF \
