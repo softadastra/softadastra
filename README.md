@@ -37,9 +37,9 @@
 <td valign="middle" width="25%" align="right">
 
 <img
-  src="https://res.cloudinary.com/dwjbed2xb/image/upload/v1767987144/android-chrome-512x512_yjmz55.png"
-  width="260"
-  style="border-radius:50%; object-fit:cover;"
+src="https://res.cloudinary.com/dwjbed2xb/image/upload/v1767987144/android-chrome-512x512_yjmz55.png"
+width="260"
+style="border-radius:50%; object-fit:cover;"
 />
 
 </td>
@@ -48,195 +48,72 @@
 
 > A write accepted locally must remain durable, observable, and eventually synchronizable.
 
-Softadastra is not only a set of libraries. It is a modular runtime with a command-line entry point, internal engines, and applications built on top of them.
+Softadastra is a modular synchronization runtime with a product-level CLI, a long-running node daemon, and reusable C++ engines for durability, storage, synchronization, transport, discovery, and metadata.
 
 ## What Softadastra is
 
-Softadastra is a **real synchronization system** designed around failure.
+Softadastra is a synchronization foundation for software that must continue working when the network is slow, unstable, or unavailable.
 
-It is:
+It provides:
 
-- a **local-first data runtime**
-- a **durable sync engine**
-- a **WAL-backed store**
-- a **peer discovery and transport layer**
-- a **metadata-aware node runtime**
-- a **foundation for resilient applications**
+- a local-first runtime model
+- a WAL-backed durability layer
+- a recoverable key-value store
+- a sync engine with queue, retry, ack, and conflict handling
+- peer transport and local discovery
+- node metadata and observability
+- a product-level CLI entry point
 
-A developer should not need to study every internal module before using it. The final entry point is the `softadastra` CLI, while `modules/` contains the reusable engines.
+A developer should not need to understand every internal module before using Softadastra. The main entry point is the `softadastra` CLI. The `modules/` directory contains the reusable engines that power it.
 
 ## Why Softadastra exists
 
-Most software assumes:
+Most software assumes the server is reachable, the network is stable, and the cloud is the source of truth.
 
-- the internet is stable
-- the server is always reachable
-- the cloud is the source of truth
-- local state is temporary
-- synchronization happens only after the server accepts the write
+That model breaks in real environments.
 
-That model fails in the real world.
+Softadastra is built for systems where:
 
-Softadastra is built for:
-
-- unstable connectivity
-- intermittent networks
-- offline-first environments
-- edge deployments
-- local-first applications
-- systems that must recover after interruption
+- users may go offline
+- networks may be unstable
+- writes must not be lost
+- synchronization may happen later
+- recovery must be deterministic
+- local state must remain useful
 
 > The network is useful, but it must never be required for local correctness.
 
 ## Core model
 
-> **Write locally. Persist first. Sync later.**
+> Write locally. Persist first. Sync later.
 
-Every operation follows this model:
-
-1. Accept the write locally
-2. Persist it durably through the WAL
-3. Apply it to the local store
-4. Queue it for synchronization
-5. Send it when peers are available
-6. Retry if acknowledgement is not received
-7. Converge deterministically after reconnection
-
-The local machine remains usable even when the network is down.
-
-## Key properties
-
-### Local-first by design
-
-Applications can write locally without waiting for a server or a remote peer.
-
-### Durable by default
-
-Accepted operations are persisted before synchronization is attempted.
-
-### Offline-capable synchronization
-
-Nodes can disconnect, continue working, and synchronize later.
-
-### Deterministic convergence
-
-When synchronization resumes, nodes converge according to deterministic conflict rules.
-
-### Observable runtime state
-
-The CLI exposes runtime status, node metadata, store state, sync state, and peer state.
-
-### Modular architecture
-
-Each internal subsystem is isolated and reusable.
-
-### Product-level CLI
-
-The `softadastra` binary provides a simple product-level interface over the internal runtime.
-
-## Architecture
-
-```text
-softadastra/
-├── apps/
-│   ├── cli/          -> final user-facing CLI binary: softadastra
-│   └── node/         -> long-running Softadastra node daemon
-│
-├── modules/
-│   ├── core/         -> Result, Error, StrongType, IDs, time, config
-│   ├── fs/           -> path, snapshot, diff, watcher
-│   ├── wal/          -> write-ahead log, replay, checksum, sequence
-│   ├── store/        -> WAL-backed key/value store
-│   ├── sync/         -> outbox, queue, ack, retry, conflict resolution
-│   ├── transport/    -> async TCP transport, framing, messages, events, ack
-│   ├── discovery/    -> peer discovery over UDP
-│   ├── metadata/     -> node identity, runtime info, capabilities
-│   └── cli/          -> reusable CLI engine
-│
-├── examples/
-├── cmake/
-├── data/
-└── CMakeLists.txt
-```
-
-### Runtime flow
+Every accepted operation follows this flow:
 
 ```text
 Local write
   ↓
-Store operation
-  ↓
 WAL append
   ↓
-In-memory state update
+Local store apply
   ↓
 Sync outbox
-  ↓
-Sync queue
   ↓
 Transport message
   ↓
 Remote peer
   ↓
-Remote store apply
-  ↓
-Acknowledgement
-  ↓
-Retry or complete
+Ack / retry / converge
 ```
 
-## Modules
-
-### `core`
-
-Foundational primitives used across the runtime: `Result`, `Error`, `StrongType`, `Timestamp`, IDs, config helpers, utility types.
-
-### `fs`
-
-Filesystem observation layer: path normalization, snapshot building, snapshot diff, polling watcher, platform watcher backends, file events.
-
-### `wal`
-
-Durability layer: monotonic sequence numbers, binary WAL records, checksums, append-only writer, reader, replayer.
-
-### `store`
-
-Local state engine: key/value operations, WAL-backed persistence, recovery from WAL, materialized in-memory state.
-
-### `sync`
-
-Synchronization engine: local operation submission, outbox, scheduling queue, acknowledgement tracking, retry handling, remote operation application, deterministic conflict resolution.
-
-### `transport`
-
-Peer-to-peer communication layer: async TCP backend, legacy blocking TCP backend, length-prefixed frames, transport messages, transport events, ping/pong, sync batch messages, and acknowledgements.
-
-### `discovery`
-
-Peer discovery layer: UDP discovery backend, announcements, probes, replies, discovered peer registry, transport integration.
-
-### `metadata`
-
-Node metadata layer: node identity, display name, hostname, OS name, version, capabilities, local runtime metadata.
-
-### `cli`
-
-Reusable command-line framework: parser, tokenizer, command registry, handlers, interactive mode, built-in commands, help formatter, table formatter, UI helpers.
+The local machine remains usable even when the network is down.
 
 ## Applications
 
-Softadastra applications live under `apps/`.
+Softadastra exposes two main applications.
 
-### `apps/cli`
+### `softadastra`
 
-Builds the final CLI binary: `softadastra`
-
-The CLI runs in two modes:
-
-- **Single command mode**
-- **Interactive mode**
-
-**Single command mode:**
+The product-level CLI for developers, operators, scripts, and local inspection.
 
 ```bash
 softadastra status
@@ -247,7 +124,7 @@ softadastra sync status
 softadastra peers
 ```
 
-**Interactive mode:**
+Interactive mode:
 
 ```bash
 softadastra
@@ -255,11 +132,7 @@ softadastra
 
 Example session:
 
-```
-Softadastra v0.1.0  CLI
-runtime: local-first node
-exit: Ctrl+D | clear: Ctrl+L | help
-
+```text
 softadastra> help
 softadastra> status
 softadastra> node info
@@ -272,205 +145,141 @@ softadastra> peers
 softadastra> exit
 ```
 
-### `apps/node`
+### `softadastra-node`
 
-Builds the long-running node daemon: `softadastra-node`
+The long-running node daemon.
 
-The node daemon drives: discovery polling, transport polling, sync scheduling, retry processing, peer communication.
+It drives:
 
-> Use the CLI for inspection and manual operations. Use the node daemon for a long-running Softadastra node.
+- discovery polling
+- transport polling
+- sync scheduling
+- retry processing
+- peer communication
+- background runtime services
 
-## CLI commands
+Use `softadastra` for inspection and manual operations. Use `softadastra-node` for a long-running local node.
 
-### Help
+## Architecture
 
-```bash
-softadastra help
+```text
+softadastra/
+├── apps/
+│   ├── cli/          -> final user-facing CLI binary: softadastra
+│   └── node/         -> long-running Softadastra node daemon
+│
+├── modules/
+│   ├── core/         -> foundational primitives
+│   ├── fs/           -> filesystem observation
+│   ├── wal/          -> write-ahead log and replay
+│   ├── store/        -> WAL-backed local state
+│   ├── sync/         -> local-first sync orchestration
+│   ├── transport/    -> peer message delivery
+│   ├── discovery/    -> local peer discovery
+│   ├── metadata/     -> node identity and capabilities
+│   └── cli/          -> reusable CLI framework
+│
+├── examples/
+├── cmake/
+├── data/
+└── CMakeLists.txt
 ```
 
-```
-softadastra
+## Modules
 
-Usage
-  softadastra <command> [options]
+| Module      | Role                                                                        |
+| ----------- | --------------------------------------------------------------------------- |
+| `core`      | Foundational primitives: result types, errors, IDs, time, config, utilities |
+| `fs`        | Filesystem observation: paths, snapshots, diffs, watchers, file events      |
+| `wal`       | Durability: append-only records, sequence numbers, checksums, replay        |
+| `store`     | WAL-backed key-value state with deterministic recovery                      |
+| `sync`      | Outbox, queue, retry, ack tracking, remote apply, conflict policy           |
+| `transport` | Peer message delivery, framing, TCP backend, ping/pong, sync batches        |
+| `discovery` | Local peer discovery through announcements, probes, replies, registry       |
+| `metadata`  | Node identity, runtime information, version, platform, capabilities         |
+| `cli`       | Command parser, registry, handlers, help output, interactive sessions       |
 
-Commands
-  help (h)                Show help information
-  version (v)             Show CLI version
-  exit (quit, q)          Exit the CLI session
-  status                  Show Softadastra runtime status
-  node                    Manage the local Softadastra node
-  store                   Read and write local store values
-  sync                    Inspect and run local sync
-  peers                   List discovery and transport peers
+Each module has its own README. The full documentation lives at [docs.softadastra.com](https://docs.softadastra.com).
 
-Run 'softadastra help <command>' for details.
-```
+## Current guarantees
 
-### Version
+| Guarantee                 | Meaning                                                                   |
+| ------------------------- | ------------------------------------------------------------------------- |
+| Local writes first        | A write does not require a remote server to be accepted locally           |
+| WAL-backed durability     | Accepted operations can be recovered after restart                        |
+| Retryable sync            | Operations can be retried until acknowledged                              |
+| Deterministic recovery    | State can be rebuilt from durable records                                 |
+| Network-optional behavior | The network propagates state, but local correctness does not depend on it |
+| Observable runtime        | CLI commands expose status, peers, sync state, store state, and metadata  |
 
-```bash
-softadastra version
-```
+## What Softadastra is not
 
-### Runtime status
+Softadastra is not:
 
-```bash
-softadastra status
-```
+- a Dropbox clone
+- a Google Drive clone
+- only a database
+- only a networking library
+- only a CLI tool
+- a replacement for application-specific business logic
 
-Shows: node id, node running state, store entries, sync counters, transport state, discovery state, metadata state.
-
-### Node commands
-
-```bash
-# Show node command help
-softadastra node
-
-# Show local node information
-softadastra node info
-
-# Start node services for the current CLI session
-softadastra node start
-```
-
-> `softadastra node start` starts services for the current CLI process only. When the process exits, the runtime stops. For a long-running node, use `softadastra-node`.
-
-### Store commands
-
-```bash
-# Show store command help
-softadastra store
-
-# Write a local key/value pair
-softadastra store put name gaspard
-
-# Read a local key
-softadastra store get name
-```
-
-### Sync commands
-
-```bash
-# Show sync command help
-softadastra sync
-
-# Show sync state
-softadastra sync status
-
-# Run one manual sync scheduler cycle
-softadastra sync tick
-```
-
-### Peer commands
-
-```bash
-# List known discovery and transport peers
-softadastra peers
-```
-
-## Example CLI usage
-
-**Start interactive mode:**
-
-```bash
-softadastra
-```
-
-Then run:
-
-```
-softadastra> status
-softadastra> node info
-softadastra> node start
-softadastra> store put name gaspard
-softadastra> store get name
-softadastra> sync status
-softadastra> sync tick
-softadastra> peers
-softadastra> exit
-```
-
-**Single commands:**
-
-```bash
-softadastra status
-softadastra store put name gaspard
-softadastra store get name
-softadastra sync status
-softadastra sync tick
-```
+Softadastra is the synchronization foundation underneath resilient applications.
 
 ## Build
 
-Softadastra uses CMake internally, but the recommended way to build is through `vix build`.
+Softadastra uses CMake internally. The recommended developer workflow is through Vix.
 
 ```bash
-vix build
+vix build --build-target all -v
 ```
 
-**Build with the CLI application enabled:**
+Build the CLI application:
 
 ```bash
-vix build -- \
+vix build --build-target all -v -- \
   -DSOFTADASTRA_BUILD_APPS=ON \
   -DSOFTADASTRA_BUILD_CLI_APP=ON
 ```
 
-**Build the node daemon too:**
+Build the CLI and node daemon:
 
 ```bash
-vix build -- \
+vix build --build-target all -v -- \
   -DSOFTADASTRA_BUILD_APPS=ON \
   -DSOFTADASTRA_BUILD_CLI_APP=ON \
   -DSOFTADASTRA_BUILD_NODE_APP=ON
 ```
 
-**Build in release mode:**
+Build in release mode:
 
 ```bash
 vix build --preset release
 ```
 
-**Build and export the final executable to the project root:**
+Build with CMake directly:
 
 ```bash
-vix build --bin
-```
-
-**Build only the CLI target:**
-
-```bash
-vix build --build-target softadastra
-```
-
-**Build only the node daemon target:**
-
-```bash
-vix build --build-target softadastra-node -- \
-  -DSOFTADASTRA_BUILD_NODE_APP=ON
-```
-
-### Build with CMake directly
-
-```bash
-# Configure
 cmake -S . -B build \
   -DSOFTADASTRA_BUILD_APPS=ON \
   -DSOFTADASTRA_BUILD_CLI_APP=ON \
   -DSOFTADASTRA_BUILD_NODE_APP=ON
 
-# Build
 cmake --build build
+```
 
-# Run the CLI
+Run the CLI:
+
+```bash
 ./build/apps/cli/softadastra
+```
 
-# Run the node daemon
+Run the node daemon:
+
+```bash
 ./build/apps/node/softadastra-node
 ```
 
-### Installation
+## Installation
 
 ```bash
 cmake --install build
@@ -479,34 +288,25 @@ cmake --install build
 After installation:
 
 ```bash
-softadastra        # CLI
-softadastra-node   # daemon
+softadastra
+softadastra-node
 ```
 
-## Current guarantees
+## Documentation
 
-| Guarantee                         | Meaning                                                        |
-| --------------------------------- | -------------------------------------------------------------- |
-| Local writes are accepted first   | The system does not depend on a remote server to accept writes |
-| WAL-backed durability             | Store operations can be recovered after restart                |
-| Retryable synchronization         | Operations can be retried if acknowledgements are not received |
-| Deterministic conflict resolution | Conflicts are resolved predictably                             |
-| Network-optional behavior         | The network is used for propagation, not for local correctness |
-| Observable state                  | Runtime state can be inspected through the CLI                 |
+For full documentation, visit [docs.softadastra.com](https://docs.softadastra.com).
 
-## What Softadastra is not
+The documentation includes:
 
-Softadastra is not:
-
-- a cloud storage product
-- a Dropbox clone
-- a Google Drive clone
-- a UI application
-- a database server only
-- a networking library only
-- a replacement for application-specific business logic
-
-> Softadastra is the synchronization foundation underneath resilient applications.
+- concepts
+- architecture
+- CLI usage
+- C++ SDK
+- JavaScript SDK
+- engine internals
+- guides
+- reference
+- releases
 
 ## Design principles
 
@@ -516,7 +316,7 @@ Softadastra is not:
 - Recovery must be deterministic
 - Synchronization must be observable
 - Modules must stay independent
-- Apps compose modules, they do not reimplement them
+- Applications compose modules
 - The CLI must stay simple and product-friendly
 
 ## Roadmap
@@ -531,18 +331,16 @@ Softadastra is not:
 - [x] UDP discovery layer
 - [x] Metadata layer
 - [x] CLI framework module
-- [x] CLI application entry point
-- [x] Grouped product CLI commands
+- [x] Product CLI application
 - [x] Interactive CLI session
-- [x] Long-running node daemon app
+- [x] Long-running node daemon
 - [ ] Persistent sync outbox
-- [x] Non-blocking transport backend
 - [ ] Real multi-operation sync batching
 - [ ] Stronger peer identity handshake
 - [ ] Encryption layer
 - [ ] Cross-platform production backends
 - [ ] SDK-level public API
-- [ ] Documentation site
+- [ ] Production documentation
 
 ## Philosophy
 
@@ -573,11 +371,6 @@ Before adding a feature, ask:
 
 ## License
 
-**Apache License 2.0**
-
-Copyright (c) Softadastra
-
 Licensed under the Apache License, Version 2.0.
-You may not use this software except in compliance with the License.
 
 See the [LICENSE](LICENSE) file for details.

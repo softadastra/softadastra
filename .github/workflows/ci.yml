@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main", "dev"]
 
+permissions:
+  contents: read
+
 jobs:
   build-test-install:
     name: ${{ matrix.os }} / ${{ matrix.build_type }}
@@ -26,14 +29,10 @@ jobs:
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
 
-      - name: Setup MSVC
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-
       - name: Clean build, install and smoke directories
         shell: bash
         run: |
-          rm -rf build install smoke
+          rm -rf build install smoke-umbrella smoke-module
 
       - name: Configure
         shell: bash
@@ -42,12 +41,13 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
-            -DSOFTADASTRA_BUILD_TESTS=OFF \
+            -DSOFTADASTRA_BUILD_TESTS=ON \
             -DSOFTADASTRA_BUILD_CLI=ON \
             -DSOFTADASTRA_BUILD_APPS=ON \
             -DSOFTADASTRA_BUILD_CLI_APP=ON \
             -DSOFTADASTRA_BUILD_NODE_APP=OFF \
-            -DSOFTADASTRA_INSTALL=ON
+            -DSOFTADASTRA_INSTALL=ON \
+            -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }}
@@ -63,11 +63,7 @@ jobs:
       - name: Smoke test - CLI binary
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            CLI="${{ github.workspace }}/install/bin/softadastra.exe"
-          else
-            CLI="${{ github.workspace }}/install/bin/softadastra"
-          fi
+          CLI="${{ github.workspace }}/install/bin/softadastra"
 
           "$CLI" version
           "$CLI" help
@@ -76,23 +72,23 @@ jobs:
           "$CLI" store get name
           "$CLI" sync status
 
-      - name: Smoke test - consumer project
+      - name: Smoke test - umbrella package
         shell: bash
         run: |
-          rm -rf smoke
-          mkdir -p smoke
+          rm -rf smoke-umbrella
+          mkdir -p smoke-umbrella
 
-          cat > smoke/CMakeLists.txt <<'EOF'
+          cat > smoke-umbrella/CMakeLists.txt <<'EOF'
           cmake_minimum_required(VERSION 3.20)
-          project(softadastra_smoke LANGUAGES CXX)
+          project(softadastra_smoke_umbrella LANGUAGES CXX)
 
           set(CMAKE_CXX_STANDARD 20)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
           find_package(softadastra CONFIG REQUIRED)
 
-          add_executable(softadastra_smoke main.cpp)
-          target_link_libraries(softadastra_smoke PRIVATE
+          add_executable(softadastra_smoke_umbrella main.cpp)
+          target_link_libraries(softadastra_smoke_umbrella PRIVATE
             softadastra::core
             softadastra::store
             softadastra::sync
@@ -103,7 +99,7 @@ jobs:
           )
           EOF
 
-          cat > smoke/main.cpp <<'EOF'
+          cat > smoke-umbrella/main.cpp <<'EOF'
           #include <softadastra/core/time/Timestamp.hpp>
           #include <softadastra/store/core/StoreConfig.hpp>
           #include <softadastra/sync/core/SyncConfig.hpp>
@@ -116,11 +112,56 @@ jobs:
           }
           EOF
 
-          cmake -S smoke -B smoke/build -G Ninja \
+          cmake -S smoke-umbrella -B smoke-umbrella/build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
 
-          cmake --build smoke/build --config ${{ matrix.build_type }}
+          cmake --build smoke-umbrella/build --config ${{ matrix.build_type }}
+
+      - name: Smoke test - direct module package
+        shell: bash
+        run: |
+          rm -rf smoke-module
+          mkdir -p smoke-module
+
+          cat > smoke-module/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(softadastra_smoke_module LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          find_package(softadastra_metadata CONFIG REQUIRED)
+
+          add_executable(softadastra_smoke_module main.cpp)
+          target_link_libraries(softadastra_smoke_module PRIVATE
+            softadastra::metadata
+          )
+          EOF
+
+          cat > smoke-module/main.cpp <<'EOF'
+          #include <softadastra/core/time/Timestamp.hpp>
+          #include <softadastra/metadata/core/NodeIdentity.hpp>
+
+          int main()
+          {
+            softadastra::metadata::core::NodeIdentity identity;
+            identity.node_id = "node-1";
+
+            if (!identity.is_valid())
+            {
+              return 1;
+            }
+
+            return softadastra::core::time::Timestamp::now().is_valid() ? 0 : 1;
+          }
+          EOF
+
+          cmake -S smoke-module -B smoke-module/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+
+          cmake --build smoke-module/build --config ${{ matrix.build_type }}
 
       - name: Upload CMake logs on failure
         if: failure()
@@ -132,7 +173,10 @@ jobs:
             build/CMakeFiles/CMakeOutput.log
             build/CMakeFiles/CMakeError.log
             build/Testing/Temporary/LastTest.log
-            smoke/build/CMakeCache.txt
-            smoke/build/CMakeFiles/CMakeOutput.log
-            smoke/build/CMakeFiles/CMakeError.log
+            smoke-umbrella/build/CMakeCache.txt
+            smoke-umbrella/build/CMakeFiles/CMakeOutput.log
+            smoke-umbrella/build/CMakeFiles/CMakeError.log
+            smoke-module/build/CMakeCache.txt
+            smoke-module/build/CMakeFiles/CMakeOutput.log
+            smoke-module/build/CMakeFiles/CMakeError.log
           if-no-files-found: ignore

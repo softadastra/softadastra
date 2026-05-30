@@ -21,6 +21,8 @@ concurrency:
 jobs:
   build-release:
     name: build (${{ matrix.softadastraos }} / ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -33,8 +35,6 @@ jobs:
             softadastraos: macos
             arch: aarch64
 
-    runs-on: ${{ matrix.os }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Checkout tag (manual input)
+      - name: Checkout tag
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
         shell: bash
         run: |
@@ -53,12 +53,7 @@ jobs:
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
 
-      - name: Setup MSVC
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Configure (Unix)
-        if: runner.os != 'Windows'
+      - name: Configure
         shell: bash
         run: |
           set -euxo pipefail
@@ -72,77 +67,35 @@ jobs:
             -DSOFTADASTRA_BUILD_APPS=ON \
             -DSOFTADASTRA_BUILD_CLI_APP=ON \
             -DSOFTADASTRA_BUILD_NODE_APP=OFF \
-            -DSOFTADASTRA_INSTALL=ON
+            -DSOFTADASTRA_INSTALL=ON \
+            -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
 
-      - name: Build (Unix)
-        if: runner.os != 'Windows'
+      - name: Build
         shell: bash
         run: |
           set -euxo pipefail
           cmake --build build -j2
 
-      - name: Install (Unix)
-        if: runner.os != 'Windows'
+      - name: Install
         shell: bash
         run: |
           set -euxo pipefail
           cmake --install build
 
-      - name: Configure (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cmake -S . -B build -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE\install" `
-            -DSOFTADASTRA_BUILD_EXAMPLES=OFF `
-            -DSOFTADASTRA_BUILD_TESTS=OFF `
-            -DSOFTADASTRA_BUILD_CLI=ON `
-            -DSOFTADASTRA_BUILD_APPS=ON `
-            -DSOFTADASTRA_BUILD_CLI_APP=ON `
-            -DSOFTADASTRA_BUILD_NODE_APP=OFF `
-            -DSOFTADASTRA_INSTALL=ON
-
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cmake --build build --config Release
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Install (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cmake --install build --config Release
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Validate installed CLI (Unix)
-        if: runner.os != 'Windows'
+      - name: Validate installed CLI
         shell: bash
         run: |
           set -euxo pipefail
+
           test -f install/bin/softadastra
           install/bin/softadastra version
           install/bin/softadastra help
           install/bin/softadastra status
+          install/bin/softadastra store put name gaspard
+          install/bin/softadastra store get name
+          install/bin/softadastra sync status
 
-      - name: Validate installed CLI (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          if (!(Test-Path "install\bin\softadastra.exe")) {
-            Write-Host "softadastra.exe not found"
-            Get-ChildItem -Recurse install | Select-Object FullName
-            exit 1
-          }
-
-          .\install\bin\softadastra.exe version
-          .\install\bin\softadastra.exe help
-          .\install\bin\softadastra.exe status
-
-      - name: Package binary (Unix)
-        if: runner.os != 'Windows'
+      - name: Package binary
         shell: bash
         run: |
           set -euxo pipefail
@@ -163,26 +116,6 @@ jobs:
 
           ASSET="softadastra-${{ matrix.softadastraos }}-${{ matrix.arch }}.tar.gz"
           tar -C dist/pkg -czf "dist/$ASSET" .
-
-      - name: Package binary (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist\pkg\bin | Out-Null
-          Copy-Item install\bin\softadastra.exe dist\pkg\bin\softadastra.exe
-
-          @"
-          Softadastra CLI
-
-          Add bin\ to your PATH or copy bin\softadastra.exe to a directory already in PATH.
-
-          Example:
-            softadastra version
-            softadastra status
-          "@ | Out-File -FilePath dist\pkg\README.txt -Encoding utf8
-
-          $asset = "softadastra-windows-${{ matrix.arch }}.zip"
-          Compress-Archive -Path dist\pkg\* -DestinationPath "dist\$asset" -Force
 
       - name: Upload dist
         uses: actions/upload-artifact@v4
@@ -220,7 +153,7 @@ jobs:
 
           mkdir -p dist
 
-          find dist-all -type f \( -name "softadastra-*.tar.gz" -o -name "softadastra-*.zip" \) -print0 |
+          find dist-all -type f -name "softadastra-*.tar.gz" -print0 |
             while IFS= read -r -d '' f; do
               base="$(basename "$f")"
               if [ -f "dist/$base" ]; then

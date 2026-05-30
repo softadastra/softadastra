@@ -6,9 +6,12 @@ on:
   pull_request:
     branches: ["main", "dev"]
 
+permissions:
+  contents: read
+
 jobs:
   linux-strict:
-    name: ubuntu-latest / ${{ matrix.build_type }} / strict
+    name: ubuntu-latest / ${{ matrix.build_type }} / examples=${{ matrix.build_examples }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -64,12 +67,14 @@ jobs:
       - name: Smoke test - CLI binary
         shell: bash
         run: |
-          "${{ github.workspace }}/install/bin/softadastra" version
-          "${{ github.workspace }}/install/bin/softadastra" help
-          "${{ github.workspace }}/install/bin/softadastra" status
-          "${{ github.workspace }}/install/bin/softadastra" store put name gaspard
-          "${{ github.workspace }}/install/bin/softadastra" store get name
-          "${{ github.workspace }}/install/bin/softadastra" sync status
+          CLI="${{ github.workspace }}/install/bin/softadastra"
+
+          "$CLI" version
+          "$CLI" help
+          "$CLI" status
+          "$CLI" store put name gaspard
+          "$CLI" store get name
+          "$CLI" sync status
 
       - name: Smoke test - umbrella package
         shell: bash
@@ -147,7 +152,7 @@ jobs:
             softadastra::metadata::core::NodeIdentity identity;
             identity.node_id = "node-1";
 
-            if (!identity.valid())
+            if (!identity.is_valid())
             {
               return 1;
             }

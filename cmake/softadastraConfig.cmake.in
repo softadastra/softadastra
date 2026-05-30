@@ -1,6 +1,10 @@
 @PACKAGE_INIT@
 
-set(_softadastra_cmake_dir "@PACKAGE_CMAKE_INSTALL_LIBDIR@/cmake")
+get_filename_component(
+    _softadastra_cmake_dir
+    "${CMAKE_CURRENT_LIST_DIR}/.."
+    ABSOLUTE
+)
 
 include("${_softadastra_cmake_dir}/softadastra_core/softadastra_coreConfig.cmake")
 include("${_softadastra_cmake_dir}/softadastra_fs/softadastra_fsConfig.cmake")
