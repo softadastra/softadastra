@@ -132,7 +132,7 @@ softadastra
 
 Example session:
 
-```text
+```bash
 softadastra> help
 softadastra> status
 softadastra> node info
