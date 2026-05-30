@@ -14,8 +14,7 @@ namespace softadastra::app::cli::commands::node
   namespace ui = softadastra::cli::utils::ui;
 
   NodeCommand::NodeCommand(SoftadastraRuntime &runtime)
-      : runtime_(runtime),
-        info_(runtime),
+      : info_(runtime),
         start_(runtime)
   {
   }

@@ -39,7 +39,6 @@ namespace softadastra::app::cli::commands::node
         const cli_parser::ParsedCommand &command) override;
 
   private:
-    SoftadastraRuntime &runtime_;
     NodeInfoCommand info_;
     NodeStartCommand start_;
   };
