@@ -3,7 +3,6 @@
  */
 
 #include <iostream>
-
 #include <softadastra/transport/Transport.hpp>
 
 using namespace softadastra;
@@ -12,7 +11,7 @@ int main()
 {
   std::cout << "== TRANSPORT PEER REGISTRY EXAMPLE ==\n";
 
-  transport::peer::PeerRegistry registry;
+  transport::peer::PeerRegistry registry{};
 
   transport::core::PeerInfo peer{
       "node-b",

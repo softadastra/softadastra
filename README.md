@@ -107,24 +107,31 @@ The local machine remains usable even when the network is down.
 ## Key properties
 
 ### Local-first by design
+
 Applications can write locally without waiting for a server or a remote peer.
 
 ### Durable by default
+
 Accepted operations are persisted before synchronization is attempted.
 
 ### Offline-capable synchronization
+
 Nodes can disconnect, continue working, and synchronize later.
 
 ### Deterministic convergence
+
 When synchronization resumes, nodes converge according to deterministic conflict rules.
 
 ### Observable runtime state
+
 The CLI exposes runtime status, node metadata, store state, sync state, and peer state.
 
 ### Modular architecture
+
 Each internal subsystem is isolated and reusable.
 
 ### Product-level CLI
+
 The `softadastra` binary provides a simple product-level interface over the internal runtime.
 
 ## Architecture
@@ -141,7 +148,7 @@ softadastra/
 │   ├── wal/          -> write-ahead log, replay, checksum, sequence
 │   ├── store/        -> WAL-backed key/value store
 │   ├── sync/         -> outbox, queue, ack, retry, conflict resolution
-│   ├── transport/    -> TCP transport, framing, messages, ack
+│   ├── transport/    -> async TCP transport, framing, messages, events, ack
 │   ├── discovery/    -> peer discovery over UDP
 │   ├── metadata/     -> node identity, runtime info, capabilities
 │   └── cli/          -> reusable CLI engine
@@ -181,30 +188,39 @@ Retry or complete
 ## Modules
 
 ### `core`
+
 Foundational primitives used across the runtime: `Result`, `Error`, `StrongType`, `Timestamp`, IDs, config helpers, utility types.
 
 ### `fs`
+
 Filesystem observation layer: path normalization, snapshot building, snapshot diff, polling watcher, platform watcher backends, file events.
 
 ### `wal`
+
 Durability layer: monotonic sequence numbers, binary WAL records, checksums, append-only writer, reader, replayer.
 
 ### `store`
+
 Local state engine: key/value operations, WAL-backed persistence, recovery from WAL, materialized in-memory state.
 
 ### `sync`
+
 Synchronization engine: local operation submission, outbox, scheduling queue, acknowledgement tracking, retry handling, remote operation application, deterministic conflict resolution.
 
 ### `transport`
-Peer-to-peer communication layer: TCP backend, length-prefixed frames, transport messages, ping/pong, sync batch messages, acknowledgements.
+
+Peer-to-peer communication layer: async TCP backend, legacy blocking TCP backend, length-prefixed frames, transport messages, transport events, ping/pong, sync batch messages, and acknowledgements.
 
 ### `discovery`
+
 Peer discovery layer: UDP discovery backend, announcements, probes, replies, discovered peer registry, transport integration.
 
 ### `metadata`
+
 Node metadata layer: node identity, display name, hostname, OS name, version, capabilities, local runtime metadata.
 
 ### `cli`
+
 Reusable command-line framework: parser, tokenizer, command registry, handlers, interactive mode, built-in commands, help formatter, table formatter, UI helpers.
 
 ## Applications
@@ -469,14 +485,14 @@ softadastra-node   # daemon
 
 ## Current guarantees
 
-| Guarantee | Meaning |
-|---|---|
-| Local writes are accepted first | The system does not depend on a remote server to accept writes |
-| WAL-backed durability | Store operations can be recovered after restart |
-| Retryable synchronization | Operations can be retried if acknowledgements are not received |
-| Deterministic conflict resolution | Conflicts are resolved predictably |
-| Network-optional behavior | The network is used for propagation, not for local correctness |
-| Observable state | Runtime state can be inspected through the CLI |
+| Guarantee                         | Meaning                                                        |
+| --------------------------------- | -------------------------------------------------------------- |
+| Local writes are accepted first   | The system does not depend on a remote server to accept writes |
+| WAL-backed durability             | Store operations can be recovered after restart                |
+| Retryable synchronization         | Operations can be retried if acknowledgements are not received |
+| Deterministic conflict resolution | Conflicts are resolved predictably                             |
+| Network-optional behavior         | The network is used for propagation, not for local correctness |
+| Observable state                  | Runtime state can be inspected through the CLI                 |
 
 ## What Softadastra is not
 
@@ -511,6 +527,7 @@ Softadastra is not:
 - [x] WAL-backed store engine
 - [x] Sync outbox, queue, retry, and ack tracking
 - [x] TCP transport layer
+- [x] Event-driven async transport backend
 - [x] UDP discovery layer
 - [x] Metadata layer
 - [x] CLI framework module
@@ -519,41 +536,13 @@ Softadastra is not:
 - [x] Interactive CLI session
 - [x] Long-running node daemon app
 - [ ] Persistent sync outbox
-- [ ] Non-blocking transport backend
+- [x] Non-blocking transport backend
 - [ ] Real multi-operation sync batching
 - [ ] Stronger peer identity handshake
 - [ ] Encryption layer
 - [ ] Cross-platform production backends
 - [ ] SDK-level public API
 - [ ] Documentation site
-
-## Repository layout
-
-```text
-.
-├── apps
-│   ├── cli
-│   └── node
-├── cmake
-├── data
-├── examples
-├── modules
-│   ├── cli
-│   ├── core
-│   ├── discovery
-│   ├── fs
-│   ├── metadata
-│   ├── store
-│   ├── sync
-│   ├── transport
-│   └── wal
-├── CHANGELOG.md
-├── CMakeLists.txt
-├── CMakePresets.json
-├── LICENSE
-├── README.md
-└── vix.json
-```
 
 ## Philosophy
 

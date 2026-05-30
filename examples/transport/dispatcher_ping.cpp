@@ -24,8 +24,12 @@ int main()
   auto sync_config =
       sync::core::SyncConfig::durable("node-local");
 
-  sync::core::SyncContext sync_context{store, sync_config};
-  sync::engine::SyncEngine sync_engine{sync_context};
+  sync::core::SyncContext sync_context{
+      store,
+      sync_config};
+
+  sync::engine::SyncEngine sync_engine{
+      sync_context};
 
   auto transport_config =
       transport::core::TransportConfig::local(7000);
@@ -50,6 +54,7 @@ int main()
     std::cerr << "dispatch failed: "
               << result.error().message()
               << "\n";
+
     std::filesystem::remove(wal_path);
     return 1;
   }
@@ -57,7 +62,8 @@ int main()
   if (result.value().reply.has_value())
   {
     std::cout << "reply type: "
-              << transport::types::to_string(result.value().reply->type)
+              << transport::types::to_string(
+                     result.value().reply->type)
               << "\n";
   }
 

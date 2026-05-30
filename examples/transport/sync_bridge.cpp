@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <utility>
 
 #include <softadastra/store/Store.hpp>
 #include <softadastra/sync/Sync.hpp>
@@ -24,12 +25,17 @@ int main()
   auto sync_config =
       sync::core::SyncConfig::durable("node-a");
 
-  sync::core::SyncContext sync_context{store, sync_config};
-  sync::engine::SyncEngine sync_engine{sync_context};
+  sync::core::SyncContext sync_context{
+      store,
+      sync_config};
 
-  auto operation = store::core::Operation::put(
-      store::types::Key{"doc:1"},
-      store::types::Value::from_string("hello from node-a"));
+  sync::engine::SyncEngine sync_engine{
+      sync_context};
+
+  auto operation =
+      store::core::Operation::put(
+          store::types::Key{"doc:1"},
+          store::types::Value::from_string("hello from node-a"));
 
   auto submitted =
       sync_engine.submit_local_operation(operation);
@@ -58,7 +64,7 @@ int main()
   auto message =
       transport::core::TransportMessage::sync_batch(
           "node-a",
-          payload);
+          std::move(payload));
 
   message.to_node_id = "node-b";
   message.correlation_id = batch.front().operation.sync_id;
