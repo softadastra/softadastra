@@ -39,7 +39,6 @@ namespace softadastra::app::cli::commands::sync
         const cli_parser::ParsedCommand &command) override;
 
   private:
-    SoftadastraRuntime &runtime_;
     SyncStatusCommand status_;
     SyncTickCommand tick_;
   };

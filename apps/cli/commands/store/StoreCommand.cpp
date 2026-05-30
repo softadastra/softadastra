@@ -14,8 +14,7 @@ namespace softadastra::app::cli::commands::store
   namespace ui = softadastra::cli::utils::ui;
 
   StoreCommand::StoreCommand(SoftadastraRuntime &runtime)
-      : runtime_(runtime),
-        put_(runtime),
+      : put_(runtime),
         get_(runtime)
   {
   }

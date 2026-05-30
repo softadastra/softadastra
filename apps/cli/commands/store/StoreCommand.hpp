@@ -39,7 +39,6 @@ namespace softadastra::app::cli::commands::store
         const cli_parser::ParsedCommand &command) override;
 
   private:
-    SoftadastraRuntime &runtime_;
     StorePutCommand put_;
     StoreGetCommand get_;
   };

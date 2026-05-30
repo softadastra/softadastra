@@ -14,8 +14,7 @@ namespace softadastra::app::cli::commands::sync
   namespace ui = softadastra::cli::utils::ui;
 
   SyncCommand::SyncCommand(SoftadastraRuntime &runtime)
-      : runtime_(runtime),
-        status_(runtime),
+      : status_(runtime),
         tick_(runtime)
   {
   }
