@@ -1,7 +1,7 @@
 {
   "name": "softadastra",
   "namespace": "softadastra",
-  "version": "0.3.1",
+  "version": "0.3.0",
   "type": "project",
   "license": "MIT",
   "description": "Offline-first C++ foundation for reliable local-first and distributed systems.",
