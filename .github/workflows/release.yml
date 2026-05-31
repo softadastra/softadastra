@@ -645,7 +645,7 @@ jobs:
 
           for f in softadastra-*.tar.gz softadastra-*.zip; do
             [ -f "$f" ] || continue
-            minisign -S -s "$keyfile" -m "$f"
+            minisign -S -W -s "$keyfile" -m "$f"
           done
 
           rm -f "$keyfile"
