@@ -22,3 +22,6 @@ install/
 smoke/
 smoke-umbrella/
 smoke-module/
+
+# Minisign private keys
+keys/*.key

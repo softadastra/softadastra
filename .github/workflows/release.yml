@@ -603,6 +603,38 @@ jobs:
 
           ls -lah
 
+      - name: Sign release assets
+        shell: bash
+        env:
+          MINISIGN_PRIVATE_KEY_B64: ${{ secrets.MINISIGN_PRIVATE_KEY_B64 }}
+        run: |
+          set -euxo pipefail
+
+          cd dist
+
+          if [ -z "${MINISIGN_PRIVATE_KEY_B64:-}" ]; then
+            echo "MINISIGN_PRIVATE_KEY_B64 is missing" >&2
+            exit 1
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends minisign
+
+          keyfile="$(mktemp)"
+          chmod 600 "$keyfile"
+
+          printf "%s" "$MINISIGN_PRIVATE_KEY_B64" | base64 -d > "$keyfile"
+          test -s "$keyfile"
+
+          for f in softadastra-*.tar.gz softadastra-*.zip; do
+            [ -f "$f" ] || continue
+            minisign -S -s "$keyfile" -m "$f"
+          done
+
+          rm -f "$keyfile"
+
+          ls -lah
+
       - name: Determine tag
         id: tag
         shell: bash
