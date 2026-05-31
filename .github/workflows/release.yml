@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Optional tag to build/release (e.g. v0.2.0). If empty, uses the current ref."
+        description: "Optional tag to build/release, for example v0.2.0. If empty, uses the current ref."
         required: false
         default: ""
 
@@ -30,17 +30,25 @@ jobs:
           - os: ubuntu-24.04
             softadastraos: linux
             arch: x86_64
-            archive: tar.gz
+            cli_asset: softadastra-linux-x86_64.tar.gz
+            sdk_asset: softadastra-sdk-linux-x86_64.tar.gz
 
           - os: macos-14
             softadastraos: macos
             arch: aarch64
-            archive: tar.gz
+            cli_asset: softadastra-macos-aarch64.tar.gz
+            sdk_asset: softadastra-sdk-macos-aarch64.tar.gz
 
           - os: windows-2022
             softadastraos: windows
             arch: x86_64
-            archive: zip
+            cli_asset: softadastra-windows-x86_64.zip
+            sdk_asset: softadastra-sdk-windows-x86_64.zip
+
+    env:
+      BUILD_DIR: build
+      INSTALL_DIR: install
+      ASYNC_INSTALL_DIR: deps/install
 
     steps:
       - name: Checkout
@@ -54,6 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+
           git fetch --tags --force
           git checkout "tags/${{ github.event.inputs.tag }}"
 
@@ -68,23 +77,44 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          set -euxo pipefail
+
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential \
             cmake \
             ninja-build \
             git \
+            curl \
             ca-certificates \
-            libasio-dev
+            libasio-dev \
+            tar \
+            zip \
+            unzip
 
       - name: Clean build directories
         shell: bash
         run: |
-          rm -rf build install deps dist dist-all asio.tar.gz asio-asio-1-30-2
+          set -euxo pipefail
+
+          rm -rf \
+            "$BUILD_DIR" \
+            "$INSTALL_DIR" \
+            "$ASYNC_INSTALL_DIR" \
+            deps/async \
+            dist \
+            dist-all \
+            smoke-cli \
+            smoke-sdk \
+            consumer \
+            /tmp/asio.tar.gz \
+            /tmp/asio-asio-1-30-2
 
       - name: Fetch vix async dependency
         shell: bash
         run: |
+          set -euxo pipefail
+
           git clone --depth 1 --branch dev --recurse-submodules https://github.com/vixcpp/async.git deps/async
           git -C deps/async submodule update --init --recursive --depth 1 || true
 
@@ -130,9 +160,11 @@ jobs:
       - name: Build and install vix async dependency
         shell: bash
         run: |
+          set -euxo pipefail
+
           cmake -S deps/async -B deps/async/build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/deps/install" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/${ASYNC_INSTALL_DIR}" \
             -DVIX_ASYNC_BUILD_TESTS=OFF \
             -DVIX_ASYNC_BUILD_EXAMPLES=OFF \
             -DVIX_ENABLE_SANITIZERS=OFF
@@ -140,15 +172,15 @@ jobs:
           cmake --build deps/async/build --config Release -j2
           cmake --install deps/async/build --config Release
 
-      - name: Configure
+      - name: Configure Softadastra
         shell: bash
         run: |
           set -euxo pipefail
 
-          cmake -S . -B build -G Ninja \
+          cmake -S . -B "$BUILD_DIR" -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/deps/install" \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/${ASYNC_INSTALL_DIR}" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/${INSTALL_DIR}" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
             -DSOFTADASTRA_BUILD_TESTS=OFF \
             -DSOFTADASTRA_BUILD_CLI=ON \
@@ -158,17 +190,19 @@ jobs:
             -DSOFTADASTRA_INSTALL=ON \
             -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
 
-      - name: Build
+      - name: Build Softadastra
         shell: bash
         run: |
           set -euxo pipefail
-          cmake --build build --config Release -j2
 
-      - name: Install
+          cmake --build "$BUILD_DIR" --config Release -j2
+
+      - name: Install Softadastra
         shell: bash
         run: |
           set -euxo pipefail
-          cmake --install build --config Release
+
+          cmake --install "$BUILD_DIR" --config Release
 
       - name: Validate installed CLI Unix
         if: runner.os != 'Windows'
@@ -176,42 +210,72 @@ jobs:
         run: |
           set -euxo pipefail
 
-          test -f install/bin/softadastra
-          install/bin/softadastra version
-          install/bin/softadastra help
-          install/bin/softadastra status
-          install/bin/softadastra store put name gaspard
-          install/bin/softadastra store get name
-          install/bin/softadastra sync status
+          test -f "$INSTALL_DIR/bin/softadastra"
+
+          "$INSTALL_DIR/bin/softadastra" version
+          "$INSTALL_DIR/bin/softadastra" help
+          "$INSTALL_DIR/bin/softadastra" status
+          "$INSTALL_DIR/bin/softadastra" store put name gaspard
+          "$INSTALL_DIR/bin/softadastra" store get name
+          "$INSTALL_DIR/bin/softadastra" sync status
 
       - name: Validate installed CLI Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (!(Test-Path "install\bin\softadastra.exe")) {
+          if (!(Test-Path "$env:INSTALL_DIR\bin\softadastra.exe")) {
             Write-Host "softadastra.exe not found"
-            Get-ChildItem -Recurse install | Select-Object FullName
+            Get-ChildItem -Recurse "$env:INSTALL_DIR" | Select-Object FullName
             exit 1
           }
 
-          .\install\bin\softadastra.exe version
-          .\install\bin\softadastra.exe help
-          .\install\bin\softadastra.exe status
-          .\install\bin\softadastra.exe store put name gaspard
-          .\install\bin\softadastra.exe store get name
-          .\install\bin\softadastra.exe sync status
+          & "$env:INSTALL_DIR\bin\softadastra.exe" version
+          & "$env:INSTALL_DIR\bin\softadastra.exe" help
+          & "$env:INSTALL_DIR\bin\softadastra.exe" status
+          & "$env:INSTALL_DIR\bin\softadastra.exe" store put name gaspard
+          & "$env:INSTALL_DIR\bin\softadastra.exe" store get name
+          & "$env:INSTALL_DIR\bin\softadastra.exe" sync status
 
-      - name: Package binary Unix
+      - name: Verify installed SDK tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          test -d "$INSTALL_DIR"
+          test -d "$INSTALL_DIR/include/softadastra"
+
+          test -f "$INSTALL_DIR/lib/cmake/softadastra/softadastraConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra/softadastraConfigVersion.cmake"
+
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_core/softadastra_coreConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_store/softadastra_storeConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_sync/softadastra_syncConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_wal/softadastra_walConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_fs/softadastra_fsConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_transport/softadastra_transportConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_discovery/softadastra_discoveryConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_metadata/softadastra_metadataConfig.cmake"
+          test -f "$INSTALL_DIR/lib/cmake/softadastra_cli/softadastra_cliConfig.cmake"
+
+          find "$INSTALL_DIR/include" -maxdepth 5 -type f | sort > installed-headers.txt
+          find "$INSTALL_DIR/lib/cmake" -maxdepth 5 -type f | sort > installed-cmake-files.txt
+
+          sed -n '1,120p' installed-headers.txt
+          cat installed-cmake-files.txt
+
+      - name: Package CLI Unix
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euxo pipefail
 
-          mkdir -p dist/pkg/bin
-          cp install/bin/softadastra dist/pkg/bin/softadastra
-          chmod +x dist/pkg/bin/softadastra
+          rm -rf dist/cli-pkg
+          mkdir -p dist/cli-pkg/bin
 
-          cat > dist/pkg/README.txt <<'EOF'
+          cp "$INSTALL_DIR/bin/softadastra" dist/cli-pkg/bin/softadastra
+          chmod +x dist/cli-pkg/bin/softadastra
+
+          cat > dist/cli-pkg/README.txt <<'EOF'
           Softadastra CLI
 
           Add bin/ to your PATH or copy bin/softadastra to a directory already in PATH.
@@ -221,15 +285,16 @@ jobs:
             softadastra status
           EOF
 
-          ASSET="softadastra-${{ matrix.softadastraos }}-${{ matrix.arch }}.tar.gz"
-          tar -C dist/pkg -czf "dist/$ASSET" .
+          tar -C dist/cli-pkg -czf "dist/${{ matrix.cli_asset }}" .
 
-      - name: Package binary Windows
+      - name: Package CLI Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist\pkg\bin | Out-Null
-          Copy-Item install\bin\softadastra.exe dist\pkg\bin\softadastra.exe
+          Remove-Item -Recurse -Force dist\cli-pkg -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path dist\cli-pkg\bin | Out-Null
+          Copy-Item "$env:INSTALL_DIR\bin\softadastra.exe" dist\cli-pkg\bin\softadastra.exe
 
           @"
           Softadastra CLI
@@ -239,16 +304,237 @@ jobs:
           Example:
             softadastra version
             softadastra status
-          "@ | Out-File -FilePath dist\pkg\README.txt -Encoding utf8
+          "@ | Out-File -FilePath dist\cli-pkg\README.txt -Encoding utf8
 
-          $asset = "softadastra-${{ matrix.softadastraos }}-${{ matrix.arch }}.zip"
-          Compress-Archive -Path dist\pkg\* -DestinationPath "dist\$asset" -Force
+          Compress-Archive -Path dist\cli-pkg\* -DestinationPath "dist\${{ matrix.cli_asset }}" -Force
+
+      - name: Package SDK Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          rm -rf dist/sdk-pkg
+          mkdir -p dist/sdk-pkg
+
+          cp -R "$INSTALL_DIR/include" dist/sdk-pkg/include
+          cp -R "$INSTALL_DIR/lib" dist/sdk-pkg/lib
+
+          if [ -d "$INSTALL_DIR/share" ]; then
+            cp -R "$INSTALL_DIR/share" dist/sdk-pkg/share
+          fi
+
+          cat > dist/sdk-pkg/README.txt <<'EOF'
+          Softadastra SDK
+
+          Use this SDK with CMake:
+
+            cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/softadastra/sdk
+            cmake --build build
+          EOF
+
+          tar -C dist/sdk-pkg -czf "dist/${{ matrix.sdk_asset }}" .
+
+      - name: Package SDK Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force dist\sdk-pkg -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path dist\sdk-pkg | Out-Null
+
+          Copy-Item "$env:INSTALL_DIR\include" dist\sdk-pkg\include -Recurse
+          Copy-Item "$env:INSTALL_DIR\lib" dist\sdk-pkg\lib -Recurse
+
+          if (Test-Path "$env:INSTALL_DIR\share") {
+            Copy-Item "$env:INSTALL_DIR\share" dist\sdk-pkg\share -Recurse
+          }
+
+          @"
+          Softadastra SDK
+
+          Use this SDK with CMake:
+
+            cmake -S . -B build -DCMAKE_PREFIX_PATH=C:\path\to\softadastra\sdk
+            cmake --build build
+          "@ | Out-File -FilePath dist\sdk-pkg\README.txt -Encoding utf8
+
+          Compress-Archive -Path dist\sdk-pkg\* -DestinationPath "dist\${{ matrix.sdk_asset }}" -Force
+
+      - name: Validate packaged CLI Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          rm -rf smoke-cli
+          mkdir -p smoke-cli
+
+          tar -xzf "dist/${{ matrix.cli_asset }}" -C smoke-cli
+
+          test -f smoke-cli/bin/softadastra
+          smoke-cli/bin/softadastra version
+
+      - name: Validate packaged CLI Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force smoke-cli -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path smoke-cli | Out-Null
+
+          Expand-Archive -Path "dist\${{ matrix.cli_asset }}" -DestinationPath smoke-cli -Force
+
+          if (!(Test-Path "smoke-cli\bin\softadastra.exe")) {
+            Write-Host "softadastra.exe not found in CLI archive"
+            Get-ChildItem -Recurse smoke-cli | Select-Object FullName
+            exit 1
+          }
+
+          .\smoke-cli\bin\softadastra.exe version
+
+      - name: Validate packaged SDK Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          rm -rf smoke-sdk consumer
+          mkdir -p smoke-sdk consumer
+
+          tar -xzf "dist/${{ matrix.sdk_asset }}" -C smoke-sdk
+
+          test -d smoke-sdk/include/softadastra
+          test -f smoke-sdk/lib/cmake/softadastra/softadastraConfig.cmake
+
+          cat > consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(softadastra_sdk_consumer LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          find_package(softadastra CONFIG REQUIRED)
+
+          add_executable(app main.cpp)
+          target_link_libraries(app PRIVATE
+            softadastra::core
+            softadastra::store
+            softadastra::sync
+            softadastra::transport
+            softadastra::discovery
+            softadastra::metadata
+            softadastra::cli
+          )
+          EOF
+
+          cat > consumer/main.cpp <<'EOF'
+          #include <softadastra/core/time/Timestamp.hpp>
+          #include <softadastra/store/core/StoreConfig.hpp>
+          #include <softadastra/sync/core/SyncConfig.hpp>
+          #include <softadastra/cli/cli.hpp>
+
+          #include <iostream>
+
+          int main()
+          {
+            auto now = softadastra::core::time::Timestamp::now();
+
+            if (!now.is_valid())
+            {
+              return 1;
+            }
+
+            std::cout << "Softadastra SDK consumer build works\n";
+            return 0;
+          }
+          EOF
+
+          cmake -S consumer -B consumer/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/smoke-sdk;${GITHUB_WORKSPACE}/${ASYNC_INSTALL_DIR}"
+
+          cmake --build consumer/build --config Release -j2
+          ./consumer/build/app
+
+      - name: Validate packaged SDK Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force smoke-sdk, consumer -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path smoke-sdk | Out-Null
+          New-Item -ItemType Directory -Force -Path consumer | Out-Null
+
+          Expand-Archive -Path "dist\${{ matrix.sdk_asset }}" -DestinationPath smoke-sdk -Force
+
+          if (!(Test-Path "smoke-sdk\include\softadastra")) {
+            Write-Host "include\softadastra not found in SDK archive"
+            Get-ChildItem -Recurse smoke-sdk | Select-Object FullName
+            exit 1
+          }
+
+          if (!(Test-Path "smoke-sdk\lib\cmake\softadastra\softadastraConfig.cmake")) {
+            Write-Host "softadastraConfig.cmake not found in SDK archive"
+            Get-ChildItem -Recurse smoke-sdk | Select-Object FullName
+            exit 1
+          }
+
+          @"
+          cmake_minimum_required(VERSION 3.20)
+          project(softadastra_sdk_consumer LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          find_package(softadastra CONFIG REQUIRED)
+
+          add_executable(app main.cpp)
+          target_link_libraries(app PRIVATE
+            softadastra::core
+            softadastra::store
+            softadastra::sync
+            softadastra::transport
+            softadastra::discovery
+            softadastra::metadata
+            softadastra::cli
+          )
+          "@ | Out-File -FilePath consumer\CMakeLists.txt -Encoding utf8
+
+          @"
+          #include <softadastra/core/time/Timestamp.hpp>
+          #include <softadastra/store/core/StoreConfig.hpp>
+          #include <softadastra/sync/core/SyncConfig.hpp>
+          #include <softadastra/cli/cli.hpp>
+
+          #include <iostream>
+
+          int main()
+          {
+            auto now = softadastra::core::time::Timestamp::now();
+
+            if (!now.is_valid())
+            {
+              return 1;
+            }
+
+            std::cout << "Softadastra SDK consumer build works\n";
+            return 0;
+          }
+          "@ | Out-File -FilePath consumer\main.cpp -Encoding utf8
+
+          cmake -S consumer -B consumer\build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}\smoke-sdk;${{ github.workspace }}\${{ env.ASYNC_INSTALL_DIR }}"
+
+          cmake --build consumer\build --config Release -j2
+          .\consumer\build\app.exe
 
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.softadastraos }}-${{ matrix.arch }}
-          path: dist/*
+          path: |
+            dist/${{ matrix.cli_asset }}
+            dist/${{ matrix.sdk_asset }}
           if-no-files-found: error
 
       - name: Upload logs on failure
@@ -257,13 +543,16 @@ jobs:
         with:
           name: logs-${{ matrix.softadastraos }}-${{ matrix.arch }}
           path: |
-            build/CMakeCache.txt
-            build/CMakeFiles/CMakeOutput.log
-            build/CMakeFiles/CMakeError.log
+            ${{ env.BUILD_DIR }}/CMakeCache.txt
+            ${{ env.BUILD_DIR }}/CMakeFiles/CMakeOutput.log
+            ${{ env.BUILD_DIR }}/CMakeFiles/CMakeError.log
+            consumer/build/CMakeCache.txt
+            consumer/build/CMakeFiles/CMakeOutput.log
+            consumer/build/CMakeFiles/CMakeError.log
           if-no-files-found: ignore
 
   publish:
-    name: publish
+    name: publish GitHub Release
     needs: build-release
     runs-on: ubuntu-24.04
 
@@ -280,17 +569,24 @@ jobs:
 
           mkdir -p dist
 
-          find dist-all -type f \( -name "softadastra-*.tar.gz" -o -name "softadastra-*.zip" \) -print0 |
+          find dist-all -type f \( \
+            -name "softadastra-*.tar.gz" -o \
+            -name "softadastra-*.zip" -o \
+            -name "softadastra-sdk-*.tar.gz" -o \
+            -name "softadastra-sdk-*.zip" \
+          \) -print0 |
             while IFS= read -r -d '' f; do
               base="$(basename "$f")"
+
               if [ -f "dist/$base" ]; then
                 echo "Asset collision: $base" >&2
                 exit 1
               fi
+
               cp -f "$f" "dist/$base"
             done
 
-          ls -la dist
+          ls -lah dist
           test "$(ls -A dist | wc -l)" -gt 0
 
       - name: Generate sha256 files
@@ -305,7 +601,7 @@ jobs:
             sha256sum "$f" > "$f.sha256"
           done
 
-          ls -la
+          ls -lah
 
       - name: Determine tag
         id: tag
