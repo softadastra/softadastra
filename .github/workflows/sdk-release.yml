@@ -99,16 +99,38 @@ jobs:
       - name: Prepare Asio for async
         shell: bash
         run: |
+          set -euo pipefail
+
+          ASIO_VERSION="asio-1-30-2"
+          ASIO_ARCHIVE="/tmp/asio.tar.gz"
+          ASIO_SRC="/tmp/asio-${ASIO_VERSION}"
+
+          rm -rf "${ASIO_ARCHIVE}" "${ASIO_SRC}"
           mkdir -p deps/async/third_party/asio/include
 
           if [ "${{ runner.os }}" = "Linux" ]; then
             cp -r /usr/include/asio* deps/async/third_party/asio/include/ || true
           fi
 
-          if [ "${{ runner.os }}" = "macOS" ] || [ "${{ runner.os }}" = "Windows" ]; then
-            curl -L https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz -o asio.tar.gz
-            tar -xzf asio.tar.gz
-            cp -r asio-asio-1-30-2/asio/include/* deps/async/third_party/asio/include/
+          if [ ! -f deps/async/third_party/asio/include/asio.hpp ]; then
+            curl -L --fail --retry 3 --retry-delay 2 \
+              -H "Accept: application/octet-stream" \
+              -o "${ASIO_ARCHIVE}" \
+              "https://codeload.github.com/chriskohlhoff/asio/tar.gz/refs/tags/${ASIO_VERSION}"
+
+            file "${ASIO_ARCHIVE}"
+            gzip -t "${ASIO_ARCHIVE}"
+
+            tar -xzf "${ASIO_ARCHIVE}" -C /tmp
+
+            test -d "${ASIO_SRC}/asio/include/asio"
+            test -f "${ASIO_SRC}/asio/include/asio.hpp"
+
+            cp -R "${ASIO_SRC}/asio/include/asio" \
+              deps/async/third_party/asio/include/
+
+            cp "${ASIO_SRC}/asio/include/asio.hpp" \
+              deps/async/third_party/asio/include/
           fi
 
           test -f deps/async/third_party/asio/include/asio.hpp
