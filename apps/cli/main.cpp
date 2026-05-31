@@ -9,6 +9,10 @@
 
 #include "runtime/SoftadastraRuntime.hpp"
 
+#ifndef SOFTADASTRA_VERSION
+#define SOFTADASTRA_VERSION "dev"
+#endif
+
 namespace
 {
   [[nodiscard]] softadastra::cli::CliOptions make_cli_options(
@@ -54,7 +58,7 @@ int main(int argc, char **argv)
   softadastra::cli::core::CliConfig config;
 
   config.app_name = "softadastra";
-  config.version = "0.1.0";
+  config.version = SOFTADASTRA_VERSION;
   config.interactive = argc <= 1;
   config.show_banner = argc <= 1;
   config.color_output = true;

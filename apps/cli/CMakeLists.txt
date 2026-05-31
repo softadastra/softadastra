@@ -4,7 +4,11 @@ cmake_minimum_required(VERSION 3.20)
 # Version
 # ========================
 if(NOT DEFINED SOFTADASTRA_VERSION)
-    set(SOFTADASTRA_VERSION "0.1.0")
+    if(DEFINED PROJECT_VERSION)
+        set(SOFTADASTRA_VERSION "${PROJECT_VERSION}")
+    else()
+        set(SOFTADASTRA_VERSION "0.0.0")
+    endif()
 endif()
 
 string(REGEX REPLACE "^v" "" SOFTADASTRA_VERSION "${SOFTADASTRA_VERSION}")
