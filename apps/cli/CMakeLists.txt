@@ -1,11 +1,20 @@
 cmake_minimum_required(VERSION 3.20)
 
 # ========================
+# Version
+# ========================
+if(NOT DEFINED SOFTADASTRA_VERSION)
+    set(SOFTADASTRA_VERSION "0.1.0")
+endif()
+
+string(REGEX REPLACE "^v" "" SOFTADASTRA_VERSION "${SOFTADASTRA_VERSION}")
+
+# ========================
 # Softadastra CLI application
 # ========================
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     project(softadastra_app_cli
-        VERSION 0.1.0
+        VERSION ${SOFTADASTRA_VERSION}
         DESCRIPTION "Softadastra CLI application"
         LANGUAGES CXX
     )
@@ -27,6 +36,11 @@ add_executable(softadastra
 )
 
 target_compile_features(softadastra PRIVATE cxx_std_20)
+
+target_compile_definitions(softadastra
+    PRIVATE
+        SOFTADASTRA_VERSION="${SOFTADASTRA_VERSION}"
+)
 
 # ========================
 # Dependencies
@@ -72,7 +86,7 @@ endif()
 # ========================
 set_target_properties(softadastra PROPERTIES
     OUTPUT_NAME softadastra
-    VERSION 0.1.0
+    VERSION ${SOFTADASTRA_VERSION}
 )
 
 # ========================
@@ -89,7 +103,7 @@ install(
 # Summary
 # ========================
 message(STATUS "------------------------------------------------------")
-message(STATUS "softadastra CLI application configured (0.1.0)")
+message(STATUS "softadastra CLI application configured (${SOFTADASTRA_VERSION})")
 message(STATUS "Executable:      softadastra")
 message(STATUS "Source dir:      ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "Warnings=error:  ${SOFTADASTRA_WARNINGS_AS_ERRORS}")

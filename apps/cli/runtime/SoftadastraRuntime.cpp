@@ -38,7 +38,12 @@ namespace softadastra::app::cli
   namespace
   {
     constexpr const char *DEFAULT_NODE_ID = "node-1";
-    constexpr const char *DEFAULT_VERSION = "0.1.0";
+
+#ifndef SOFTADASTRA_VERSION
+#define SOFTADASTRA_VERSION "0.1.0"
+#endif
+
+    constexpr const char *DEFAULT_VERSION = SOFTADASTRA_VERSION;
     constexpr const char *DEFAULT_DISPLAY_NAME = "Softadastra Node";
 
     constexpr const char *DATA_DIRECTORY = "data";
