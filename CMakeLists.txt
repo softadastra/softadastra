@@ -1,7 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 
+if(NOT DEFINED SOFTADASTRA_VERSION)
+    set(SOFTADASTRA_VERSION "0.1.0")
+endif()
+
+string(REGEX REPLACE "^v" "" SOFTADASTRA_VERSION "${SOFTADASTRA_VERSION}")
+
 project(softadastra
-    VERSION 0.1.0
+    VERSION ${SOFTADASTRA_VERSION}
     DESCRIPTION "Softadastra umbrella build"
     LANGUAGES CXX
 )

@@ -172,6 +172,22 @@ jobs:
           cmake --build deps/async/build --config Release -j2
           cmake --install deps/async/build --config Release
 
+      - name: Determine build version
+        id: build_version
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+
+          VERSION="${VERSION#v}"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Configure Softadastra
         shell: bash
         run: |
@@ -179,6 +195,7 @@ jobs:
 
           cmake -S . -B "$BUILD_DIR" -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DSOFTADASTRA_VERSION="${{ steps.build_version.outputs.version }}" \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/${ASYNC_INSTALL_DIR}" \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/${INSTALL_DIR}" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
