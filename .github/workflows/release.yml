@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Optional tag to build/release (e.g. v0.1.0). If empty, uses the current ref."
+        description: "Optional tag to build/release (e.g. v0.2.0). If empty, uses the current ref."
         required: false
         default: ""
 
@@ -30,10 +30,17 @@ jobs:
           - os: ubuntu-24.04
             softadastraos: linux
             arch: x86_64
+            archive: tar.gz
 
           - os: macos-14
             softadastraos: macos
             arch: aarch64
+            archive: tar.gz
+
+          - os: windows-2022
+            softadastraos: windows
+            arch: x86_64
+            archive: zip
 
     steps:
       - name: Checkout
@@ -53,6 +60,10 @@ jobs:
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
 
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         shell: bash
@@ -66,10 +77,10 @@ jobs:
             ca-certificates \
             libasio-dev
 
-      - name: Clean build, install, deps and dist directories
+      - name: Clean build directories
         shell: bash
         run: |
-          rm -rf build install deps dist dist-all
+          rm -rf build install deps dist dist-all asio.tar.gz asio-asio-1-30-2
 
       - name: Fetch vix async dependency
         shell: bash
@@ -86,7 +97,7 @@ jobs:
             cp -r /usr/include/asio* deps/async/third_party/asio/include/ || true
           fi
 
-          if [ "${{ runner.os }}" = "macOS" ]; then
+          if [ "${{ runner.os }}" = "macOS" ] || [ "${{ runner.os }}" = "Windows" ]; then
             curl -L https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz -o asio.tar.gz
             tar -xzf asio.tar.gz
             cp -r asio-asio-1-30-2/asio/include/* deps/async/third_party/asio/include/
@@ -104,8 +115,8 @@ jobs:
             -DVIX_ASYNC_BUILD_EXAMPLES=OFF \
             -DVIX_ENABLE_SANITIZERS=OFF
 
-          cmake --build deps/async/build -j2
-          cmake --install deps/async/build
+          cmake --build deps/async/build --config Release -j2
+          cmake --install deps/async/build --config Release
 
       - name: Configure
         shell: bash
@@ -115,7 +126,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/deps/install" \
-            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/install" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DSOFTADASTRA_BUILD_EXAMPLES=OFF \
             -DSOFTADASTRA_BUILD_TESTS=OFF \
             -DSOFTADASTRA_BUILD_CLI=ON \
@@ -129,15 +140,16 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cmake --build build -j2
+          cmake --build build --config Release -j2
 
       - name: Install
         shell: bash
         run: |
           set -euxo pipefail
-          cmake --install build
+          cmake --install build --config Release
 
-      - name: Validate installed CLI
+      - name: Validate installed CLI Unix
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euxo pipefail
@@ -150,7 +162,25 @@ jobs:
           install/bin/softadastra store get name
           install/bin/softadastra sync status
 
-      - name: Package binary
+      - name: Validate installed CLI Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (!(Test-Path "install\bin\softadastra.exe")) {
+            Write-Host "softadastra.exe not found"
+            Get-ChildItem -Recurse install | Select-Object FullName
+            exit 1
+          }
+
+          .\install\bin\softadastra.exe version
+          .\install\bin\softadastra.exe help
+          .\install\bin\softadastra.exe status
+          .\install\bin\softadastra.exe store put name gaspard
+          .\install\bin\softadastra.exe store get name
+          .\install\bin\softadastra.exe sync status
+
+      - name: Package binary Unix
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euxo pipefail
@@ -171,6 +201,26 @@ jobs:
 
           ASSET="softadastra-${{ matrix.softadastraos }}-${{ matrix.arch }}.tar.gz"
           tar -C dist/pkg -czf "dist/$ASSET" .
+
+      - name: Package binary Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\pkg\bin | Out-Null
+          Copy-Item install\bin\softadastra.exe dist\pkg\bin\softadastra.exe
+
+          @"
+          Softadastra CLI
+
+          Add bin\ to your PATH or copy bin\softadastra.exe to a directory already in PATH.
+
+          Example:
+            softadastra version
+            softadastra status
+          "@ | Out-File -FilePath dist\pkg\README.txt -Encoding utf8
+
+          $asset = "softadastra-${{ matrix.softadastraos }}-${{ matrix.arch }}.zip"
+          Compress-Archive -Path dist\pkg\* -DestinationPath "dist\$asset" -Force
 
       - name: Upload dist
         uses: actions/upload-artifact@v4
@@ -208,7 +258,7 @@ jobs:
 
           mkdir -p dist
 
-          find dist-all -type f -name "softadastra-*.tar.gz" -print0 |
+          find dist-all -type f \( -name "softadastra-*.tar.gz" -o -name "softadastra-*.zip" \) -print0 |
             while IFS= read -r -d '' f; do
               base="$(basename "$f")"
               if [ -f "dist/$base" ]; then
@@ -227,6 +277,7 @@ jobs:
           set -euxo pipefail
 
           cd dist
+
           for f in softadastra-*; do
             [ -f "$f" ] || continue
             sha256sum "$f" > "$f.sha256"

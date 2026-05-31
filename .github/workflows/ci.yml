@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-2022]
         build_type: [Release]
 
     steps:
@@ -28,6 +28,10 @@ jobs:
 
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
+
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -45,7 +49,7 @@ jobs:
       - name: Clean build, install, deps and smoke directories
         shell: bash
         run: |
-          rm -rf build install deps smoke-umbrella smoke-module
+          rm -rf build install deps smoke-umbrella smoke-module asio.tar.gz asio-asio-1-30-2
 
       - name: Fetch vix async dependency
         shell: bash
@@ -62,7 +66,7 @@ jobs:
             cp -r /usr/include/asio* deps/async/third_party/asio/include/ || true
           fi
 
-          if [ "${{ runner.os }}" = "macOS" ]; then
+          if [ "${{ runner.os }}" = "macOS" ] || [ "${{ runner.os }}" = "Windows" ]; then
             curl -L https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz -o asio.tar.gz
             tar -xzf asio.tar.gz
             cp -r asio-asio-1-30-2/asio/include/* deps/async/third_party/asio/include/
@@ -80,8 +84,8 @@ jobs:
             -DVIX_ASYNC_BUILD_EXAMPLES=OFF \
             -DVIX_ENABLE_SANITIZERS=OFF
 
-          cmake --build deps/async/build -j2
-          cmake --install deps/async/build
+          cmake --build deps/async/build --config ${{ matrix.build_type }} -j2
+          cmake --install deps/async/build --config ${{ matrix.build_type }}
 
       - name: Configure
         shell: bash
@@ -100,20 +104,28 @@ jobs:
             -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
 
       - name: Build
-        run: cmake --build build --config ${{ matrix.build_type }}
+        shell: bash
+        run: |
+          cmake --build build --config ${{ matrix.build_type }} -j2
 
       - name: Test
-        run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
+        shell: bash
+        run: |
+          ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
 
       - name: Install
         shell: bash
         run: |
-          cmake --install build
+          cmake --install build --config ${{ matrix.build_type }}
 
       - name: Smoke test - CLI binary
         shell: bash
         run: |
-          CLI="${{ github.workspace }}/install/bin/softadastra"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            CLI="${{ github.workspace }}/install/bin/softadastra.exe"
+          else
+            CLI="${{ github.workspace }}/install/bin/softadastra"
+          fi
 
           "$CLI" version
           "$CLI" help
@@ -166,7 +178,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install;${{ github.workspace }}/deps/install"
 
-          cmake --build smoke-umbrella/build --config ${{ matrix.build_type }}
+          cmake --build smoke-umbrella/build --config ${{ matrix.build_type }} -j2
 
       - name: Smoke test - direct module package
         shell: bash
@@ -211,7 +223,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install;${{ github.workspace }}/deps/install"
 
-          cmake --build smoke-module/build --config ${{ matrix.build_type }}
+          cmake --build smoke-module/build --config ${{ matrix.build_type }} -j2
 
       - name: Upload CMake logs on failure
         if: failure()
