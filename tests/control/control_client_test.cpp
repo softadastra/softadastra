@@ -284,6 +284,30 @@ namespace
         softadastra::SoftwareState::Stopped);
   }
 
+  TEST(ControlClientTest, RestartsRegisteredSoftware)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        client.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+    ASSERT_TRUE(client.start_software(id));
+
+    EXPECT_TRUE(client.restart_software(id));
+
+    EXPECT_EQ(
+        client.software_state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
   TEST(ControlClientTest, DetectsSuccessfulProcessExitAfterRefresh)
   {
     TestPlatform platform;

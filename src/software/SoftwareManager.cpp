@@ -138,6 +138,41 @@ namespace softadastra
     return true;
   }
 
+  bool SoftwareManager::restart(const SoftwareId &id)
+  {
+    SoftwareEntry *entry = state_.find_software(id);
+
+    if (entry == nullptr)
+    {
+      return false;
+    }
+
+    ManagedProcess *managed = find_process(id);
+
+    if (managed != nullptr)
+    {
+      if (!managed->process->stop())
+      {
+        entry->set_state(SoftwareState::Failed);
+        return false;
+      }
+
+      processes_.erase(
+          std::remove_if(
+              processes_.begin(),
+              processes_.end(),
+              [&id](const ManagedProcess &current)
+              {
+                return current.id == id;
+              }),
+          processes_.end());
+
+      entry->set_state(SoftwareState::Stopped);
+    }
+
+    return start(id);
+  }
+
   void SoftwareManager::refresh()
   {
     auto current = processes_.begin();

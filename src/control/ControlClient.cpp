@@ -42,6 +42,11 @@ namespace softadastra
     return server_.stop_software(id);
   }
 
+  bool ControlClient::restart_software(const SoftwareId &id)
+  {
+    return server_.restart_software(id);
+  }
+
   void ControlClient::refresh()
   {
     server_.refresh();

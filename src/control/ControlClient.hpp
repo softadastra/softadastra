@@ -53,6 +53,11 @@ namespace softadastra
     bool stop_software(const SoftwareId &id);
 
     /**
+     * @brief Restarts registered software.
+     */
+    bool restart_software(const SoftwareId &id);
+
+    /**
      * @brief Refreshes software lifecycle state from running processes.
      */
     void refresh();

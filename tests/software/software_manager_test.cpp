@@ -21,48 +21,54 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <memory>
-#include <string>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace
 {
+  struct TestProcessState
+  {
+    bool running{true};
+    bool stop_succeeds{true};
+    std::optional<int> exit_code;
+  };
+
   class TestProcess final : public softadastra::Process
   {
   public:
     explicit TestProcess(
-        bool running = true,
-        bool stop_succeeds = true) noexcept
-        : running_(running),
-          stop_succeeds_(stop_succeeds)
+        std::shared_ptr<TestProcessState> state) noexcept
+        : state_(std::move(state))
     {
     }
 
     bool stop() override
     {
-      if (!stop_succeeds_)
+      if (!state_->stop_succeeds)
       {
         return false;
       }
 
-      running_ = false;
+      state_->running = false;
+      state_->exit_code = 0;
       return true;
     }
 
     [[nodiscard]] bool is_running() const noexcept override
     {
-      return running_;
+      return state_->running;
     }
 
     [[nodiscard]] std::optional<int> exit_code() noexcept override
     {
-      return exit_code_;
+      return state_->exit_code;
     }
 
   private:
-    bool running_;
-    bool stop_succeeds_;
-    std::optional<int> exit_code_;
+    std::shared_ptr<TestProcessState> state_;
   };
 
   class TestProcessLauncher final : public softadastra::ProcessLauncher
@@ -79,9 +85,13 @@ namespace
         return nullptr;
       }
 
-      return std::make_unique<TestProcess>(
-          process_running_,
-          stop_succeeds_);
+      auto process = std::make_shared<TestProcessState>();
+      process->running = process_running_;
+      process->stop_succeeds = stop_succeeds_;
+
+      processes_.push_back(process);
+
+      return std::make_unique<TestProcess>(std::move(process));
     }
 
     void set_launch_fails(bool value) noexcept
@@ -109,12 +119,24 @@ namespace
       return last_executable_;
     }
 
+    [[nodiscard]] std::size_t active_process_count() const noexcept
+    {
+      return static_cast<std::size_t>(std::count_if(
+          processes_.begin(),
+          processes_.end(),
+          [](const std::shared_ptr<TestProcessState> &process)
+          {
+            return process->running;
+          }));
+    }
+
   private:
     bool launch_fails_{false};
     bool process_running_{true};
     bool stop_succeeds_{true};
     int launch_count_{0};
     std::string last_executable_;
+    std::vector<std::shared_ptr<TestProcessState>> processes_;
   };
 
   TEST(SoftwareManagerTest, RegistersSoftware)
@@ -422,6 +444,122 @@ namespace
     EXPECT_EQ(
         manager.state(second).value(),
         softadastra::SoftwareState::Running);
+  }
+
+  TEST(SoftwareManagerTest, RestartsRunningSoftwareWithOneProcess)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+    ASSERT_TRUE(manager.start(id));
+
+    EXPECT_TRUE(manager.restart(id));
+    EXPECT_EQ(launcher.launch_count(), 2);
+    EXPECT_EQ(launcher.active_process_count(), 1U);
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
+  TEST(SoftwareManagerTest, RestartsStoppedSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_TRUE(manager.restart(id));
+    EXPECT_EQ(launcher.launch_count(), 1);
+    EXPECT_EQ(launcher.active_process_count(), 1U);
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
+  TEST(SoftwareManagerTest, RestartsFailedSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_launch_fails(true);
+
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+    EXPECT_FALSE(manager.start(id));
+
+    launcher.set_launch_fails(false);
+
+    EXPECT_TRUE(manager.restart(id));
+    EXPECT_EQ(launcher.launch_count(), 2);
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
+  TEST(SoftwareManagerTest, DoesNotLaunchReplacementWhenStopFails)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_stop_succeeds(false);
+
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+    ASSERT_TRUE(manager.start(id));
+
+    EXPECT_FALSE(manager.restart(id));
+    EXPECT_EQ(launcher.launch_count(), 1);
+    EXPECT_EQ(launcher.active_process_count(), 1U);
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Failed);
+  }
+
+  TEST(SoftwareManagerTest, MarksSoftwareFailedWhenReplacementLaunchFails)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+    ASSERT_TRUE(manager.start(id));
+
+    launcher.set_launch_fails(true);
+
+    EXPECT_FALSE(manager.restart(id));
+    EXPECT_EQ(launcher.launch_count(), 2);
+    EXPECT_EQ(launcher.active_process_count(), 0U);
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Failed);
   }
 
 } // namespace

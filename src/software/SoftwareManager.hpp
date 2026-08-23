@@ -65,6 +65,17 @@ namespace softadastra
     bool stop(const SoftwareId &id);
 
     /**
+     * @brief Restarts registered software.
+     *
+     * A running managed process is stopped before a replacement is launched.
+     * If no process is managed for the software, a new process is launched
+     * directly.
+     *
+     * @return true when the replacement process is running, otherwise false.
+     */
+    bool restart(const SoftwareId &id);
+
+    /**
      * @brief Refreshes lifecycle state from managed processes.
      *
      * Running software remains Running while its process is active.

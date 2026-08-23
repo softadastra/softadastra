@@ -291,6 +291,28 @@ namespace
         softadastra::SoftwareState::Stopped);
   }
 
+  TEST(HostServiceTest, RestartsRegisteredSoftware)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        service.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+    ASSERT_TRUE(service.start_software(id));
+
+    EXPECT_TRUE(service.restart_software(id));
+
+    EXPECT_EQ(
+        service.software_state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
   TEST(HostServiceTest, KeepsRunningSoftwareRunningAfterRefresh)
   {
     TestPlatform platform;
