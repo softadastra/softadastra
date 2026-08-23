@@ -29,12 +29,15 @@ add_library(
   src/host/Host.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
+  src/host/HostStateFile.cpp
   src/platform/NativeNetwork.cpp
+  src/platform/NativeDataDirectory.cpp
   src/platform/NativePlatform.cpp
   src/platform/NativeProcess.cpp
   src/platform/NativeProcessLauncher.cpp
   src/platform/NativeService.cpp
   src/software/SoftwareManager.cpp
+  src/software/SoftwareRegistrationFormat.cpp
 )
 
 target_include_directories(
@@ -163,6 +166,21 @@ if(SOFTADASTRA_BUILD_TESTS)
 
     gtest_discover_tests(${target})
   endfunction()
+
+  softadastra_add_test(
+    softadastra_host_state_file_test
+    tests/host/host_state_file_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_software_registration_format_test
+    tests/software/software_registration_format_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_data_directory_test
+    tests/platform/native_data_directory_test.cpp
+  )
 
   softadastra_add_test(
     softadastra_software_id_test

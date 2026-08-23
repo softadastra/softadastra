@@ -16,6 +16,7 @@
 #include "control/ControlServer.hpp"
 #include "host/Host.hpp"
 #include "host/HostService.hpp"
+#include "host/HostStateFile.hpp"
 #include "platform/NativePlatform.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
@@ -24,6 +25,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <filesystem>
 #include <thread>
 #include <vector>
 
@@ -603,6 +605,46 @@ namespace
     EXPECT_EQ(
         client.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
+  }
+
+  TEST(HostRuntimeTest, StartsRestoredRealSoftware)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-host-" + std::to_string(
+                               std::chrono::steady_clock::now()
+                                   .time_since_epoch()
+                                   .count()));
+    const auto path = directory / "state";
+    const softadastra::SoftwareId first("first");
+    const softadastra::SoftwareId second("second");
+
+    {
+      softadastra::NativePlatform platform;
+      softadastra::Host host(platform);
+      softadastra::HostService service(host, platform.process_launcher());
+
+      ASSERT_TRUE(service.register_software(
+          first,
+          softadastra::ProcessSpec("sleep", {"30"})));
+      ASSERT_TRUE(service.register_software(
+          second,
+          softadastra::ProcessSpec("sleep", {"30"})));
+      ASSERT_TRUE(softadastra::HostStateFile(path).save(host.state()));
+    }
+
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+    ASSERT_TRUE(softadastra::HostStateFile(path).load(host.state()));
+    softadastra::HostService service(host, platform.process_launcher());
+    RunningSoftwareCleanup cleanup(*new softadastra::ControlClient(
+        *new softadastra::ControlServer(service)));
+
+    EXPECT_EQ(service.software_state(first).value(), softadastra::SoftwareState::Stopped);
+    EXPECT_EQ(service.software_state(second).value(), softadastra::SoftwareState::Stopped);
+    ASSERT_TRUE(service.start_software(first));
+    EXPECT_EQ(service.software_state(first).value(), softadastra::SoftwareState::Running);
+    EXPECT_TRUE(service.stop_software(first));
+    std::filesystem::remove_all(directory);
   }
 
 } // namespace

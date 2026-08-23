@@ -66,4 +66,9 @@ namespace softadastra
     return software_.empty();
   }
 
+  const std::vector<SoftwareEntry> &HostState::software() const noexcept
+  {
+    return software_;
+  }
+
 } // namespace softadastra

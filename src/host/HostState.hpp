@@ -85,6 +85,11 @@ namespace softadastra
      */
     [[nodiscard]] bool empty() const noexcept;
 
+    /**
+     * @brief Returns registered software infrastructure metadata.
+     */
+    [[nodiscard]] const std::vector<SoftwareEntry> &software() const noexcept;
+
   private:
     std::vector<SoftwareEntry> software_;
   };
