@@ -15,6 +15,8 @@
 #include "control/LocalControlServer.hpp"
 
 #include "control/LocalControlProtocol.hpp"
+#include "control/RemoteAccessConfig.hpp"
+#include "control/RemoteControlServer.hpp"
 
 #include <array>
 #include <cerrno>
@@ -50,9 +52,13 @@ namespace softadastra
 
   LocalControlServer::LocalControlServer(
       ControlServer &server,
-      std::filesystem::path path) noexcept
+      std::filesystem::path path,
+      RemoteAccessConfig *remote_config,
+      RemoteControlServer *remote_server) noexcept
       : server_(server),
-        path_(std::move(path))
+        path_(std::move(path)),
+        remote_config_(remote_config),
+        remote_server_(remote_server)
   {
   }
 
@@ -138,8 +144,26 @@ namespace softadastra
 
       if (received > 0)
       {
-        const std::string response = handle(
-            std::string_view(buffer.data(), static_cast<std::size_t>(received)));
+        const std::string_view request(buffer.data(), static_cast<std::size_t>(received));
+        std::string response;
+        const auto fields = LocalControlProtocol::fields(request);
+        if (remote_config_ != nullptr && remote_server_ != nullptr && fields.size() >= 2 && fields[0] == "remote")
+        {
+          RemoteAccessSettings settings;
+          if (fields[1] == "disable" && fields.size() == 2)
+          {
+            response = remote_config_->save(settings) && remote_server_->apply() ? "remote 0" : "error";
+          }
+          else if (fields[1] == "enable" && fields.size() == 4)
+          {
+            const auto port = LocalControlProtocol::integer(fields[3]);
+            const bool valid_port = port.has_value() && port.value() > 0 && port.value() <= 65535;
+            settings = {true, fields[2], valid_port ? static_cast<std::uint16_t>(port.value()) : static_cast<std::uint16_t>(0)};
+            response = remote_config_->save(settings) && remote_server_->apply() ? "remote 1" : "error";
+          }
+          else response = "error";
+        }
+        else response = handle(server_, request);
         static_cast<void>(::send(client, response.data(), response.size(), MSG_NOSIGNAL));
       }
 
@@ -164,7 +188,7 @@ namespace softadastra
 #endif
   }
 
-  std::string LocalControlServer::handle(std::string_view request)
+  std::string LocalControlServer::handle(ControlServer &server, std::string_view request)
   {
     const auto fields = LocalControlProtocol::fields(request);
 
@@ -181,13 +205,13 @@ namespace softadastra
     if (fields[0] == "connectivity" && fields.size() == 1)
     {
       return "connectivity " +
-             std::to_string(server_.connectivity_available() ? 1 : 0) +
-             " " + std::to_string(server_.connected() ? 1 : 0);
+             std::to_string(server.connectivity_available() ? 1 : 0) +
+             " " + std::to_string(server.connected() ? 1 : 0);
     }
 
     if (fields[0] == "access" && fields.size() == 1)
     {
-      const LocalHostAccess access = server_.local_access();
+      const LocalHostAccess access = server.local_access();
       std::string response = "access " +
                              LocalControlProtocol::encode(access.host_name) +
                              " " + std::to_string(access.addresses.size());
@@ -233,7 +257,7 @@ namespace softadastra
       }
 
       return std::string("register ") +
-             (server_.register_software(
+             (server.register_software(
                   SoftwareId(id.value()),
                   ProcessSpec(executable.value(), std::move(arguments)))
                   ? "1"
@@ -255,21 +279,21 @@ namespace softadastra
 
       if (fields[0] == "start")
       {
-        return operation_response(server_.start_software(software_id));
+        return operation_response(server.start_software(software_id));
       }
 
       if (fields[0] == "stop")
       {
-        return operation_response(server_.stop_software(software_id));
+        return operation_response(server.stop_software(software_id));
       }
 
       if (fields[0] == "restart")
       {
-        return operation_response(server_.restart_software(software_id));
+        return operation_response(server.restart_software(software_id));
       }
 
-      const auto state = server_.software_state(software_id);
-      const auto result = server_.software_result(software_id);
+      const auto state = server.software_state(software_id);
+      const auto result = server.software_result(software_id);
       const auto error = result.has_value() ? result->error() : std::nullopt;
       const auto code = result.has_value() ? result->exit_code() : std::nullopt;
       return "status " + std::to_string(state.has_value()

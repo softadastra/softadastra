@@ -106,6 +106,8 @@ namespace
         << "  softadastra status <software-id>\n"
         << "  softadastra connectivity\n"
         << "  softadastra access\n"
+        << "  softadastra remote enable <ipv4-address> <port>\n"
+        << "  softadastra remote disable\n"
         << "  softadastra help\n";
   }
 
@@ -141,6 +143,26 @@ namespace softadastra
     {
       std::cerr << "Host is not running\n";
       return 1;
+    }
+
+    if (command == "remote")
+    {
+      if ((argc != 3 || std::string(argv[2]) != "disable") &&
+          (argc != 5 || std::string(argv[2]) != "enable"))
+      {
+        std::cerr << "remote requires enable <ipv4-address> <port> or disable\n";
+        return 2;
+      }
+      const std::string request = argc == 3 ? "remote disable" :
+          "remote enable " + std::string(argv[3]) + " " + std::string(argv[4]);
+      const auto response = client_.request(request);
+      if (!response.has_value() || response.value() == "error")
+      {
+        std::cerr << "failed to update remote access\n";
+        return 1;
+      }
+      std::cout << (response.value() == "remote 1" ? "remote access: enabled\n" : "remote access: disabled\n");
+      return 0;
     }
 
     if (command == "connectivity")

@@ -16,7 +16,10 @@
 #include "control/ControlClient.hpp"
 #include "control/ControlServer.hpp"
 #include "control/LocalControlServer.hpp"
+#include "control/RemoteAccessConfig.hpp"
+#include "control/RemoteControlServer.hpp"
 #include "host/Host.hpp"
+#include "host/HostIdentity.hpp"
 #include "host/HostLoop.hpp"
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
@@ -82,6 +85,15 @@ int main(int argc, char *argv[])
 
   if (argc == 2 && std::string(argv[1]) == "host")
   {
+    softadastra::HostIdentity identity(
+        softadastra::NativeDataDirectory::path() / "identity");
+
+    if (!identity.load_or_create())
+    {
+      std::cerr << "failed to load Host identity\n";
+      return 1;
+    }
+
     softadastra::NativePlatform platform;
     softadastra::Host host(platform);
     softadastra::HostService host_service(
@@ -90,9 +102,26 @@ int main(int argc, char *argv[])
     softadastra::HostStateFile state_file(
         softadastra::NativeDataDirectory::path() / "host-state");
     softadastra::ControlServer control_server(host_service);
+    softadastra::RemoteAccessConfig remote_config(
+        softadastra::NativeDataDirectory::path() / "remote-access");
+    softadastra::RemoteAccessSettings remote_settings;
+    if (!remote_config.load(remote_settings) && !remote_config.save(remote_settings))
+    {
+      std::cerr << "failed to initialize remote access configuration\n";
+      return 1;
+    }
+    softadastra::RemoteControlServer remote_server(
+        control_server, remote_config, identity.secret(),
+        softadastra::NativeDataDirectory::path());
+    if (!remote_server.apply())
+    {
+      std::cerr << "failed to apply remote access configuration\n";
+      return 1;
+    }
     softadastra::LocalControlServer local_control_server(
         control_server,
-        softadastra::NativeDataDirectory::path() / "control.sock");
+        softadastra::NativeDataDirectory::path() / "control.sock",
+        &remote_config, &remote_server);
     softadastra::HostLoop host_loop(
         host_service,
         state_file,

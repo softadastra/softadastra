@@ -23,6 +23,8 @@
 
 namespace softadastra
 {
+  class RemoteAccessConfig;
+  class RemoteControlServer;
   /**
    * @brief Serves Host control operations through a local platform channel.
    */
@@ -34,7 +36,9 @@ namespace softadastra
      */
     LocalControlServer(
         ControlServer &server,
-        std::filesystem::path path) noexcept;
+        std::filesystem::path path,
+        RemoteAccessConfig *remote_config = nullptr,
+        RemoteControlServer *remote_server = nullptr) noexcept;
 
     ~LocalControlServer();
 
@@ -56,12 +60,15 @@ namespace softadastra
      */
     void stop() noexcept;
 
-  private:
-    [[nodiscard]] std::string handle(std::string_view request);
+    /** Executes the shared Host control protocol. */
+    [[nodiscard]] static std::string handle(ControlServer &server, std::string_view request);
 
+  private:
     ControlServer &server_;
     std::filesystem::path path_;
     int descriptor_{-1};
+    RemoteAccessConfig *remote_config_;
+    RemoteControlServer *remote_server_;
   };
 
 } // namespace softadastra

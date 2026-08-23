@@ -102,7 +102,7 @@ namespace softadastra
      */
     [[nodiscard]] std::optional<LocalHostAccess> local_access() const noexcept;
 
-  private:
+  public:
     [[nodiscard]] std::optional<std::string> request(
         const std::string &message) const noexcept;
 

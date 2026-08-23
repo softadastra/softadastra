@@ -18,6 +18,7 @@ option(
 )
 
 find_package(Vix CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 add_library(
   softadastra_internal
@@ -28,7 +29,11 @@ add_library(
   src/control/ControlServer.cpp
   src/control/LocalControlProtocol.cpp
   src/control/LocalControlServer.cpp
+  src/control/RemoteAccessConfig.cpp
+  src/control/RemoteControlClient.cpp
+  src/control/RemoteControlServer.cpp
   src/host/Host.cpp
+  src/host/HostIdentity.cpp
   src/host/HostLoop.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
@@ -53,6 +58,8 @@ target_link_libraries(
   softadastra_internal
   PUBLIC
     vix::vix
+    OpenSSL::Crypto
+    OpenSSL::SSL
 )
 
 if(WIN32)
@@ -268,6 +275,21 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_host_test
     tests/host/host_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_identity_test
+    tests/host/host_identity_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_remote_access_config_test
+    tests/control/remote_access_config_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_remote_control_test
+    tests/integration/remote_control_test.cpp
   )
 
   softadastra_add_test(
