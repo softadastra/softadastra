@@ -1,10 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(softadastra LANGUAGES CXX)
-
-# --------------------------------------------------------------------
-# Language
-# --------------------------------------------------------------------
+project(
+  softadastra
+  LANGUAGES CXX
+)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,111 +11,120 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# --------------------------------------------------------------------
-# Options
-# --------------------------------------------------------------------
-
 option(
   SOFTADASTRA_BUILD_TESTS
   "Build Softadastra tests"
   ON
 )
 
-# --------------------------------------------------------------------
-# Dependencies
-# --------------------------------------------------------------------
-
 find_package(Vix CONFIG REQUIRED)
 
-# --------------------------------------------------------------------
-# Internal implementation
-#
-# This is not a public Softadastra library or SDK.
-# It only exists to share implementation between the executable
-# and the tests.
-# --------------------------------------------------------------------
-
-add_library(softadastra_internal STATIC
+add_library(
+  softadastra_internal
+  STATIC
   src/cli/Cli.cpp
-
+  src/connectivity/ConnectivityManager.cpp
+  src/control/ControlClient.cpp
+  src/control/ControlServer.cpp
   src/host/Host.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
-
+  src/platform/NativeNetwork.cpp
+  src/platform/NativePlatform.cpp
+  src/platform/NativeProcess.cpp
+  src/platform/NativeProcessLauncher.cpp
+  src/platform/NativeService.cpp
   src/software/SoftwareManager.cpp
-
-  src/connectivity/ConnectivityManager.cpp
-
-  src/control/ControlClient.cpp
-  src/control/ControlServer.cpp
 )
 
-target_include_directories(softadastra_internal
+target_include_directories(
+  softadastra_internal
   PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(softadastra_internal
+target_link_libraries(
+  softadastra_internal
   PUBLIC
     vix::vix
 )
 
-# --------------------------------------------------------------------
-# Warnings
-# --------------------------------------------------------------------
-
-if(MSVC)
-  target_compile_options(softadastra_internal PRIVATE
-    /W4
-    /permissive-
-  )
-else()
-  target_compile_options(softadastra_internal PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
+if(WIN32)
+  target_link_libraries(
+    softadastra_internal
+    PRIVATE
+      advapi32
+      iphlpapi
+      ws2_32
   )
 endif()
 
-# --------------------------------------------------------------------
-# Executable
-#
-# main.cpp is implemented at the final application-entry step.
-# EXCLUDE_FROM_ALL keeps the current staged build valid while main.cpp
-# is intentionally still empty.
-#
-# Remove EXCLUDE_FROM_ALL when src/main.cpp is implemented.
-# --------------------------------------------------------------------
+if(MSVC)
+  target_compile_options(
+    softadastra_internal
+    PRIVATE
+      /W4
+      /permissive-
+  )
+else()
+  target_compile_options(
+    softadastra_internal
+    PRIVATE
+      -Wall
+      -Wextra
+      -Wpedantic
+  )
+endif()
 
-add_executable(softadastra EXCLUDE_FROM_ALL
+add_executable(
+  softadastra
   src/main.cpp
 )
 
-target_link_libraries(softadastra
+target_link_libraries(
+  softadastra
   PRIVATE
     softadastra_internal
 )
 
-# --------------------------------------------------------------------
-# Tests
-# --------------------------------------------------------------------
+if(MSVC)
+  target_compile_options(
+    softadastra
+    PRIVATE
+      /W4
+      /permissive-
+  )
+else()
+  target_compile_options(
+    softadastra
+    PRIVATE
+      -Wall
+      -Wextra
+      -Wpedantic
+  )
+endif()
 
 if(SOFTADASTRA_BUILD_TESTS)
   include(CTest)
-  enable_testing()
-
-  include(FetchContent)
 
   find_package(GTest CONFIG QUIET)
 
   if(NOT GTest_FOUND)
+    include(FetchContent)
+
     FetchContent_Declare(
       googletest
-      GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG v1.14.0
+      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
     )
 
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    if(WIN32)
+      set(
+        gtest_force_shared_crt
+        ON
+        CACHE BOOL ""
+        FORCE
+      )
+    endif()
 
     FetchContent_MakeAvailable(googletest)
   endif()
@@ -124,33 +132,118 @@ if(SOFTADASTRA_BUILD_TESTS)
   include(GoogleTest)
 
   function(softadastra_add_test target source)
-    add_executable(${target}
+    add_executable(
+      ${target}
       ${source}
     )
 
-    target_link_libraries(${target}
+    target_link_libraries(
+      ${target}
       PRIVATE
         softadastra_internal
         GTest::gtest_main
     )
 
     if(MSVC)
-      target_compile_options(${target} PRIVATE
-        /W4
-        /permissive-
+      target_compile_options(
+        ${target}
+        PRIVATE
+          /W4
+          /permissive-
       )
     else()
-      target_compile_options(${target} PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
+      target_compile_options(
+        ${target}
+        PRIVATE
+          -Wall
+          -Wextra
+          -Wpedantic
       )
     endif()
 
     gtest_discover_tests(${target})
   endfunction()
 
-  # Host
+  softadastra_add_test(
+    softadastra_software_id_test
+    tests/software/software_id_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_software_state_test
+    tests/software/software_state_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_software_entry_test
+    tests/software/software_entry_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_software_manager_test
+    tests/software/software_manager_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_process_spec_test
+    tests/platform/process_spec_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_process_test
+    tests/platform/process_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_process_launcher_test
+    tests/platform/process_launcher_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_service_test
+    tests/platform/service_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_network_test
+    tests/platform/network_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_platform_test
+    tests/platform/platform_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_process_test
+    tests/platform/native_process_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_process_launcher_test
+    tests/platform/native_process_launcher_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_network_test
+    tests/platform/native_network_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_service_test
+    tests/platform/native_service_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_platform_test
+    tests/platform/native_platform_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_state_test
+    tests/host/host_state_test.cpp
+  )
+
   softadastra_add_test(
     softadastra_host_test
     tests/host/host_test.cpp
@@ -162,41 +255,8 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
-    softadastra_host_state_test
-    tests/host/host_state_test.cpp
-  )
-
-  # Software
-  softadastra_add_test(
-    softadastra_software_id_test
-    tests/software/software_id_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_software_entry_test
-    tests/software/software_entry_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_software_state_test
-    tests/software/software_state_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_software_manager_test
-    tests/software/software_manager_test.cpp
-  )
-
-  # Connectivity
-  softadastra_add_test(
     softadastra_connectivity_manager_test
     tests/connectivity/connectivity_manager_test.cpp
-  )
-
-  # Control
-  softadastra_add_test(
-    softadastra_control_client_test
-    tests/control/control_client_test.cpp
   )
 
   softadastra_add_test(
@@ -204,24 +264,13 @@ if(SOFTADASTRA_BUILD_TESTS)
     tests/control/control_server_test.cpp
   )
 
-  # Platform
   softadastra_add_test(
-    softadastra_platform_test
-    tests/platform/platform_test.cpp
+    softadastra_control_client_test
+    tests/control/control_client_test.cpp
   )
 
   softadastra_add_test(
-    softadastra_process_test
-    tests/platform/process_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_service_test
-    tests/platform/service_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_network_test
-    tests/platform/network_test.cpp
+    softadastra_host_runtime_test
+    tests/integration/host_runtime_test.cpp
   )
 endif()

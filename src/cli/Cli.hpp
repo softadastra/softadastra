@@ -16,20 +16,17 @@
 #define SOFTADASTRA_CLI_CLI_HPP
 
 #include "control/ControlClient.hpp"
-#include "platform/Process.hpp"
 
 namespace softadastra
 {
   /**
-   * @brief Provides the command-line interface for controlling a Host.
+   * @brief Provides the Softadastra command-line interface.
    *
-   * Cli translates command-line arguments into operations performed through
-   * ControlClient. It does not implement Host lifecycle, software lifecycle,
-   * connectivity, or platform behavior itself.
+   * Cli translates command-line arguments into Host control operations through
+   * ControlClient.
    *
-   * The Process reference represents the current execution capability used by
-   * start and stop operations. Process creation and software-specific execution
-   * configuration remain outside the CLI.
+   * It does not interact directly with platform processes or other
+   * operating-system capabilities.
    */
   class Cli
   {
@@ -37,23 +34,17 @@ namespace softadastra
     /**
      * @brief Creates a command-line interface.
      *
-     * The ControlClient and Process instances must remain valid for the lifetime
-     * of the Cli instance.
-     *
      * @param client Control client used to communicate with the Host.
-     * @param process Process capability used for software lifecycle operations.
      */
-    Cli(
-        ControlClient &client,
-        Process &process) noexcept;
+    explicit Cli(ControlClient &client) noexcept;
 
     /**
-     * @brief Executes a command-line request.
+     * @brief Executes a command-line operation.
      *
-     * Supported commands are:
+     * Supported commands:
      *
      * @code
-     * softadastra register <software-id>
+     * softadastra register <software-id> <executable> [arguments...]
      * softadastra start <software-id>
      * softadastra stop <software-id>
      * softadastra status <software-id>
@@ -64,15 +55,13 @@ namespace softadastra
      * @param argc Number of command-line arguments.
      * @param argv Command-line arguments.
      *
-     * @return 0 on success, 1 when an operation fails, or 2 for invalid usage.
+     * @return 0 on success, 1 when an operation fails, or 2 when command usage
+     *         is invalid.
      */
-    int run(
-        int argc,
-        const char *const argv[]);
+    int run(int argc, const char *const argv[]);
 
   private:
     ControlClient &client_;
-    Process &process_;
   };
 
 } // namespace softadastra

@@ -17,90 +17,96 @@
 
 #include "host/HostState.hpp"
 #include "platform/Process.hpp"
+#include "platform/ProcessLauncher.hpp"
+#include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareState.hpp"
 
+#include <memory>
 #include <optional>
+#include <vector>
 
 namespace softadastra
 {
   /**
-   * @brief Manages the infrastructure lifecycle of software known to a Host.
+   * @brief Manages software registered with a Host.
    *
-   * SoftwareManager coordinates software registration and lifecycle state with
-   * the process capability used to execute the software.
+   * SoftwareManager owns the runtime association between registered software
+   * and the operating-system processes launched for it.
    *
-   * It does not know how the software is implemented, which language it uses,
-   * which protocols it exposes, or how its internal architecture is organized.
-   *
-   * A Process supplied to a lifecycle operation represents the execution handle
-   * associated with that software. SoftwareManager controls that handle without
-   * knowing how the platform created it.
+   * Process creation is delegated to ProcessLauncher so that software
+   * management remains independent of the underlying operating system.
    */
   class SoftwareManager
   {
   public:
     /**
-     * @brief Creates a software manager for a Host state.
+     * @brief Creates a software manager.
      *
-     * The HostState instance must remain valid for the lifetime of the manager.
-     *
-     * @param state Host infrastructure state managed by this instance.
+     * @param state Host-owned software state.
+     * @param process_launcher Platform capability used to launch processes.
      */
-    explicit SoftwareManager(HostState &state) noexcept;
+    SoftwareManager(
+        HostState &state,
+        ProcessLauncher &process_launcher) noexcept;
 
     /**
      * @brief Registers software with the Host.
      *
-     * Registered software begins in the Stopped state.
+     * @param id Software identifier.
+     * @param process_spec Information required to launch the software.
      *
-     * @param id Identifier of the software to register.
-     *
-     * @return true if the software was registered, otherwise false if the
-     *         identifier is already known to the Host.
+     * @return true if the software was registered, otherwise false.
      */
-    bool register_software(SoftwareId id);
+    bool register_software(
+        SoftwareId id,
+        ProcessSpec process_spec);
 
     /**
-     * @brief Starts registered software using a process execution handle.
-     *
-     * The software state changes to Starting before the process start attempt.
-     * A successful start changes the state to Running. A failed start changes
-     * the state to Failed.
+     * @brief Starts registered software.
      *
      * @param id Identifier of the software to start.
-     * @param process Process execution handle associated with the software.
      *
-     * @return true if the software started successfully, otherwise false.
+     * @return true if the software was started, otherwise false.
      */
-    bool start(const SoftwareId &id, Process &process);
+    bool start(const SoftwareId &id);
 
     /**
-     * @brief Stops registered software using a process execution handle.
-     *
-     * A successful stop changes the software state to Stopped. A failed stop
-     * changes the software state to Failed.
+     * @brief Stops running software.
      *
      * @param id Identifier of the software to stop.
-     * @param process Process execution handle associated with the software.
      *
-     * @return true if the software stopped successfully, otherwise false.
+     * @return true if the software was stopped, otherwise false.
      */
-    bool stop(const SoftwareId &id, Process &process);
+    bool stop(const SoftwareId &id);
 
     /**
-     * @brief Returns the infrastructure lifecycle state of registered software.
+     * @brief Returns the lifecycle state of registered software.
      *
-     * @param id Identifier of the software to inspect.
+     * @param id Software identifier.
      *
-     * @return Current software state, or std::nullopt if the identifier is not
-     *         known to the Host.
+     * @return The lifecycle state, or std::nullopt when the software is not
+     *         registered.
      */
     [[nodiscard]] std::optional<SoftwareState> state(
         const SoftwareId &id) const noexcept;
 
   private:
+    struct ManagedProcess
+    {
+      SoftwareId id;
+      std::unique_ptr<Process> process;
+    };
+
+    [[nodiscard]] ManagedProcess *find_process(
+        const SoftwareId &id) noexcept;
+
+    [[nodiscard]] const ManagedProcess *find_process(
+        const SoftwareId &id) const noexcept;
+
     HostState &state_;
+    ProcessLauncher &process_launcher_;
+    std::vector<ManagedProcess> processes_;
   };
 
 } // namespace softadastra

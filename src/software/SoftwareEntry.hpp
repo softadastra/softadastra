@@ -15,6 +15,7 @@
 #ifndef SOFTADASTRA_SOFTWARE_SOFTWARE_ENTRY_HPP
 #define SOFTADASTRA_SOFTWARE_SOFTWARE_ENTRY_HPP
 
+#include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareState.hpp"
 
@@ -23,13 +24,13 @@
 namespace softadastra
 {
   /**
-   * @brief Represents software known to a Softadastra Host.
+   * @brief Represents software registered with a Host.
    *
-   * SoftwareEntry contains the minimal infrastructure information Softadastra
-   * needs to identify hosted software and track its lifecycle state.
+   * SoftwareEntry stores only Host-owned infrastructure information required
+   * to identify, launch, and track software.
    *
-   * It does not describe the software's programming language, framework,
-   * protocol, database, business logic, or internal architecture.
+   * It does not describe the software language, framework, protocol, database,
+   * or application architecture.
    */
   class SoftwareEntry
   {
@@ -37,19 +38,17 @@ namespace softadastra
     /**
      * @brief Creates a software entry.
      *
-     * New software entries begin in the Stopped state.
-     *
-     * @param id Identifier assigned to the software.
+     * @param id Stable identifier used by the Host.
+     * @param process_spec Information required to launch the software process.
      */
-    explicit SoftwareEntry(SoftwareId id)
-        : id_(std::move(id))
+    SoftwareEntry(SoftwareId id, ProcessSpec process_spec)
+        : id_(std::move(id)),
+          process_spec_(std::move(process_spec))
     {
     }
 
     /**
      * @brief Returns the software identifier.
-     *
-     * @return Constant reference to the software identifier.
      */
     [[nodiscard]] const SoftwareId &id() const noexcept
     {
@@ -57,9 +56,15 @@ namespace softadastra
     }
 
     /**
-     * @brief Returns the current infrastructure lifecycle state.
-     *
-     * @return Current software state.
+     * @brief Returns the process launch specification.
+     */
+    [[nodiscard]] const ProcessSpec &process_spec() const noexcept
+    {
+      return process_spec_;
+    }
+
+    /**
+     * @brief Returns the current software lifecycle state.
      */
     [[nodiscard]] SoftwareState state() const noexcept
     {
@@ -67,10 +72,7 @@ namespace softadastra
     }
 
     /**
-     * @brief Updates the infrastructure lifecycle state.
-     *
-     * This operation changes only the state tracked by Softadastra. It does not
-     * modify any state owned internally by the hosted software.
+     * @brief Updates the software lifecycle state.
      *
      * @param state New lifecycle state.
      */
@@ -81,6 +83,7 @@ namespace softadastra
 
   private:
     SoftwareId id_;
+    ProcessSpec process_spec_;
     SoftwareState state_{SoftwareState::Stopped};
   };
 

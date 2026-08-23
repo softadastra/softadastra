@@ -17,13 +17,13 @@
 
 namespace
 {
+
   class TestProcess final : public softadastra::Process
   {
   public:
-    bool start() override
+    explicit TestProcess(bool running = true) noexcept
+        : running_(running)
     {
-      running_ = true;
-      return true;
     }
 
     bool stop() override
@@ -38,45 +38,39 @@ namespace
     }
 
   private:
-    bool running_{false};
+    bool running_;
   };
 
+  TEST(ProcessTest, RepresentsRunningProcess)
+  {
+    const TestProcess process;
+
+    EXPECT_TRUE(process.is_running());
+  }
+
+  TEST(ProcessTest, CanRepresentStoppedProcess)
+  {
+    const TestProcess process(false);
+
+    EXPECT_FALSE(process.is_running());
+  }
+
+  TEST(ProcessTest, CanStopProcess)
+  {
+    TestProcess process;
+
+    EXPECT_TRUE(process.stop());
+    EXPECT_FALSE(process.is_running());
+  }
+
+  TEST(ProcessTest, SupportsUseThroughProcessInterface)
+  {
+    TestProcess concrete_process;
+    softadastra::Process &process = concrete_process;
+
+    EXPECT_TRUE(process.is_running());
+    EXPECT_TRUE(process.stop());
+    EXPECT_FALSE(process.is_running());
+  }
+
 } // namespace
-
-TEST(ProcessTest, StartsStopped)
-{
-  TestProcess process;
-
-  EXPECT_FALSE(process.is_running());
-}
-
-TEST(ProcessTest, CanStart)
-{
-  TestProcess process;
-
-  EXPECT_TRUE(process.start());
-  EXPECT_TRUE(process.is_running());
-}
-
-TEST(ProcessTest, CanStop)
-{
-  TestProcess process;
-
-  ASSERT_TRUE(process.start());
-  ASSERT_TRUE(process.is_running());
-
-  EXPECT_TRUE(process.stop());
-  EXPECT_FALSE(process.is_running());
-}
-
-TEST(ProcessTest, SupportsUseThroughProcessInterface)
-{
-  TestProcess concrete;
-  softadastra::Process &process = concrete;
-
-  EXPECT_TRUE(process.start());
-  EXPECT_TRUE(process.is_running());
-
-  EXPECT_TRUE(process.stop());
-  EXPECT_FALSE(process.is_running());
-}

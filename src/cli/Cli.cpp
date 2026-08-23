@@ -14,17 +14,17 @@
 
 #include "cli/Cli.hpp"
 
+#include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareState.hpp"
 
 #include <iostream>
-#include <string_view>
+#include <string>
+#include <vector>
 
 namespace
 {
-
-  const char *software_state_name(
-      softadastra::SoftwareState state) noexcept
+  const char *software_state_name(softadastra::SoftwareState state) noexcept
   {
     switch (state)
     {
@@ -47,10 +47,8 @@ namespace
   void print_usage()
   {
     std::cout
-        << "Softadastra\n"
-        << '\n'
         << "Usage:\n"
-        << "  softadastra register <software-id>\n"
+        << "  softadastra register <software-id> <executable> [arguments...]\n"
         << "  softadastra start <software-id>\n"
         << "  softadastra stop <software-id>\n"
         << "  softadastra status <software-id>\n"
@@ -63,17 +61,12 @@ namespace
 namespace softadastra
 {
 
-  Cli::Cli(
-      ControlClient &client,
-      Process &process) noexcept
-      : client_(client),
-        process_(process)
+  Cli::Cli(ControlClient &client) noexcept
+      : client_(client)
   {
   }
 
-  int Cli::run(
-      int argc,
-      const char *const argv[])
+  int Cli::run(int argc, const char *const argv[])
   {
     if (argc < 2)
     {
@@ -81,7 +74,7 @@ namespace softadastra
       return 2;
     }
 
-    const std::string_view command(argv[1]);
+    const std::string command(argv[1]);
 
     if (command == "help" ||
         command == "--help" ||
@@ -93,38 +86,52 @@ namespace softadastra
 
     if (command == "connectivity")
     {
+      if (argc != 2)
+      {
+        std::cerr << "connectivity does not accept arguments\n";
+        return 2;
+      }
+
       if (!client_.connectivity_available())
       {
         std::cout << "network: unavailable\n";
         return 0;
       }
 
-      std::cout
-          << "network: available\n"
-          << "connected: "
-          << (client_.connected() ? "yes" : "no")
-          << '\n';
+      std::cout << "network: available\n"
+                << "connected: "
+                << (client_.connected() ? "yes" : "no")
+                << '\n';
 
       return 0;
     }
 
-    if (argc < 3)
-    {
-      std::cerr
-          << "Missing software identifier.\n\n";
-
-      print_usage();
-      return 2;
-    }
-
-    const SoftwareId id(argv[2]);
-
     if (command == "register")
     {
-      if (!client_.register_software(id))
+      if (argc < 4)
       {
         std::cerr
-            << "Software is already registered: "
+            << "register requires a software identifier and an executable\n";
+        return 2;
+      }
+
+      std::vector<std::string> arguments;
+      arguments.reserve(static_cast<std::size_t>(argc - 4));
+
+      for (int index = 4; index < argc; ++index)
+      {
+        arguments.emplace_back(argv[index]);
+      }
+
+      const SoftwareId id(argv[2]);
+      const ProcessSpec process_spec(
+          argv[3],
+          std::move(arguments));
+
+      if (!client_.register_software(id, process_spec))
+      {
+        std::cerr
+            << "failed to register software: "
             << id.value()
             << '\n';
 
@@ -139,12 +146,23 @@ namespace softadastra
       return 0;
     }
 
+    if (argc != 3)
+    {
+      std::cerr
+          << command
+          << " requires a software identifier\n";
+
+      return 2;
+    }
+
+    const SoftwareId id(argv[2]);
+
     if (command == "start")
     {
-      if (!client_.start_software(id, process_))
+      if (!client_.start_software(id))
       {
         std::cerr
-            << "Failed to start software: "
+            << "failed to start software: "
             << id.value()
             << '\n';
 
@@ -161,10 +179,10 @@ namespace softadastra
 
     if (command == "stop")
     {
-      if (!client_.stop_software(id, process_))
+      if (!client_.stop_software(id))
       {
         std::cerr
-            << "Failed to stop software: "
+            << "failed to stop software: "
             << id.value()
             << '\n';
 
@@ -181,13 +199,12 @@ namespace softadastra
 
     if (command == "status")
     {
-      const auto state =
-          client_.software_state(id);
+      const auto state = client_.software_state(id);
 
       if (!state.has_value())
       {
         std::cerr
-            << "Software is not registered: "
+            << "software not found: "
             << id.value()
             << '\n';
 
@@ -197,16 +214,16 @@ namespace softadastra
       std::cout
           << id.value()
           << ": "
-          << software_state_name(*state)
+          << software_state_name(state.value())
           << '\n';
 
       return 0;
     }
 
     std::cerr
-        << "Unknown command: "
+        << "unknown command: "
         << command
-        << "\n\n";
+        << '\n';
 
     print_usage();
 

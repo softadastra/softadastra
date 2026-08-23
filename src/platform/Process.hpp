@@ -18,30 +18,18 @@
 namespace softadastra
 {
   /**
-   * @brief Defines the process lifecycle operations required by a Host.
+   * @brief Represents a running operating-system process.
    *
-   * Process represents the minimal operating-system process capability needed
-   * by Softadastra. It allows higher-level Host components to start, stop, and
-   * inspect a process without depending directly on a particular operating
-   * system or process implementation.
+   * Process is a handle to a process that has already been launched.
+   * Process creation belongs to ProcessLauncher.
    *
-   * This interface does not describe the architecture, language, protocol, or
-   * internal behavior of the software executed by the process.
+   * The interface exposes only the lifecycle capabilities currently required
+   * by Softadastra.
    */
   class Process
   {
   public:
-    /**
-     * @brief Destroys the process interface.
-     */
     virtual ~Process() = default;
-
-    /**
-     * @brief Starts the process.
-     *
-     * @return true if the process was started successfully, otherwise false.
-     */
-    virtual bool start() = 0;
 
     /**
      * @brief Stops the process.
@@ -51,9 +39,7 @@ namespace softadastra
     virtual bool stop() = 0;
 
     /**
-     * @brief Checks whether the process is currently running.
-     *
-     * @return true if the process is running, otherwise false.
+     * @brief Returns whether the process is currently running.
      */
     [[nodiscard]] virtual bool is_running() const noexcept = 0;
   };

@@ -12,32 +12,34 @@
  *  Softadastra
  */
 
+#include "host/HostState.hpp"
+#include "platform/ProcessLauncher.hpp"
+#include "platform/ProcessSpec.hpp"
+#include "software/SoftwareId.hpp"
 #include "software/SoftwareManager.hpp"
+#include "software/SoftwareState.hpp"
+
 #include <gtest/gtest.h>
+
+#include <memory>
+#include <string>
 
 namespace
 {
   class TestProcess final : public softadastra::Process
   {
   public:
-    bool start() override
+    explicit TestProcess(
+        bool running = true,
+        bool stop_succeeds = true) noexcept
+        : running_(running),
+          stop_succeeds_(stop_succeeds)
     {
-      ++start_calls_;
-
-      if (!start_result_)
-      {
-        return false;
-      }
-
-      running_ = true;
-      return true;
     }
 
     bool stop() override
     {
-      ++stop_calls_;
-
-      if (!stop_result_)
+      if (!stop_succeeds_)
       {
         return false;
       }
@@ -51,235 +53,368 @@ namespace
       return running_;
     }
 
-    void set_start_result(bool result) noexcept
+  private:
+    bool running_;
+    bool stop_succeeds_;
+  };
+
+  class TestProcessLauncher final : public softadastra::ProcessLauncher
+  {
+  public:
+    [[nodiscard]] std::unique_ptr<softadastra::Process> launch(
+        const softadastra::ProcessSpec &spec) override
     {
-      start_result_ = result;
+      last_executable_ = spec.executable();
+      ++launch_count_;
+
+      if (launch_fails_)
+      {
+        return nullptr;
+      }
+
+      return std::make_unique<TestProcess>(
+          process_running_,
+          stop_succeeds_);
     }
 
-    void set_stop_result(bool result) noexcept
+    void set_launch_fails(bool value) noexcept
     {
-      stop_result_ = result;
+      launch_fails_ = value;
     }
 
-    [[nodiscard]] int start_calls() const noexcept
+    void set_process_running(bool value) noexcept
     {
-      return start_calls_;
+      process_running_ = value;
     }
 
-    [[nodiscard]] int stop_calls() const noexcept
+    void set_stop_succeeds(bool value) noexcept
     {
-      return stop_calls_;
+      stop_succeeds_ = value;
+    }
+
+    [[nodiscard]] int launch_count() const noexcept
+    {
+      return launch_count_;
+    }
+
+    [[nodiscard]] const std::string &last_executable() const noexcept
+    {
+      return last_executable_;
     }
 
   private:
-    bool running_{false};
-    bool start_result_{true};
-    bool stop_result_{true};
-
-    int start_calls_{0};
-    int stop_calls_{0};
+    bool launch_fails_{false};
+    bool process_running_{true};
+    bool stop_succeeds_{true};
+    int launch_count_{0};
+    std::string last_executable_;
   };
 
+  TEST(SoftwareManagerTest, RegistersSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    EXPECT_TRUE(
+        manager.register_software(
+            softadastra::SoftwareId("example"),
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_EQ(host_state.software_count(), 1U);
+  }
+
+  TEST(SoftwareManagerTest, RejectsDuplicateSoftwareRegistration)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    EXPECT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_FALSE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/other")));
+  }
+
+  TEST(SoftwareManagerTest, StartsRegisteredSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_TRUE(manager.start(id));
+    EXPECT_EQ(launcher.launch_count(), 1);
+    EXPECT_EQ(
+        launcher.last_executable(),
+        "/usr/bin/example");
+
+    ASSERT_TRUE(manager.state(id).has_value());
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
+  TEST(SoftwareManagerTest, RejectsSecondStartWhileSoftwareIsRunning)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    ASSERT_TRUE(manager.start(id));
+
+    EXPECT_FALSE(manager.start(id));
+    EXPECT_EQ(launcher.launch_count(), 1);
+  }
+
+  TEST(SoftwareManagerTest, MarksSoftwareFailedWhenLaunchFails)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_launch_fails(true);
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_FALSE(manager.start(id));
+
+    ASSERT_TRUE(manager.state(id).has_value());
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Failed);
+  }
+
+  TEST(SoftwareManagerTest, RejectsProcessThatIsNotRunningAfterLaunch)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_process_running(false);
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_FALSE(manager.start(id));
+
+    ASSERT_TRUE(manager.state(id).has_value());
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Failed);
+  }
+
+  TEST(SoftwareManagerTest, StopsRunningSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    ASSERT_TRUE(manager.start(id));
+
+    EXPECT_TRUE(manager.stop(id));
+
+    ASSERT_TRUE(manager.state(id).has_value());
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Stopped);
+  }
+
+  TEST(SoftwareManagerTest, MarksSoftwareFailedWhenStopFails)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_stop_succeeds(false);
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    ASSERT_TRUE(manager.start(id));
+
+    EXPECT_FALSE(manager.stop(id));
+
+    ASSERT_TRUE(manager.state(id).has_value());
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Failed);
+  }
+
+  TEST(SoftwareManagerTest, RejectsStartForUnknownSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    EXPECT_FALSE(
+        manager.start(
+            softadastra::SoftwareId("unknown")));
+
+    EXPECT_EQ(launcher.launch_count(), 0);
+  }
+
+  TEST(SoftwareManagerTest, RejectsStopForUnknownSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    EXPECT_FALSE(
+        manager.stop(
+            softadastra::SoftwareId("unknown")));
+  }
+
+  TEST(SoftwareManagerTest, RejectsStopWhenSoftwareIsNotRunning)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    EXPECT_FALSE(manager.stop(id));
+
+    ASSERT_TRUE(manager.state(id).has_value());
+    EXPECT_EQ(
+        manager.state(id).value(),
+        softadastra::SoftwareState::Stopped);
+  }
+
+  TEST(SoftwareManagerTest, ReturnsNoStateForUnknownSoftware)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    const softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    EXPECT_FALSE(
+        manager.state(
+                   softadastra::SoftwareId("unknown"))
+            .has_value());
+  }
+
+  TEST(SoftwareManagerTest, ManagesIndependentSoftwareProcesses)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+
+    softadastra::SoftwareManager manager(
+        host_state,
+        launcher);
+
+    const softadastra::SoftwareId first("first");
+    const softadastra::SoftwareId second("second");
+
+    ASSERT_TRUE(
+        manager.register_software(
+            first,
+            softadastra::ProcessSpec("/usr/bin/first")));
+
+    ASSERT_TRUE(
+        manager.register_software(
+            second,
+            softadastra::ProcessSpec("/usr/bin/second")));
+
+    EXPECT_TRUE(manager.start(first));
+    EXPECT_TRUE(manager.start(second));
+
+    EXPECT_EQ(launcher.launch_count(), 2);
+
+    EXPECT_EQ(
+        manager.state(first).value(),
+        softadastra::SoftwareState::Running);
+
+    EXPECT_EQ(
+        manager.state(second).value(),
+        softadastra::SoftwareState::Running);
+
+    EXPECT_TRUE(manager.stop(first));
+
+    EXPECT_EQ(
+        manager.state(first).value(),
+        softadastra::SoftwareState::Stopped);
+
+    EXPECT_EQ(
+        manager.state(second).value(),
+        softadastra::SoftwareState::Running);
+  }
+
 } // namespace
-
-TEST(SoftwareManagerTest, RegistersSoftware)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-
-  EXPECT_TRUE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  EXPECT_EQ(state.software_count(), 1U);
-
-  const auto software_state = manager.state(
-      softadastra::SoftwareId("inventory"));
-
-  ASSERT_TRUE(software_state.has_value());
-
-  EXPECT_EQ(
-      *software_state,
-      softadastra::SoftwareState::Stopped);
-}
-
-TEST(SoftwareManagerTest, RejectsDuplicateSoftwareRegistration)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-
-  ASSERT_TRUE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  EXPECT_FALSE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  EXPECT_EQ(state.software_count(), 1U);
-}
-
-TEST(SoftwareManagerTest, StartsRegisteredSoftware)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-  TestProcess process;
-
-  ASSERT_TRUE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  EXPECT_TRUE(
-      manager.start(
-          softadastra::SoftwareId("inventory"),
-          process));
-
-  EXPECT_TRUE(process.is_running());
-  EXPECT_EQ(process.start_calls(), 1);
-
-  const auto software_state = manager.state(
-      softadastra::SoftwareId("inventory"));
-
-  ASSERT_TRUE(software_state.has_value());
-
-  EXPECT_EQ(
-      *software_state,
-      softadastra::SoftwareState::Running);
-}
-
-TEST(SoftwareManagerTest, MarksSoftwareFailedWhenStartFails)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-  TestProcess process;
-
-  process.set_start_result(false);
-
-  ASSERT_TRUE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  EXPECT_FALSE(
-      manager.start(
-          softadastra::SoftwareId("inventory"),
-          process));
-
-  EXPECT_FALSE(process.is_running());
-
-  const auto software_state = manager.state(
-      softadastra::SoftwareId("inventory"));
-
-  ASSERT_TRUE(software_state.has_value());
-
-  EXPECT_EQ(
-      *software_state,
-      softadastra::SoftwareState::Failed);
-}
-
-TEST(SoftwareManagerTest, StopsRunningSoftware)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-  TestProcess process;
-
-  ASSERT_TRUE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  ASSERT_TRUE(
-      manager.start(
-          softadastra::SoftwareId("inventory"),
-          process));
-
-  ASSERT_TRUE(process.is_running());
-
-  EXPECT_TRUE(
-      manager.stop(
-          softadastra::SoftwareId("inventory"),
-          process));
-
-  EXPECT_FALSE(process.is_running());
-  EXPECT_EQ(process.stop_calls(), 1);
-
-  const auto software_state = manager.state(
-      softadastra::SoftwareId("inventory"));
-
-  ASSERT_TRUE(software_state.has_value());
-
-  EXPECT_EQ(
-      *software_state,
-      softadastra::SoftwareState::Stopped);
-}
-
-TEST(SoftwareManagerTest, MarksSoftwareFailedWhenStopFails)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-  TestProcess process;
-
-  ASSERT_TRUE(
-      manager.register_software(
-          softadastra::SoftwareId("inventory")));
-
-  ASSERT_TRUE(
-      manager.start(
-          softadastra::SoftwareId("inventory"),
-          process));
-
-  process.set_stop_result(false);
-
-  EXPECT_FALSE(
-      manager.stop(
-          softadastra::SoftwareId("inventory"),
-          process));
-
-  EXPECT_TRUE(process.is_running());
-
-  const auto software_state = manager.state(
-      softadastra::SoftwareId("inventory"));
-
-  ASSERT_TRUE(software_state.has_value());
-
-  EXPECT_EQ(
-      *software_state,
-      softadastra::SoftwareState::Failed);
-}
-
-TEST(SoftwareManagerTest, RejectsStartForUnknownSoftware)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-  TestProcess process;
-
-  EXPECT_FALSE(
-      manager.start(
-          softadastra::SoftwareId("unknown"),
-          process));
-
-  EXPECT_EQ(process.start_calls(), 0);
-}
-
-TEST(SoftwareManagerTest, RejectsStopForUnknownSoftware)
-{
-  softadastra::HostState state;
-  softadastra::SoftwareManager manager(state);
-  TestProcess process;
-
-  EXPECT_FALSE(
-      manager.stop(
-          softadastra::SoftwareId("unknown"),
-          process));
-
-  EXPECT_EQ(process.stop_calls(), 0);
-}
-
-TEST(SoftwareManagerTest, ReturnsNoStateForUnknownSoftware)
-{
-  softadastra::HostState state;
-  const softadastra::SoftwareManager manager(state);
-
-  EXPECT_FALSE(
-      manager.state(
-                 softadastra::SoftwareId("unknown"))
-          .has_value());
-}

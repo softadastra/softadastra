@@ -12,20 +12,22 @@
  *  Softadastra
  */
 
+#include "platform/Network.hpp"
 #include "platform/Platform.hpp"
+#include "platform/Process.hpp"
+#include "platform/ProcessLauncher.hpp"
+#include "platform/ProcessSpec.hpp"
+#include "platform/Service.hpp"
+
 #include <gtest/gtest.h>
+
+#include <memory>
 
 namespace
 {
   class TestProcess final : public softadastra::Process
   {
   public:
-    bool start() override
-    {
-      running_ = true;
-      return true;
-    }
-
     bool stop() override
     {
       running_ = false;
@@ -38,7 +40,17 @@ namespace
     }
 
   private:
-    bool running_{false};
+    bool running_{true};
+  };
+
+  class TestProcessLauncher final : public softadastra::ProcessLauncher
+  {
+  public:
+    [[nodiscard]] std::unique_ptr<softadastra::Process> launch(
+        const softadastra::ProcessSpec &) override
+    {
+      return std::make_unique<TestProcess>();
+    }
   };
 
   class TestService final : public softadastra::Service
@@ -70,104 +82,130 @@ namespace
   public:
     [[nodiscard]] bool is_available() const noexcept override
     {
-      return true;
+      return available_;
     }
 
     [[nodiscard]] bool is_connected() const noexcept override
     {
-      return true;
+      return connected_;
     }
+
+    void set_available(bool value) noexcept
+    {
+      available_ = value;
+    }
+
+    void set_connected(bool value) noexcept
+    {
+      connected_ = value;
+    }
+
+  private:
+    bool available_{false};
+    bool connected_{false};
   };
 
   class TestPlatform final : public softadastra::Platform
   {
   public:
-    [[nodiscard]] softadastra::Process &process() noexcept override
+    softadastra::ProcessLauncher &process_launcher() noexcept override
     {
-      return process_;
+      return process_launcher_;
     }
 
-    [[nodiscard]] const softadastra::Process &process() const noexcept override
+    const softadastra::ProcessLauncher &process_launcher()
+        const noexcept override
     {
-      return process_;
+      return process_launcher_;
     }
 
-    [[nodiscard]] softadastra::Service &service() noexcept override
-    {
-      return service_;
-    }
-
-    [[nodiscard]] const softadastra::Service &service() const noexcept override
+    softadastra::Service &service() noexcept override
     {
       return service_;
     }
 
-    [[nodiscard]] softadastra::Network &network() noexcept override
+    const softadastra::Service &service() const noexcept override
+    {
+      return service_;
+    }
+
+    softadastra::Network &network() noexcept override
     {
       return network_;
     }
 
-    [[nodiscard]] const softadastra::Network &network() const noexcept override
+    const softadastra::Network &network() const noexcept override
     {
       return network_;
     }
 
   private:
-    TestProcess process_;
+    TestProcessLauncher process_launcher_;
     TestService service_;
     TestNetwork network_;
   };
 
+  TEST(PlatformTest, ExposesProcessLauncherCapability)
+  {
+    TestPlatform platform;
+
+    const softadastra::ProcessSpec spec("/usr/bin/example");
+
+    auto process = platform.process_launcher().launch(spec);
+
+    ASSERT_NE(process, nullptr);
+    EXPECT_TRUE(process->is_running());
+  }
+
+  TEST(PlatformTest, ExposesServiceCapability)
+  {
+    TestPlatform platform;
+
+    EXPECT_FALSE(platform.service().is_running());
+    EXPECT_TRUE(platform.service().start());
+    EXPECT_TRUE(platform.service().is_running());
+  }
+
+  TEST(PlatformTest, ExposesNetworkCapability)
+  {
+    TestPlatform platform;
+
+    EXPECT_FALSE(platform.network().is_available());
+    EXPECT_FALSE(platform.network().is_connected());
+  }
+
+  TEST(PlatformTest, SupportsConstCapabilityAccess)
+  {
+    const TestPlatform platform;
+
+    const softadastra::ProcessLauncher &process_launcher =
+        platform.process_launcher();
+
+    const softadastra::Service &service =
+        platform.service();
+
+    const softadastra::Network &network =
+        platform.network();
+
+    EXPECT_EQ(&process_launcher, &platform.process_launcher());
+    EXPECT_EQ(&service, &platform.service());
+    EXPECT_EQ(&network, &platform.network());
+  }
+
+  TEST(PlatformTest, SupportsUseThroughPlatformInterface)
+  {
+    TestPlatform concrete_platform;
+    softadastra::Platform &platform = concrete_platform;
+
+    const softadastra::ProcessSpec spec("/usr/bin/example");
+
+    auto process = platform.process_launcher().launch(spec);
+
+    ASSERT_NE(process, nullptr);
+    EXPECT_TRUE(process->is_running());
+
+    EXPECT_FALSE(platform.service().is_running());
+    EXPECT_FALSE(platform.network().is_available());
+  }
+
 } // namespace
-
-TEST(PlatformTest, ExposesProcessCapability)
-{
-  TestPlatform platform;
-
-  EXPECT_FALSE(platform.process().is_running());
-
-  EXPECT_TRUE(platform.process().start());
-  EXPECT_TRUE(platform.process().is_running());
-}
-
-TEST(PlatformTest, ExposesServiceCapability)
-{
-  TestPlatform platform;
-
-  EXPECT_FALSE(platform.service().is_running());
-
-  EXPECT_TRUE(platform.service().start());
-  EXPECT_TRUE(platform.service().is_running());
-}
-
-TEST(PlatformTest, ExposesNetworkCapability)
-{
-  TestPlatform platform;
-
-  EXPECT_TRUE(platform.network().is_available());
-  EXPECT_TRUE(platform.network().is_connected());
-}
-
-TEST(PlatformTest, SupportsConstCapabilityAccess)
-{
-  const TestPlatform platform;
-
-  EXPECT_FALSE(platform.process().is_running());
-  EXPECT_FALSE(platform.service().is_running());
-  EXPECT_TRUE(platform.network().is_available());
-  EXPECT_TRUE(platform.network().is_connected());
-}
-
-TEST(PlatformTest, SupportsUseThroughPlatformInterface)
-{
-  TestPlatform concrete;
-  softadastra::Platform &platform = concrete;
-
-  EXPECT_TRUE(platform.process().start());
-  EXPECT_TRUE(platform.process().is_running());
-
-  EXPECT_TRUE(platform.service().start());
-  EXPECT_TRUE(platform.service().is_running());
-
-  EXPECT_TRUE(platform.network().is_available());
-}

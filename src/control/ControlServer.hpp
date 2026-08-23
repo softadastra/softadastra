@@ -16,7 +16,7 @@
 #define SOFTADASTRA_CONTROL_CONTROL_SERVER_HPP
 
 #include "host/HostService.hpp"
-#include "platform/Process.hpp"
+#include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareState.hpp"
 
@@ -25,87 +25,70 @@
 namespace softadastra
 {
   /**
-   * @brief Provides the control boundary for a Softadastra Host.
+   * @brief Exposes Host control operations.
    *
-   * ControlServer exposes Host operations to the control layer while keeping
-   * HostService independent from CLI or transport concerns.
+   * ControlServer defines the Host operations available to control clients.
    *
-   * At this stage, ControlServer represents the control contract only. It does
-   * not define sockets, IPC, serialization, or another transport mechanism.
-   * Those mechanisms may be introduced later when a real local control channel
-   * is required.
+   * It does not implement transport, serialization, sockets, or IPC. Those
+   * concerns can be introduced later without changing the Host service model.
    */
   class ControlServer
   {
   public:
     /**
-     * @brief Creates a control server for a Host service.
+     * @brief Creates a control server.
      *
-     * The HostService instance must remain valid for the lifetime of the
-     * ControlServer.
-     *
-     * @param host_service Host service controlled by this server.
+     * @param host_service Host service receiving control operations.
      */
     explicit ControlServer(HostService &host_service) noexcept;
 
     /**
      * @brief Registers software with the Host.
      *
-     * @param id Identifier of the software to register.
+     * @param id Software identifier.
+     * @param process_spec Information required to launch the software.
      *
-     * @return true if the software was registered, otherwise false.
+     * @return true if registration succeeds, otherwise false.
      */
-    bool register_software(SoftwareId id);
+    bool register_software(
+        SoftwareId id,
+        ProcessSpec process_spec);
 
     /**
      * @brief Starts registered software.
      *
-     * The supplied Process represents the platform execution handle associated
-     * with the software.
+     * @param id Software identifier.
      *
-     * @param id Identifier of the software to start.
-     * @param process Process execution handle associated with the software.
-     *
-     * @return true if the software started successfully, otherwise false.
+     * @return true if the software starts successfully, otherwise false.
      */
-    bool start_software(
-        const SoftwareId &id,
-        Process &process);
+    bool start_software(const SoftwareId &id);
 
     /**
-     * @brief Stops registered software.
+     * @brief Stops running software.
      *
-     * @param id Identifier of the software to stop.
-     * @param process Process execution handle associated with the software.
+     * @param id Software identifier.
      *
-     * @return true if the software stopped successfully, otherwise false.
+     * @return true if the software stops successfully, otherwise false.
      */
-    bool stop_software(
-        const SoftwareId &id,
-        Process &process);
+    bool stop_software(const SoftwareId &id);
 
     /**
      * @brief Returns the lifecycle state of registered software.
      *
-     * @param id Identifier of the software to inspect.
+     * @param id Software identifier.
      *
-     * @return Current software state, or std::nullopt if the software is not
-     *         registered.
+     * @return The software state, or std::nullopt if the software is unknown.
      */
     [[nodiscard]] std::optional<SoftwareState> software_state(
         const SoftwareId &id) const noexcept;
 
     /**
-     * @brief Checks whether networking is available to the Host.
-     *
-     * @return true if networking is available, otherwise false.
+     * @brief Returns whether network connectivity is available.
      */
     [[nodiscard]] bool connectivity_available() const noexcept;
 
     /**
-     * @brief Checks whether the Host currently has network connectivity.
-     *
-     * @return true if the Host is connected, otherwise false.
+     * @brief Returns whether the Host is currently connected.
      */
     [[nodiscard]] bool connected() const noexcept;
 

@@ -13,13 +13,17 @@
  */
 
 #include "host/HostService.hpp"
+
 #include <utility>
 
 namespace softadastra
 {
-  HostService::HostService(Host &host) noexcept
+
+  HostService::HostService(
+      Host &host,
+      ProcessLauncher &process_launcher) noexcept
       : host_(host),
-        software_manager_(host.state()),
+        software_manager_(host.state(), process_launcher),
         connectivity_manager_(host.platform().network())
   {
   }
@@ -34,24 +38,23 @@ namespace softadastra
     return host_;
   }
 
-  bool HostService::register_software(SoftwareId id)
+  bool HostService::register_software(
+      SoftwareId id,
+      ProcessSpec process_spec)
   {
     return software_manager_.register_software(
-        std::move(id));
+        std::move(id),
+        std::move(process_spec));
   }
 
-  bool HostService::start_software(
-      const SoftwareId &id,
-      Process &process)
+  bool HostService::start_software(const SoftwareId &id)
   {
-    return software_manager_.start(id, process);
+    return software_manager_.start(id);
   }
 
-  bool HostService::stop_software(
-      const SoftwareId &id,
-      Process &process)
+  bool HostService::stop_software(const SoftwareId &id)
   {
-    return software_manager_.stop(id, process);
+    return software_manager_.stop(id);
   }
 
   std::optional<SoftwareState> HostService::software_state(

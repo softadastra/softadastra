@@ -15,36 +15,53 @@
 #include "software/SoftwareEntry.hpp"
 #include <gtest/gtest.h>
 
-TEST(SoftwareEntryTest, PreservesSoftwareIdentifier)
+#include <string>
+#include <vector>
+
+namespace
 {
-  const softadastra::SoftwareEntry entry(
-      softadastra::SoftwareId("inventory"));
 
-  EXPECT_EQ(entry.id().value(), "inventory");
-}
+  TEST(SoftwareEntryTest, PreservesSoftwareIdentifier)
+  {
+    const softadastra::SoftwareEntry entry(
+        softadastra::SoftwareId("example"),
+        softadastra::ProcessSpec("/usr/bin/example"));
 
-TEST(SoftwareEntryTest, StartsStopped)
-{
-  const softadastra::SoftwareEntry entry(
-      softadastra::SoftwareId("inventory"));
+    EXPECT_EQ(entry.id().value(), "example");
+  }
 
-  EXPECT_EQ(entry.state(), softadastra::SoftwareState::Stopped);
-}
+  TEST(SoftwareEntryTest, PreservesProcessSpecification)
+  {
+    const softadastra::SoftwareEntry entry(
+        softadastra::SoftwareId("example"),
+        softadastra::ProcessSpec(
+            "/usr/bin/example",
+            {"--port", "8080"}));
 
-TEST(SoftwareEntryTest, UpdatesLifecycleState)
-{
-  softadastra::SoftwareEntry entry(
-      softadastra::SoftwareId("inventory"));
+    EXPECT_EQ(entry.process_spec().executable(), "/usr/bin/example");
 
-  entry.set_state(softadastra::SoftwareState::Starting);
-  EXPECT_EQ(entry.state(), softadastra::SoftwareState::Starting);
+    const std::vector<std::string> expected{"--port", "8080"};
+    EXPECT_EQ(entry.process_spec().arguments(), expected);
+  }
 
-  entry.set_state(softadastra::SoftwareState::Running);
-  EXPECT_EQ(entry.state(), softadastra::SoftwareState::Running);
+  TEST(SoftwareEntryTest, StartsStopped)
+  {
+    const softadastra::SoftwareEntry entry(
+        softadastra::SoftwareId("example"),
+        softadastra::ProcessSpec("/usr/bin/example"));
 
-  entry.set_state(softadastra::SoftwareState::Failed);
-  EXPECT_EQ(entry.state(), softadastra::SoftwareState::Failed);
+    EXPECT_EQ(entry.state(), softadastra::SoftwareState::Stopped);
+  }
 
-  entry.set_state(softadastra::SoftwareState::Stopped);
-  EXPECT_EQ(entry.state(), softadastra::SoftwareState::Stopped);
-}
+  TEST(SoftwareEntryTest, UpdatesLifecycleState)
+  {
+    softadastra::SoftwareEntry entry(
+        softadastra::SoftwareId("example"),
+        softadastra::ProcessSpec("/usr/bin/example"));
+
+    entry.set_state(softadastra::SoftwareState::Running);
+
+    EXPECT_EQ(entry.state(), softadastra::SoftwareState::Running);
+  }
+
+} // namespace

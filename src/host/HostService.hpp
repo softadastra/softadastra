@@ -17,7 +17,8 @@
 
 #include "connectivity/ConnectivityManager.hpp"
 #include "host/Host.hpp"
-#include "platform/Process.hpp"
+#include "platform/ProcessLauncher.hpp"
+#include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareManager.hpp"
 #include "software/SoftwareState.hpp"
@@ -27,103 +28,83 @@
 namespace softadastra
 {
   /**
-   * @brief Coordinates the main infrastructure responsibilities of a Host.
+   * @brief Coordinates Host infrastructure capabilities.
    *
-   * HostService is the central orchestration layer between the Host,
-   * SoftwareManager, and ConnectivityManager.
+   * HostService provides operations over software lifecycle and connectivity
+   * while keeping callers independent from the underlying platform details.
    *
-   * It does not implement process execution, networking, application logic, or
-   * platform-specific behavior itself. Those responsibilities remain delegated
-   * to the corresponding lower-level components.
+   * Process creation remains below this service through ProcessLauncher.
    */
   class HostService
   {
   public:
     /**
-     * @brief Creates a service for a Host.
-     *
-     * The Host instance must remain valid for the lifetime of HostService.
+     * @brief Creates a Host service.
      *
      * @param host Host coordinated by this service.
+     * @param process_launcher Capability used to launch software processes.
      */
-    explicit HostService(Host &host) noexcept;
+    HostService(
+        Host &host,
+        ProcessLauncher &process_launcher) noexcept;
 
     /**
-     * @brief Returns the Host coordinated by this service.
-     *
-     * @return Reference to the Host.
+     * @brief Returns the managed Host.
      */
     [[nodiscard]] Host &host() noexcept;
 
     /**
-     * @brief Returns the Host coordinated by this service.
-     *
-     * @return Constant reference to the Host.
+     * @brief Returns the managed Host.
      */
     [[nodiscard]] const Host &host() const noexcept;
 
     /**
      * @brief Registers software with the Host.
      *
-     * @param id Identifier of the software to register.
+     * @param id Software identifier.
+     * @param process_spec Information required to launch the software.
      *
-     * @return true if the software was registered, otherwise false.
+     * @return true if registration succeeds, otherwise false.
      */
-    bool register_software(SoftwareId id);
+    bool register_software(
+        SoftwareId id,
+        ProcessSpec process_spec);
 
     /**
-     * @brief Starts registered software using its process execution handle.
+     * @brief Starts registered software.
      *
-     * HostService delegates lifecycle management to SoftwareManager.
+     * @param id Software identifier.
      *
-     * @param id Identifier of the software to start.
-     * @param process Process execution handle associated with the software.
-     *
-     * @return true if the software started successfully, otherwise false.
+     * @return true if the software starts successfully, otherwise false.
      */
-    bool start_software(
-        const SoftwareId &id,
-        Process &process);
+    bool start_software(const SoftwareId &id);
 
     /**
-     * @brief Stops registered software using its process execution handle.
+     * @brief Stops running software.
      *
-     * HostService delegates lifecycle management to SoftwareManager.
+     * @param id Software identifier.
      *
-     * @param id Identifier of the software to stop.
-     * @param process Process execution handle associated with the software.
-     *
-     * @return true if the software stopped successfully, otherwise false.
+     * @return true if the software stops successfully, otherwise false.
      */
-    bool stop_software(
-        const SoftwareId &id,
-        Process &process);
+    bool stop_software(const SoftwareId &id);
 
     /**
      * @brief Returns the lifecycle state of registered software.
      *
-     * @param id Identifier of the software to inspect.
+     * @param id Software identifier.
      *
-     * @return Current software state, or std::nullopt if the software is not
-     *         registered.
+     * @return The software state, or std::nullopt if the software is unknown.
      */
     [[nodiscard]] std::optional<SoftwareState> software_state(
         const SoftwareId &id) const noexcept;
 
     /**
-     * @brief Checks whether networking is available to the Host.
-     *
-     * @return true if a usable network capability is available, otherwise false.
+     * @brief Returns whether network connectivity is available.
      */
     [[nodiscard]] bool connectivity_available() const noexcept;
 
     /**
-     * @brief Checks whether the Host currently has network connectivity.
-     *
-     * This does not imply Internet access.
-     *
-     * @return true if the Host currently has network connectivity, otherwise
-     *         false.
+     * @brief Returns whether the Host is currently connected.
      */
     [[nodiscard]] bool connected() const noexcept;
 

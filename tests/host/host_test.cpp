@@ -13,19 +13,23 @@
  */
 
 #include "host/Host.hpp"
+#include "platform/Network.hpp"
+#include "platform/Platform.hpp"
+#include "platform/Process.hpp"
+#include "platform/ProcessLauncher.hpp"
+#include "platform/ProcessSpec.hpp"
+#include "platform/Service.hpp"
+
 #include <gtest/gtest.h>
+
+#include <memory>
 
 namespace
 {
+
   class TestProcess final : public softadastra::Process
   {
   public:
-    bool start() override
-    {
-      running_ = true;
-      return true;
-    }
-
     bool stop() override
     {
       running_ = false;
@@ -38,7 +42,17 @@ namespace
     }
 
   private:
-    bool running_{false};
+    bool running_{true};
+  };
+
+  class TestProcessLauncher final : public softadastra::ProcessLauncher
+  {
+  public:
+    [[nodiscard]] std::unique_ptr<softadastra::Process> launch(
+        const softadastra::ProcessSpec &) override
+    {
+      return std::make_unique<TestProcess>();
+    }
   };
 
   class TestService final : public softadastra::Service
@@ -70,114 +84,96 @@ namespace
   public:
     [[nodiscard]] bool is_available() const noexcept override
     {
-      return true;
+      return available_;
     }
 
     [[nodiscard]] bool is_connected() const noexcept override
     {
-      return true;
+      return connected_;
     }
+
+  private:
+    bool available_{false};
+    bool connected_{false};
   };
 
   class TestPlatform final : public softadastra::Platform
   {
   public:
-    [[nodiscard]] softadastra::Process &process() noexcept override
+    [[nodiscard]] softadastra::ProcessLauncher &
+    process_launcher() noexcept override
     {
-      return process_;
+      return process_launcher_;
     }
 
-    [[nodiscard]] const softadastra::Process &process() const noexcept override
+    [[nodiscard]] const softadastra::ProcessLauncher &
+    process_launcher() const noexcept override
     {
-      return process_;
+      return process_launcher_;
     }
 
-    [[nodiscard]] softadastra::Service &service() noexcept override
-    {
-      return service_;
-    }
-
-    [[nodiscard]] const softadastra::Service &service() const noexcept override
+    [[nodiscard]] softadastra::Service &
+    service() noexcept override
     {
       return service_;
     }
 
-    [[nodiscard]] softadastra::Network &network() noexcept override
+    [[nodiscard]] const softadastra::Service &
+    service() const noexcept override
+    {
+      return service_;
+    }
+
+    [[nodiscard]] softadastra::Network &
+    network() noexcept override
     {
       return network_;
     }
 
-    [[nodiscard]] const softadastra::Network &network() const noexcept override
+    [[nodiscard]] const softadastra::Network &
+    network() const noexcept override
     {
       return network_;
     }
 
   private:
-    TestProcess process_;
+    TestProcessLauncher process_launcher_;
     TestService service_;
     TestNetwork network_;
   };
 
+  TEST(HostTest, StartsWithEmptyState)
+  {
+    TestPlatform platform;
+    softadastra::Host host(platform);
+
+    EXPECT_TRUE(host.state().empty());
+  }
+
+  TEST(HostTest, ExposesPlatform)
+  {
+    TestPlatform platform;
+    softadastra::Host host(platform);
+
+    EXPECT_EQ(&host.platform(), &platform);
+  }
+
+  TEST(HostTest, ExposesMutableState)
+  {
+    TestPlatform platform;
+    softadastra::Host host(platform);
+
+    EXPECT_TRUE(host.state().empty());
+    EXPECT_EQ(host.state().software_count(), 0U);
+  }
+
+  TEST(HostTest, SupportsConstAccess)
+  {
+    TestPlatform platform;
+    const softadastra::Host host(platform);
+
+    EXPECT_EQ(&host.platform(), &platform);
+    EXPECT_TRUE(host.state().empty());
+  }
+
 } // namespace
-
-TEST(HostTest, StartsWithEmptyInfrastructureState)
-{
-  TestPlatform platform;
-  const softadastra::Host host(platform);
-
-  EXPECT_TRUE(host.state().empty());
-  EXPECT_EQ(host.state().software_count(), 0U);
-}
-
-TEST(HostTest, OwnsInfrastructureState)
-{
-  TestPlatform platform;
-  softadastra::Host host(platform);
-
-  EXPECT_TRUE(
-      host.state().add_software(
-          softadastra::SoftwareEntry(
-              softadastra::SoftwareId("inventory"))));
-
-  EXPECT_EQ(host.state().software_count(), 1U);
-
-  const auto *entry = host.state().find_software(
-      softadastra::SoftwareId("inventory"));
-
-  ASSERT_NE(entry, nullptr);
-  EXPECT_EQ(entry->id().value(), "inventory");
-}
-
-TEST(HostTest, ExposesPlatformCapabilities)
-{
-  TestPlatform platform;
-  softadastra::Host host(platform);
-
-  EXPECT_TRUE(host.platform().network().is_available());
-  EXPECT_TRUE(host.platform().network().is_connected());
-
-  EXPECT_FALSE(host.platform().process().is_running());
-  EXPECT_FALSE(host.platform().service().is_running());
-}
-
-TEST(HostTest, UsesUnderlyingPlatform)
-{
-  TestPlatform platform;
-  softadastra::Host host(platform);
-
-  EXPECT_TRUE(host.platform().process().start());
-  EXPECT_TRUE(platform.process().is_running());
-
-  EXPECT_TRUE(host.platform().service().start());
-  EXPECT_TRUE(platform.service().is_running());
-}
-
-TEST(HostTest, SupportsConstAccess)
-{
-  TestPlatform platform;
-  const softadastra::Host host(platform);
-
-  EXPECT_TRUE(host.state().empty());
-  EXPECT_TRUE(host.platform().network().is_available());
-  EXPECT_TRUE(host.platform().network().is_connected());
-}

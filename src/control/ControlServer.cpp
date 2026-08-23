@@ -13,6 +13,7 @@
  */
 
 #include "control/ControlServer.hpp"
+
 #include <utility>
 
 namespace softadastra
@@ -22,28 +23,23 @@ namespace softadastra
   {
   }
 
-  bool ControlServer::register_software(SoftwareId id)
+  bool ControlServer::register_software(
+      SoftwareId id,
+      ProcessSpec process_spec)
   {
     return host_service_.register_software(
-        std::move(id));
+        std::move(id),
+        std::move(process_spec));
   }
 
-  bool ControlServer::start_software(
-      const SoftwareId &id,
-      Process &process)
+  bool ControlServer::start_software(const SoftwareId &id)
   {
-    return host_service_.start_software(
-        id,
-        process);
+    return host_service_.start_software(id);
   }
 
-  bool ControlServer::stop_software(
-      const SoftwareId &id,
-      Process &process)
+  bool ControlServer::stop_software(const SoftwareId &id)
   {
-    return host_service_.stop_software(
-        id,
-        process);
+    return host_service_.stop_software(id);
   }
 
   std::optional<SoftwareState> ControlServer::software_state(
