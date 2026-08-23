@@ -162,6 +162,10 @@ namespace
     EXPECT_EQ(access.exit_code, 0);
     EXPECT_NE(access.output.find("hosted software endpoints"), std::string::npos);
 
+    const auto host_status = invoke_cli(state_home, {"status"});
+    EXPECT_EQ(host_status.exit_code, 0);
+    EXPECT_NE(host_status.output.find("Host: running"), std::string::npos);
+
     EXPECT_EQ(invoke_cli(state_home, {"register", "demo", "sleep", "30"}).exit_code, 0);
     EXPECT_EQ(invoke_cli(state_home, {"start", "demo"}).exit_code, 0);
     const auto running = invoke_cli(state_home, {"status", "demo"});

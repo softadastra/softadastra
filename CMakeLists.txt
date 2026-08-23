@@ -120,6 +120,17 @@ endif()
 if(SOFTADASTRA_BUILD_TESTS)
   include(CTest)
 
+  add_test(
+    NAME softadastra_box_install_test
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/box/install_test.sh
+  )
+
+  set_tests_properties(
+    softadastra_box_install_test
+    PROPERTIES
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
   find_package(GTest CONFIG QUIET)
 
   if(NOT GTest_FOUND)

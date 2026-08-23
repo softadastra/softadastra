@@ -305,6 +305,18 @@ The Box must not become a closed platform restricted to Softadastra-developed ap
 
 A user or organization can deploy a dedicated Softadastra Host with substantially less infrastructure setup than a general-purpose machine.
 
+### First Box implementation status
+
+- [x] Define minimum and recommended hardware needs
+- [x] Define a vendor-neutral x86_64 mini-PC profile
+- [x] Prepare reproducible Debian/Ubuntu provisioning
+- [x] Install the Host through a systemd unit
+- [x] Enable Host startup at boot
+- [x] Provide local status, access and connectivity commands
+- [x] Exercise lifecycle, network availability and reboot restoration in tests
+- [x] Exercise independent third-party process categories in tests
+- [ ] Build the first physical prototype
+
 ---
 
 ## Phase 7: Host-to-Host

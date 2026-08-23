@@ -49,6 +49,7 @@ namespace softadastra
      * softadastra stop <software-id>
      * softadastra restart <software-id>
      * softadastra status <software-id>
+     * softadastra status
      * softadastra connectivity
      * softadastra help
      * @endcode

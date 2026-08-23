@@ -104,6 +104,7 @@ namespace
         << "  softadastra stop <software-id>\n"
         << "  softadastra restart <software-id>\n"
         << "  softadastra status <software-id>\n"
+        << "  softadastra status\n"
         << "  softadastra connectivity\n"
         << "  softadastra access\n"
         << "  softadastra remote enable <ipv4-address> <port>\n"
@@ -223,6 +224,12 @@ namespace softadastra
       }
 
       std::cout << "hosted software endpoints are managed by the software\n";
+      return 0;
+    }
+
+    if (command == "status" && argc == 2)
+    {
+      std::cout << "Host: running\n";
       return 0;
     }
 
