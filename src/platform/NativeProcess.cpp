@@ -36,7 +36,7 @@ namespace softadastra
 
     if (!is_running())
     {
-      return true;
+      return exit_code().has_value();
     }
 
     const auto error = vix::process::terminate(child_);

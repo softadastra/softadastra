@@ -538,4 +538,71 @@ namespace
         softadastra::SoftwareState::Running);
   }
 
+  TEST(HostRuntimeTest, RepeatsRealLifecycleOperationsAndRefreshes)
+  {
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+
+    softadastra::HostService host_service(
+        host,
+        platform.process_launcher());
+
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    RunningSoftwareCleanup cleanup(client);
+
+    const softadastra::SoftwareId id("repeated-lifecycle");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "ping.exe",
+        {
+            "-n",
+            "30",
+            "127.0.0.1",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sleep",
+        {
+            "30",
+        });
+
+#endif
+
+    ASSERT_TRUE(client.register_software(id, spec));
+    ASSERT_TRUE(client.start_software(id));
+    cleanup.track(id);
+
+    for (int attempt = 0; attempt < 3; ++attempt)
+    {
+      client.refresh();
+
+      EXPECT_EQ(
+          client.software_state(id).value(),
+          softadastra::SoftwareState::Running);
+    }
+
+    ASSERT_TRUE(client.stop_software(id));
+    ASSERT_TRUE(client.start_software(id));
+    ASSERT_TRUE(client.restart_software(id));
+
+    for (int attempt = 0; attempt < 3; ++attempt)
+    {
+      client.refresh();
+
+      EXPECT_EQ(
+          client.software_state(id).value(),
+          softadastra::SoftwareState::Running);
+    }
+
+    EXPECT_TRUE(client.stop_software(id));
+    EXPECT_EQ(
+        client.software_state(id).value(),
+        softadastra::SoftwareState::Stopped);
+  }
+
 } // namespace
