@@ -35,6 +35,7 @@ add_library(
   src/host/Host.cpp
   src/host/HostIdentity.cpp
   src/host/HostPeerIdentity.cpp
+  src/host/HostPeerTrust.cpp
   src/host/HostLoop.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
@@ -297,6 +298,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_host_peer_identity_test
     tests/host/host_peer_identity_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_peer_trust_test
+    tests/host/host_peer_trust_test.cpp
   )
 
   softadastra_add_test(
