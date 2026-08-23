@@ -67,3 +67,8 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+SOFTADASTRA_MISSION.md
+notes/
+cmd.md
+document.md
