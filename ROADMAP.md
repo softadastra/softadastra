@@ -365,11 +365,11 @@ Two or more Hosts can securely communicate to solve a demonstrated infrastructur
 ### Phase 10 implementation status
 
 - [x] Reuse persistent Host identity as public peer identity
-- [ ] Implement TLS 1.3 direct Host-to-Host connection
-- [ ] Implement explicit-address peer reachability
-- [ ] Implement non-sensitive peer communication
-- [ ] Test three independent Hosts on a LAN
-- [ ] Test peer loss and reconnection
+- [x] Implement TLS 1.3 direct Host-to-Host connection
+- [x] Implement explicit-address peer reachability
+- [x] Implement non-sensitive peer communication
+- [x] Test three independent Hosts on a LAN
+- [x] Test peer loss and reconnection
 - [x] Study NAT honestly
 - [x] Study relay necessity without implementing one
 - [x] Study regional independent-Host use

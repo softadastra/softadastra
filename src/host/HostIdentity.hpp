@@ -38,6 +38,15 @@ namespace softadastra
     /** @brief Returns the persistent Ed25519 public key as hexadecimal text. */
     [[nodiscard]] const std::string &public_key() const noexcept;
 
+    /**
+     * @brief Writes an Ed25519 self-signed TLS certificate for this identity.
+     *
+     * The certificate public key is the key from which HostId is derived.
+     */
+    [[nodiscard]] bool write_tls_certificate(
+        const std::filesystem::path &certificate_path,
+        const std::filesystem::path &private_key_path) const;
+
     /** @brief Returns the remote administration secret. */
     [[nodiscard]] const std::string &secret() const noexcept;
 
