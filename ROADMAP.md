@@ -362,6 +362,19 @@ unless real Host requirements prove that such a capability is necessary.
 
 Two or more Hosts can securely communicate to solve a demonstrated infrastructure problem while remaining independently useful Hosts.
 
+### Phase 10 implementation status
+
+- [x] Reuse persistent Host identity as public peer identity
+- [ ] Implement TLS 1.3 direct Host-to-Host connection
+- [ ] Implement explicit-address peer reachability
+- [ ] Implement non-sensitive peer communication
+- [ ] Test three independent Hosts on a LAN
+- [ ] Test peer loss and reconnection
+- [x] Study NAT honestly
+- [x] Study relay necessity without implementing one
+- [x] Study regional independent-Host use
+- [x] Keep the architecture free of global coordination
+
 ---
 
 ## Beyond the initial roadmap
