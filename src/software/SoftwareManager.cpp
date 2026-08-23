@@ -13,6 +13,7 @@
  */
 
 #include "software/SoftwareManager.hpp"
+
 #include "software/SoftwareEntry.hpp"
 
 #include <algorithm>
@@ -49,13 +50,13 @@ namespace softadastra
 
     ManagedProcess *existing = find_process(id);
 
-    if (existing != nullptr && existing->process->is_running())
-    {
-      return false;
-    }
-
     if (existing != nullptr)
     {
+      if (existing->process->is_running())
+      {
+        return false;
+      }
+
       processes_.erase(
           std::remove_if(
               processes_.begin(),
@@ -80,7 +81,13 @@ namespace softadastra
 
     if (!process->is_running())
     {
-      entry->set_state(SoftwareState::Failed);
+      const auto code = process->exit_code();
+
+      entry->set_state(
+          code.has_value() && code.value() == 0
+              ? SoftwareState::Stopped
+              : SoftwareState::Failed);
+
       return false;
     }
 
@@ -131,10 +138,45 @@ namespace softadastra
     return true;
   }
 
+  void SoftwareManager::refresh()
+  {
+    auto current = processes_.begin();
+
+    while (current != processes_.end())
+    {
+      if (current->process->is_running())
+      {
+        ++current;
+        continue;
+      }
+
+      SoftwareEntry *entry =
+          state_.find_software(current->id);
+
+      if (entry != nullptr)
+      {
+        const auto code =
+            current->process->exit_code();
+
+        if (code.has_value() && code.value() == 0)
+        {
+          entry->set_state(SoftwareState::Stopped);
+        }
+        else
+        {
+          entry->set_state(SoftwareState::Failed);
+        }
+      }
+
+      current = processes_.erase(current);
+    }
+  }
+
   std::optional<SoftwareState> SoftwareManager::state(
       const SoftwareId &id) const noexcept
   {
-    const SoftwareEntry *entry = state_.find_software(id);
+    const SoftwareEntry *entry =
+        state_.find_software(id);
 
     if (entry == nullptr)
     {

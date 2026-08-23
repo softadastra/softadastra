@@ -32,10 +32,7 @@ namespace softadastra
    * @brief Manages software registered with a Host.
    *
    * SoftwareManager owns the runtime association between registered software
-   * and the operating-system processes launched for it.
-   *
-   * Process creation is delegated to ProcessLauncher so that software
-   * management remains independent of the underlying operating system.
+   * and the processes launched for it.
    */
   class SoftwareManager
   {
@@ -52,11 +49,6 @@ namespace softadastra
 
     /**
      * @brief Registers software with the Host.
-     *
-     * @param id Software identifier.
-     * @param process_spec Information required to launch the software.
-     *
-     * @return true if the software was registered, otherwise false.
      */
     bool register_software(
         SoftwareId id,
@@ -64,29 +56,25 @@ namespace softadastra
 
     /**
      * @brief Starts registered software.
-     *
-     * @param id Identifier of the software to start.
-     *
-     * @return true if the software was started, otherwise false.
      */
     bool start(const SoftwareId &id);
 
     /**
      * @brief Stops running software.
-     *
-     * @param id Identifier of the software to stop.
-     *
-     * @return true if the software was stopped, otherwise false.
      */
     bool stop(const SoftwareId &id);
 
     /**
+     * @brief Refreshes lifecycle state from managed processes.
+     *
+     * Running software remains Running while its process is active.
+     * A process that exits with code 0 becomes Stopped.
+     * A process that exits with a non-zero code becomes Failed.
+     */
+    void refresh();
+
+    /**
      * @brief Returns the lifecycle state of registered software.
-     *
-     * @param id Software identifier.
-     *
-     * @return The lifecycle state, or std::nullopt when the software is not
-     *         registered.
      */
     [[nodiscard]] std::optional<SoftwareState> state(
         const SoftwareId &id) const noexcept;

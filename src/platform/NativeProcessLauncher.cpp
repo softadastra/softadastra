@@ -13,13 +13,17 @@
  */
 
 #include "platform/NativeProcessLauncher.hpp"
+
 #include "platform/NativeProcess.hpp"
-#include <vix/process/Process.hpp>
 
 #include <memory>
+#include <utility>
+#include <vix/process/Command.hpp>
+#include <vix/process/Spawn.hpp>
 
 namespace softadastra
 {
+
   std::unique_ptr<Process> NativeProcessLauncher::launch(
       const ProcessSpec &spec)
   {
@@ -41,7 +45,7 @@ namespace softadastra
       return nullptr;
     }
 
-    const vix::process::Child &child = result.value();
+    vix::process::Child child = std::move(result.value());
 
     if (!child.valid())
     {
@@ -49,7 +53,7 @@ namespace softadastra
     }
 
     return std::make_unique<NativeProcess>(
-        static_cast<NativeProcess::Id>(child.id()));
+        std::move(child));
   }
 
 } // namespace softadastra

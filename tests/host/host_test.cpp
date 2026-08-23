@@ -23,6 +23,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
 
 namespace
 {
@@ -33,6 +34,7 @@ namespace
     bool stop() override
     {
       running_ = false;
+      exit_code_ = 0;
       return true;
     }
 
@@ -41,8 +43,14 @@ namespace
       return running_;
     }
 
+    [[nodiscard]] std::optional<int> exit_code() noexcept override
+    {
+      return exit_code_;
+    }
+
   private:
     bool running_{true};
+    std::optional<int> exit_code_;
   };
 
   class TestProcessLauncher final : public softadastra::ProcessLauncher

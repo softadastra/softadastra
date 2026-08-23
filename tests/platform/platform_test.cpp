@@ -22,15 +22,18 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
 
 namespace
 {
+
   class TestProcess final : public softadastra::Process
   {
   public:
     bool stop() override
     {
       running_ = false;
+      exit_code_ = 0;
       return true;
     }
 
@@ -39,8 +42,14 @@ namespace
       return running_;
     }
 
+    [[nodiscard]] std::optional<int> exit_code() noexcept override
+    {
+      return exit_code_;
+    }
+
   private:
     bool running_{true};
+    std::optional<int> exit_code_;
   };
 
   class TestProcessLauncher final : public softadastra::ProcessLauncher
@@ -90,16 +99,6 @@ namespace
       return connected_;
     }
 
-    void set_available(bool value) noexcept
-    {
-      available_ = value;
-    }
-
-    void set_connected(bool value) noexcept
-    {
-      connected_ = value;
-    }
-
   private:
     bool available_{false};
     bool connected_{false};
@@ -108,33 +107,38 @@ namespace
   class TestPlatform final : public softadastra::Platform
   {
   public:
-    softadastra::ProcessLauncher &process_launcher() noexcept override
+    [[nodiscard]] softadastra::ProcessLauncher &
+    process_launcher() noexcept override
     {
       return process_launcher_;
     }
 
-    const softadastra::ProcessLauncher &process_launcher()
-        const noexcept override
+    [[nodiscard]] const softadastra::ProcessLauncher &
+    process_launcher() const noexcept override
     {
       return process_launcher_;
     }
 
-    softadastra::Service &service() noexcept override
+    [[nodiscard]] softadastra::Service &
+    service() noexcept override
     {
       return service_;
     }
 
-    const softadastra::Service &service() const noexcept override
+    [[nodiscard]] const softadastra::Service &
+    service() const noexcept override
     {
       return service_;
     }
 
-    softadastra::Network &network() noexcept override
+    [[nodiscard]] softadastra::Network &
+    network() noexcept override
     {
       return network_;
     }
 
-    const softadastra::Network &network() const noexcept override
+    [[nodiscard]] const softadastra::Network &
+    network() const noexcept override
     {
       return network_;
     }
@@ -151,10 +155,12 @@ namespace
 
     const softadastra::ProcessSpec spec("/usr/bin/example");
 
-    auto process = platform.process_launcher().launch(spec);
+    auto process =
+        platform.process_launcher().launch(spec);
 
     ASSERT_NE(process, nullptr);
     EXPECT_TRUE(process->is_running());
+    EXPECT_FALSE(process->exit_code().has_value());
   }
 
   TEST(PlatformTest, ExposesServiceCapability)
@@ -162,8 +168,12 @@ namespace
     TestPlatform platform;
 
     EXPECT_FALSE(platform.service().is_running());
+
     EXPECT_TRUE(platform.service().start());
     EXPECT_TRUE(platform.service().is_running());
+
+    EXPECT_TRUE(platform.service().stop());
+    EXPECT_FALSE(platform.service().is_running());
   }
 
   TEST(PlatformTest, ExposesNetworkCapability)
@@ -187,25 +197,40 @@ namespace
     const softadastra::Network &network =
         platform.network();
 
-    EXPECT_EQ(&process_launcher, &platform.process_launcher());
-    EXPECT_EQ(&service, &platform.service());
-    EXPECT_EQ(&network, &platform.network());
+    EXPECT_EQ(
+        &process_launcher,
+        &platform.process_launcher());
+
+    EXPECT_EQ(
+        &service,
+        &platform.service());
+
+    EXPECT_EQ(
+        &network,
+        &platform.network());
   }
 
   TEST(PlatformTest, SupportsUseThroughPlatformInterface)
   {
     TestPlatform concrete_platform;
-    softadastra::Platform &platform = concrete_platform;
+    softadastra::Platform &platform =
+        concrete_platform;
 
     const softadastra::ProcessSpec spec("/usr/bin/example");
 
-    auto process = platform.process_launcher().launch(spec);
+    auto process =
+        platform.process_launcher().launch(spec);
 
     ASSERT_NE(process, nullptr);
-    EXPECT_TRUE(process->is_running());
 
-    EXPECT_FALSE(platform.service().is_running());
-    EXPECT_FALSE(platform.network().is_available());
+    EXPECT_TRUE(process->is_running());
+    EXPECT_FALSE(process->exit_code().has_value());
+
+    EXPECT_TRUE(process->stop());
+    EXPECT_FALSE(process->is_running());
+
+    ASSERT_TRUE(process->exit_code().has_value());
+    EXPECT_EQ(process->exit_code().value(), 0);
   }
 
 } // namespace

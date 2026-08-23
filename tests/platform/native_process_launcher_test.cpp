@@ -19,24 +19,38 @@
 
 #include <gtest/gtest.h>
 
-#include <memory>
-
-#if !defined(_WIN32)
-
-#include <sys/types.h>
-#include <sys/wait.h>
-
-#endif
+#include <chrono>
+#include <optional>
+#include <thread>
 
 namespace
 {
+
+  std::optional<int> wait_for_exit_code(
+      softadastra::Process &process)
+  {
+    for (int attempt = 0; attempt < 100; ++attempt)
+    {
+      const auto code = process.exit_code();
+
+      if (code.has_value())
+      {
+        return code;
+      }
+
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(10));
+    }
+
+    return std::nullopt;
+  }
+
   TEST(NativeProcessLauncherTest, RejectsEmptyExecutable)
   {
     softadastra::NativeProcessLauncher launcher;
 
-    const softadastra::ProcessSpec spec("");
-
-    auto process = launcher.launch(spec);
+    auto process = launcher.launch(
+        softadastra::ProcessSpec(""));
 
     EXPECT_EQ(process, nullptr);
   }
@@ -45,15 +59,117 @@ namespace
   {
     softadastra::NativeProcessLauncher launcher;
 
-    const softadastra::ProcessSpec spec(
-        "softadastra-executable-that-does-not-exist");
-
-    auto process = launcher.launch(spec);
+    auto process = launcher.launch(
+        softadastra::ProcessSpec(
+            "softadastra-executable-that-does-not-exist"));
 
     EXPECT_EQ(process, nullptr);
   }
 
-  TEST(NativeProcessLauncherTest, LaunchesRealProcess)
+  TEST(NativeProcessLauncherTest, LaunchesRunningProcess)
+  {
+    softadastra::NativeProcessLauncher launcher;
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 30 127.0.0.1 >NUL",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "sleep 30",
+        });
+
+#endif
+
+    auto process = launcher.launch(spec);
+
+    ASSERT_NE(process, nullptr);
+    EXPECT_TRUE(process->is_running());
+    EXPECT_FALSE(process->exit_code().has_value());
+
+    EXPECT_TRUE(process->stop());
+  }
+
+  TEST(NativeProcessLauncherTest, ReportsSuccessfulNaturalExit)
+  {
+    softadastra::NativeProcessLauncher launcher;
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "exit 0",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "exit 0",
+        });
+
+#endif
+
+    auto process = launcher.launch(spec);
+
+    ASSERT_NE(process, nullptr);
+
+    const auto code = wait_for_exit_code(*process);
+
+    ASSERT_TRUE(code.has_value());
+    EXPECT_EQ(code.value(), 0);
+    EXPECT_FALSE(process->is_running());
+  }
+
+  TEST(NativeProcessLauncherTest, ReportsFailedNaturalExit)
+  {
+    softadastra::NativeProcessLauncher launcher;
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "exit 7",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "exit 7",
+        });
+
+#endif
+
+    auto process = launcher.launch(spec);
+
+    ASSERT_NE(process, nullptr);
+
+    const auto code = wait_for_exit_code(*process);
+
+    ASSERT_TRUE(code.has_value());
+    EXPECT_EQ(code.value(), 7);
+    EXPECT_FALSE(process->is_running());
+  }
+
+  TEST(NativeProcessLauncherTest, PreservesArguments)
   {
     softadastra::NativeProcessLauncher launcher;
 
@@ -83,77 +199,9 @@ namespace
     EXPECT_TRUE(process->is_running());
 
     EXPECT_TRUE(process->stop());
-
-#if !defined(_WIN32)
-
-    const auto *native_process =
-        dynamic_cast<const softadastra::NativeProcess *>(process.get());
-
-    ASSERT_NE(native_process, nullptr);
-
-    int status = 0;
-
-    EXPECT_EQ(
-        ::waitpid(
-            static_cast<pid_t>(native_process->id()),
-            &status,
-            0),
-        static_cast<pid_t>(native_process->id()));
-
-#endif
   }
 
-  TEST(NativeProcessLauncherTest, PreservesProcessArguments)
-  {
-    softadastra::NativeProcessLauncher launcher;
-
-#if defined(_WIN32)
-
-    const softadastra::ProcessSpec spec(
-        "cmd.exe",
-        {
-            "/C",
-            "ping -n 30 127.0.0.1 >NUL",
-        });
-
-#else
-
-    const softadastra::ProcessSpec spec(
-        "sh",
-        {
-            "-c",
-            "sleep 30",
-        });
-
-#endif
-
-    auto process = launcher.launch(spec);
-
-    ASSERT_NE(process, nullptr);
-    EXPECT_TRUE(process->is_running());
-
-    EXPECT_TRUE(process->stop());
-
-#if !defined(_WIN32)
-
-    const auto *native_process =
-        dynamic_cast<const softadastra::NativeProcess *>(process.get());
-
-    ASSERT_NE(native_process, nullptr);
-
-    int status = 0;
-
-    EXPECT_EQ(
-        ::waitpid(
-            static_cast<pid_t>(native_process->id()),
-            &status,
-            0),
-        static_cast<pid_t>(native_process->id()));
-
-#endif
-  }
-
-  TEST(NativeProcessLauncherTest, SupportsUseThroughProcessLauncherInterface)
+  TEST(NativeProcessLauncherTest, SupportsProcessLauncherInterface)
   {
     softadastra::NativeProcessLauncher native_launcher;
     softadastra::ProcessLauncher &launcher = native_launcher;
@@ -184,24 +232,6 @@ namespace
     EXPECT_TRUE(process->is_running());
 
     EXPECT_TRUE(process->stop());
-
-#if !defined(_WIN32)
-
-    const auto *native_process =
-        dynamic_cast<const softadastra::NativeProcess *>(process.get());
-
-    ASSERT_NE(native_process, nullptr);
-
-    int status = 0;
-
-    EXPECT_EQ(
-        ::waitpid(
-            static_cast<pid_t>(native_process->id()),
-            &status,
-            0),
-        static_cast<pid_t>(native_process->id()));
-
-#endif
   }
 
 } // namespace

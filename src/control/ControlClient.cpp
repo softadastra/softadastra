@@ -42,6 +42,11 @@ namespace softadastra
     return server_.stop_software(id);
   }
 
+  void ControlClient::refresh()
+  {
+    server_.refresh();
+  }
+
   std::optional<SoftwareState> ControlClient::software_state(
       const SoftwareId &id) const noexcept
   {

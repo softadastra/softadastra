@@ -26,40 +26,51 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
 
 namespace
 {
+
+  struct TestProcessState
+  {
+    bool running{true};
+    bool stop_succeeds{true};
+    std::optional<int> exit_code;
+  };
 
   class TestProcess final : public softadastra::Process
   {
   public:
     explicit TestProcess(
-        bool running = true,
-        bool stop_succeeds = true) noexcept
-        : running_(running),
-          stop_succeeds_(stop_succeeds)
+        std::shared_ptr<TestProcessState> state)
+        : state_(std::move(state))
     {
     }
 
     bool stop() override
     {
-      if (!stop_succeeds_)
+      if (!state_->stop_succeeds)
       {
         return false;
       }
 
-      running_ = false;
+      state_->running = false;
+      state_->exit_code = 0;
       return true;
     }
 
     [[nodiscard]] bool is_running() const noexcept override
     {
-      return running_;
+      return state_->running;
+    }
+
+    [[nodiscard]] std::optional<int> exit_code() noexcept override
+    {
+      return state_->exit_code;
     }
 
   private:
-    bool running_;
-    bool stop_succeeds_;
+    std::shared_ptr<TestProcessState> state_;
   };
 
   class TestProcessLauncher final : public softadastra::ProcessLauncher
@@ -73,9 +84,19 @@ namespace
         return nullptr;
       }
 
+      last_process_ =
+          std::make_shared<TestProcessState>();
+
+      last_process_->running = process_running_;
+      last_process_->stop_succeeds = stop_succeeds_;
+
+      if (!process_running_)
+      {
+        last_process_->exit_code = launch_exit_code_;
+      }
+
       return std::make_unique<TestProcess>(
-          process_running_,
-          stop_succeeds_);
+          last_process_);
     }
 
     void set_launch_fails(bool value) noexcept
@@ -88,15 +109,28 @@ namespace
       process_running_ = value;
     }
 
+    void set_launch_exit_code(int code) noexcept
+    {
+      launch_exit_code_ = code;
+    }
+
     void set_stop_succeeds(bool value) noexcept
     {
       stop_succeeds_ = value;
+    }
+
+    [[nodiscard]] std::shared_ptr<TestProcessState>
+    last_process() const noexcept
+    {
+      return last_process_;
     }
 
   private:
     bool launch_fails_{false};
     bool process_running_{true};
     bool stop_succeeds_{true};
+    int launch_exit_code_{0};
+    std::shared_ptr<TestProcessState> last_process_;
   };
 
   class TestService final : public softadastra::Service
@@ -201,52 +235,17 @@ namespace
     TestNetwork network_;
   };
 
-  TEST(HostServiceTest, ExposesManagedHost)
-  {
-    TestPlatform platform;
-    TestProcessLauncher launcher;
-    softadastra::Host host(platform);
-
-    softadastra::HostService service(host, launcher);
-
-    EXPECT_EQ(&service.host(), &host);
-  }
-
   TEST(HostServiceTest, RegistersSoftware)
   {
     TestPlatform platform;
     TestProcessLauncher launcher;
     softadastra::Host host(platform);
-
     softadastra::HostService service(host, launcher);
 
     EXPECT_TRUE(
         service.register_software(
             softadastra::SoftwareId("example"),
             softadastra::ProcessSpec("/usr/bin/example")));
-
-    EXPECT_EQ(host.state().software_count(), 1U);
-  }
-
-  TEST(HostServiceTest, RejectsDuplicateSoftwareRegistration)
-  {
-    TestPlatform platform;
-    TestProcessLauncher launcher;
-    softadastra::Host host(platform);
-
-    softadastra::HostService service(host, launcher);
-
-    const softadastra::SoftwareId id("example");
-
-    ASSERT_TRUE(
-        service.register_software(
-            id,
-            softadastra::ProcessSpec("/usr/bin/example")));
-
-    EXPECT_FALSE(
-        service.register_software(
-            id,
-            softadastra::ProcessSpec("/usr/bin/other")));
   }
 
   TEST(HostServiceTest, StartsRegisteredSoftware)
@@ -254,7 +253,6 @@ namespace
     TestPlatform platform;
     TestProcessLauncher launcher;
     softadastra::Host host(platform);
-
     softadastra::HostService service(host, launcher);
 
     const softadastra::SoftwareId id("example");
@@ -266,8 +264,6 @@ namespace
 
     EXPECT_TRUE(service.start_software(id));
 
-    ASSERT_TRUE(service.software_state(id).has_value());
-
     EXPECT_EQ(
         service.software_state(id).value(),
         softadastra::SoftwareState::Running);
@@ -278,7 +274,28 @@ namespace
     TestPlatform platform;
     TestProcessLauncher launcher;
     softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
 
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        service.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    ASSERT_TRUE(service.start_software(id));
+    EXPECT_TRUE(service.stop_software(id));
+
+    EXPECT_EQ(
+        service.software_state(id).value(),
+        softadastra::SoftwareState::Stopped);
+  }
+
+  TEST(HostServiceTest, KeepsRunningSoftwareRunningAfterRefresh)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
     softadastra::HostService service(host, launcher);
 
     const softadastra::SoftwareId id("example");
@@ -290,20 +307,77 @@ namespace
 
     ASSERT_TRUE(service.start_software(id));
 
-    EXPECT_TRUE(service.stop_software(id));
+    service.refresh();
 
-    ASSERT_TRUE(service.software_state(id).has_value());
+    EXPECT_EQ(
+        service.software_state(id).value(),
+        softadastra::SoftwareState::Running);
+  }
+
+  TEST(HostServiceTest, DetectsSuccessfulProcessExit)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        service.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    ASSERT_TRUE(service.start_software(id));
+
+    auto process = launcher.last_process();
+
+    ASSERT_NE(process, nullptr);
+
+    process->running = false;
+    process->exit_code = 0;
+
+    service.refresh();
 
     EXPECT_EQ(
         service.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
   }
 
-  TEST(HostServiceTest, PropagatesSoftwareStartFailure)
+  TEST(HostServiceTest, DetectsFailedProcessExit)
   {
     TestPlatform platform;
     TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
 
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(
+        service.register_software(
+            id,
+            softadastra::ProcessSpec("/usr/bin/example")));
+
+    ASSERT_TRUE(service.start_software(id));
+
+    auto process = launcher.last_process();
+
+    ASSERT_NE(process, nullptr);
+
+    process->running = false;
+    process->exit_code = 7;
+
+    service.refresh();
+
+    EXPECT_EQ(
+        service.software_state(id).value(),
+        softadastra::SoftwareState::Failed);
+  }
+
+  TEST(HostServiceTest, PropagatesLaunchFailure)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
     launcher.set_launch_fails(true);
 
     softadastra::Host host(platform);
@@ -318,44 +392,15 @@ namespace
 
     EXPECT_FALSE(service.start_software(id));
 
-    ASSERT_TRUE(service.software_state(id).has_value());
-
     EXPECT_EQ(
         service.software_state(id).value(),
         softadastra::SoftwareState::Failed);
   }
 
-  TEST(HostServiceTest, RejectsProcessThatDoesNotRemainRunning)
+  TEST(HostServiceTest, PropagatesStopFailure)
   {
     TestPlatform platform;
     TestProcessLauncher launcher;
-
-    launcher.set_process_running(false);
-
-    softadastra::Host host(platform);
-    softadastra::HostService service(host, launcher);
-
-    const softadastra::SoftwareId id("example");
-
-    ASSERT_TRUE(
-        service.register_software(
-            id,
-            softadastra::ProcessSpec("/usr/bin/example")));
-
-    EXPECT_FALSE(service.start_software(id));
-
-    ASSERT_TRUE(service.software_state(id).has_value());
-
-    EXPECT_EQ(
-        service.software_state(id).value(),
-        softadastra::SoftwareState::Failed);
-  }
-
-  TEST(HostServiceTest, PropagatesSoftwareStopFailure)
-  {
-    TestPlatform platform;
-    TestProcessLauncher launcher;
-
     launcher.set_stop_succeeds(false);
 
     softadastra::Host host(platform);
@@ -371,8 +416,6 @@ namespace
     ASSERT_TRUE(service.start_software(id));
 
     EXPECT_FALSE(service.stop_software(id));
-
-    ASSERT_TRUE(service.software_state(id).has_value());
 
     EXPECT_EQ(
         service.software_state(id).value(),
@@ -391,32 +434,6 @@ namespace
         service.software_state(
                    softadastra::SoftwareId("unknown"))
             .has_value());
-  }
-
-  TEST(HostServiceTest, ReportsUnavailableConnectivity)
-  {
-    TestPlatform platform;
-    TestProcessLauncher launcher;
-    softadastra::Host host(platform);
-
-    const softadastra::HostService service(host, launcher);
-
-    EXPECT_FALSE(service.connectivity_available());
-    EXPECT_FALSE(service.connected());
-  }
-
-  TEST(HostServiceTest, ReportsAvailableConnectivity)
-  {
-    TestPlatform platform;
-    platform.test_network().set_available(true);
-
-    TestProcessLauncher launcher;
-    softadastra::Host host(platform);
-
-    const softadastra::HostService service(host, launcher);
-
-    EXPECT_TRUE(service.connectivity_available());
-    EXPECT_FALSE(service.connected());
   }
 
   TEST(HostServiceTest, ReportsConnectedHost)

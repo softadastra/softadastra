@@ -23,33 +23,38 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <thread>
+
 namespace
 {
-
-  softadastra::ProcessSpec make_long_running_process()
+  void refresh_until_settled(
+      softadastra::ControlClient &client,
+      const softadastra::SoftwareId &id)
   {
-#if defined(_WIN32)
+    for (int attempt = 0; attempt < 100; ++attempt)
+    {
+      client.refresh();
 
-    return softadastra::ProcessSpec(
-        "cmd.exe",
-        {
-            "/C",
-            "ping -n 30 127.0.0.1 >NUL",
-        });
+      const auto state = client.software_state(id);
 
-#else
+      if (!state.has_value())
+      {
+        return;
+      }
 
-    return softadastra::ProcessSpec(
-        "sh",
-        {
-            "-c",
-            "sleep 30",
-        });
+      if (state.value() != softadastra::SoftwareState::Running &&
+          state.value() != softadastra::SoftwareState::Starting)
+      {
+        return;
+      }
 
-#endif
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(10));
+    }
   }
 
-  TEST(HostRuntimeTest, RunsSoftwareThroughCompleteHostControlPath)
+  TEST(HostRuntimeTest, RunsAndStopsRealSoftware)
   {
     softadastra::NativePlatform platform;
     softadastra::Host host(platform);
@@ -58,37 +63,141 @@ namespace
         host,
         platform.process_launcher());
 
-    softadastra::ControlServer control_server(host_service);
-    softadastra::ControlClient control_client(control_server);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
 
-    const softadastra::SoftwareId id("integration-test");
+    const softadastra::SoftwareId id("long-running");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 30 127.0.0.1 >NUL",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "sleep 30",
+        });
+
+#endif
 
     ASSERT_TRUE(
-        control_client.register_software(
-            id,
-            make_long_running_process()));
+        client.register_software(id, spec));
 
-    ASSERT_TRUE(control_client.software_state(id).has_value());
+    ASSERT_TRUE(client.start_software(id));
 
     EXPECT_EQ(
-        control_client.software_state(id).value(),
-        softadastra::SoftwareState::Stopped);
-
-    ASSERT_TRUE(control_client.start_software(id));
-
-    ASSERT_TRUE(control_client.software_state(id).has_value());
-
-    EXPECT_EQ(
-        control_client.software_state(id).value(),
+        client.software_state(id).value(),
         softadastra::SoftwareState::Running);
 
-    ASSERT_TRUE(control_client.stop_software(id));
-
-    ASSERT_TRUE(control_client.software_state(id).has_value());
+    EXPECT_TRUE(client.stop_software(id));
 
     EXPECT_EQ(
-        control_client.software_state(id).value(),
+        client.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
+  }
+
+  TEST(HostRuntimeTest, DetectsSuccessfulNaturalExit)
+  {
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+
+    softadastra::HostService host_service(
+        host,
+        platform.process_launcher());
+
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+
+    const softadastra::SoftwareId id("successful-exit");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 2 127.0.0.1 >NUL & exit 0",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "sleep 0.1; exit 0",
+        });
+
+#endif
+
+    ASSERT_TRUE(
+        client.register_software(id, spec));
+
+    ASSERT_TRUE(client.start_software(id));
+
+    refresh_until_settled(client, id);
+
+    ASSERT_TRUE(client.software_state(id).has_value());
+
+    EXPECT_EQ(
+        client.software_state(id).value(),
+        softadastra::SoftwareState::Stopped);
+  }
+
+  TEST(HostRuntimeTest, DetectsFailedNaturalExit)
+  {
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+
+    softadastra::HostService host_service(
+        host,
+        platform.process_launcher());
+
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+
+    const softadastra::SoftwareId id("failed-exit");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 2 127.0.0.1 >NUL & exit 7",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "sleep 0.1; exit 7",
+        });
+
+#endif
+
+    ASSERT_TRUE(
+        client.register_software(id, spec));
+
+    ASSERT_TRUE(client.start_software(id));
+
+    refresh_until_settled(client, id);
+
+    ASSERT_TRUE(client.software_state(id).has_value());
+
+    EXPECT_EQ(
+        client.software_state(id).value(),
+        softadastra::SoftwareState::Failed);
   }
 
   TEST(HostRuntimeTest, RejectsSoftwareThatCannotBeLaunched)
@@ -100,27 +209,27 @@ namespace
         host,
         platform.process_launcher());
 
-    softadastra::ControlServer control_server(host_service);
-    softadastra::ControlClient control_client(control_server);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
 
     const softadastra::SoftwareId id("missing-software");
 
     ASSERT_TRUE(
-        control_client.register_software(
+        client.register_software(
             id,
             softadastra::ProcessSpec(
                 "softadastra-executable-that-does-not-exist")));
 
-    EXPECT_FALSE(control_client.start_software(id));
+    EXPECT_FALSE(client.start_software(id));
 
-    ASSERT_TRUE(control_client.software_state(id).has_value());
+    ASSERT_TRUE(client.software_state(id).has_value());
 
     EXPECT_EQ(
-        control_client.software_state(id).value(),
+        client.software_state(id).value(),
         softadastra::SoftwareState::Failed);
   }
 
-  TEST(HostRuntimeTest, ReportsNativeConnectivityConsistently)
+  TEST(HostRuntimeTest, KeepsLongRunningSoftwareRunningAfterRefresh)
   {
     softadastra::NativePlatform platform;
     softadastra::Host host(platform);
@@ -129,13 +238,43 @@ namespace
         host,
         platform.process_launcher());
 
-    softadastra::ControlServer control_server(host_service);
-    const softadastra::ControlClient control_client(control_server);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
 
-    if (control_client.connected())
-    {
-      EXPECT_TRUE(control_client.connectivity_available());
-    }
+    const softadastra::SoftwareId id("still-running");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 30 127.0.0.1 >NUL",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "sleep 30",
+        });
+
+#endif
+
+    ASSERT_TRUE(
+        client.register_software(id, spec));
+
+    ASSERT_TRUE(client.start_software(id));
+
+    client.refresh();
+
+    EXPECT_EQ(
+        client.software_state(id).value(),
+        softadastra::SoftwareState::Running);
+
+    EXPECT_TRUE(client.stop_software(id));
   }
 
 } // namespace

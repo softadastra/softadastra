@@ -23,6 +23,7 @@
 
 #include <memory>
 #include <string>
+#include <optional>
 
 namespace
 {
@@ -53,9 +54,15 @@ namespace
       return running_;
     }
 
+    [[nodiscard]] std::optional<int> exit_code() noexcept override
+    {
+      return exit_code_;
+    }
+
   private:
     bool running_;
     bool stop_succeeds_;
+    std::optional<int> exit_code_;
   };
 
   class TestProcessLauncher final : public softadastra::ProcessLauncher

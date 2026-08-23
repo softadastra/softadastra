@@ -14,145 +14,120 @@
 
 #include "platform/NativeProcess.hpp"
 
-#if defined(_WIN32)
-
-#include <windows.h>
-
-#else
-
-#include <cerrno>
-#include <csignal>
-#include <limits>
-#include <sys/types.h>
-
-#endif
+#include <utility>
+#include <vix/process/Status.hpp>
+#include <vix/process/Terminate.hpp>
+#include <vix/process/Wait.hpp>
 
 namespace softadastra
 {
 
-  NativeProcess::NativeProcess(Id id) noexcept
-      : id_(id)
+  NativeProcess::NativeProcess(vix::process::Child child) noexcept
+      : child_(std::move(child))
   {
   }
 
   bool NativeProcess::stop()
   {
+    if (!child_.valid())
+    {
+      return false;
+    }
+
     if (!is_running())
     {
       return true;
     }
 
-#if defined(_WIN32)
+    const auto error = vix::process::terminate(child_);
 
-    if (id_ > static_cast<Id>(MAXDWORD))
+    if (error.has_error())
     {
       return false;
     }
 
-    HANDLE process = OpenProcess(
-        PROCESS_TERMINATE | SYNCHRONIZE,
-        FALSE,
-        static_cast<DWORD>(id_));
+    const auto result = vix::process::wait(child_);
 
-    if (process == nullptr)
+    if (!result)
     {
       return false;
     }
 
-    const BOOL terminated = TerminateProcess(process, 1);
+    exit_code_ = result.value();
 
-    if (terminated != FALSE)
-    {
-      WaitForSingleObject(process, 5000);
-    }
-
-    CloseHandle(process);
-
-    return terminated != FALSE;
-
-#else
-
-    if (id_ == 0 ||
-        id_ > static_cast<Id>(std::numeric_limits<pid_t>::max()))
-    {
-      return false;
-    }
-
-    const pid_t pid = static_cast<pid_t>(id_);
-
-    if (::kill(pid, SIGTERM) == 0)
-    {
-      return true;
-    }
-
-    return errno == ESRCH;
-
-#endif
+    return true;
   }
 
   bool NativeProcess::is_running() const noexcept
   {
-    if (id_ == 0)
+    if (!child_.valid())
     {
       return false;
     }
 
-#if defined(_WIN32)
+    try
+    {
+      const auto result = vix::process::status(child_);
 
-    if (id_ > static_cast<Id>(MAXDWORD))
+      if (!result)
+      {
+        return false;
+      }
+
+      return result.value();
+    }
+    catch (...)
     {
       return false;
     }
+  }
 
-    HANDLE process = OpenProcess(
-        PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
-        FALSE,
-        static_cast<DWORD>(id_));
-
-    if (process == nullptr)
+  std::optional<int> NativeProcess::exit_code() noexcept
+  {
+    if (exit_code_.has_value())
     {
-      return false;
+      return exit_code_;
     }
 
-    DWORD exit_code = 0;
-
-    const BOOL queried =
-        GetExitCodeProcess(process, &exit_code);
-
-    CloseHandle(process);
-
-    if (queried == FALSE)
+    if (!child_.valid())
     {
-      return false;
+      return std::nullopt;
     }
 
-    return exit_code == STILL_ACTIVE;
-
-#else
-
-    if (id_ > static_cast<Id>(std::numeric_limits<pid_t>::max()))
+    try
     {
-      return false;
+      const auto status = vix::process::status(child_);
+
+      if (!status)
+      {
+        return std::nullopt;
+      }
+
+      if (status.value())
+      {
+        return std::nullopt;
+      }
+
+      const auto result = vix::process::wait(child_);
+
+      if (!result)
+      {
+        return std::nullopt;
+      }
+
+      exit_code_ = result.value();
+
+      return exit_code_;
     }
-
-    errno = 0;
-
-    const int result =
-        ::kill(static_cast<pid_t>(id_), 0);
-
-    if (result == 0)
+    catch (...)
     {
-      return true;
+      return std::nullopt;
     }
-
-    return errno == EPERM;
-
-#endif
   }
 
   NativeProcess::Id NativeProcess::id() const noexcept
   {
-    return id_;
+    return child_.id();
   }
 
 } // namespace softadastra

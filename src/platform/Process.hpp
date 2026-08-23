@@ -15,16 +15,13 @@
 #ifndef SOFTADASTRA_PLATFORM_PROCESS_HPP
 #define SOFTADASTRA_PLATFORM_PROCESS_HPP
 
+#include <optional>
+
 namespace softadastra
 {
+
   /**
-   * @brief Represents a running operating-system process.
-   *
-   * Process is a handle to a process that has already been launched.
-   * Process creation belongs to ProcessLauncher.
-   *
-   * The interface exposes only the lifecycle capabilities currently required
-   * by Softadastra.
+   * @brief Represents a process launched by the operating system.
    */
   class Process
   {
@@ -34,7 +31,7 @@ namespace softadastra
     /**
      * @brief Stops the process.
      *
-     * @return true if the process was stopped successfully, otherwise false.
+     * @return true if the process is stopped successfully, otherwise false.
      */
     virtual bool stop() = 0;
 
@@ -42,6 +39,14 @@ namespace softadastra
      * @brief Returns whether the process is currently running.
      */
     [[nodiscard]] virtual bool is_running() const noexcept = 0;
+
+    /**
+     * @brief Returns the process exit code when available.
+     *
+     * @return The exit code when the process has terminated, or std::nullopt
+     *         while the process is still running.
+     */
+    [[nodiscard]] virtual std::optional<int> exit_code() noexcept = 0;
   };
 
 } // namespace softadastra

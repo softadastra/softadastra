@@ -29,20 +29,12 @@ namespace softadastra
 {
   /**
    * @brief Coordinates Host infrastructure capabilities.
-   *
-   * HostService provides operations over software lifecycle and connectivity
-   * while keeping callers independent from the underlying platform details.
-   *
-   * Process creation remains below this service through ProcessLauncher.
    */
   class HostService
   {
   public:
     /**
      * @brief Creates a Host service.
-     *
-     * @param host Host coordinated by this service.
-     * @param process_launcher Capability used to launch software processes.
      */
     HostService(
         Host &host,
@@ -60,11 +52,6 @@ namespace softadastra
 
     /**
      * @brief Registers software with the Host.
-     *
-     * @param id Software identifier.
-     * @param process_spec Information required to launch the software.
-     *
-     * @return true if registration succeeds, otherwise false.
      */
     bool register_software(
         SoftwareId id,
@@ -72,28 +59,21 @@ namespace softadastra
 
     /**
      * @brief Starts registered software.
-     *
-     * @param id Software identifier.
-     *
-     * @return true if the software starts successfully, otherwise false.
      */
     bool start_software(const SoftwareId &id);
 
     /**
      * @brief Stops running software.
-     *
-     * @param id Software identifier.
-     *
-     * @return true if the software stops successfully, otherwise false.
      */
     bool stop_software(const SoftwareId &id);
 
     /**
+     * @brief Refreshes software lifecycle state from running processes.
+     */
+    void refresh();
+
+    /**
      * @brief Returns the lifecycle state of registered software.
-     *
-     * @param id Software identifier.
-     *
-     * @return The software state, or std::nullopt if the software is unknown.
      */
     [[nodiscard]] std::optional<SoftwareState> software_state(
         const SoftwareId &id) const noexcept;

@@ -18,7 +18,6 @@
 
 namespace softadastra
 {
-
   HostService::HostService(
       Host &host,
       ProcessLauncher &process_launcher) noexcept
@@ -55,6 +54,11 @@ namespace softadastra
   bool HostService::stop_software(const SoftwareId &id)
   {
     return software_manager_.stop(id);
+  }
+
+  void HostService::refresh()
+  {
+    software_manager_.refresh();
   }
 
   std::optional<SoftwareState> HostService::software_state(

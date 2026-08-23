@@ -17,50 +17,48 @@
 
 #include "platform/Process.hpp"
 
-#include <cstdint>
+#include <optional>
+#include <vix/process/Child.hpp>
 
 namespace softadastra
 {
+
   /**
-   * @brief Represents a process running on the native operating system.
-   *
-   * NativeProcess owns the infrastructure handle needed by Softadastra to
-   * inspect and stop a process that has already been launched.
-   *
-   * Process creation remains the responsibility of ProcessLauncher.
+   * @brief Represents a process launched through the native process backend.
    */
   class NativeProcess final : public Process
   {
   public:
-    using Id = std::uint64_t;
+    using Id = vix::process::ProcessId;
 
     /**
-     * @brief Creates a native process handle.
-     *
-     * @param id Operating-system process identifier.
+     * @brief Creates a native process from a Vix child handle.
      */
-    explicit NativeProcess(Id id) noexcept;
+    explicit NativeProcess(vix::process::Child child) noexcept;
 
     /**
-     * @brief Requests termination of the process.
-     *
-     * @return true if the process is already stopped or the termination request
-     *         succeeds, otherwise false.
+     * @brief Requests graceful termination of the process.
      */
     bool stop() override;
 
     /**
-     * @brief Returns whether the process currently exists.
+     * @brief Returns whether the process is currently running.
      */
     [[nodiscard]] bool is_running() const noexcept override;
 
     /**
-     * @brief Returns the operating-system process identifier.
+     * @brief Returns the exit code when the process has terminated.
+     */
+    [[nodiscard]] std::optional<int> exit_code() noexcept override;
+
+    /**
+     * @brief Returns the native process identifier.
      */
     [[nodiscard]] Id id() const noexcept;
 
   private:
-    Id id_;
+    vix::process::Child child_;
+    std::optional<int> exit_code_;
   };
 
 } // namespace softadastra

@@ -13,29 +13,39 @@
  */
 
 #include "platform/ProcessLauncher.hpp"
+
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace
 {
+
   class TestProcess final : public softadastra::Process
   {
   public:
+    bool stop() override
+    {
+      running_ = false;
+      exit_code_ = 0;
+      return true;
+    }
+
     [[nodiscard]] bool is_running() const noexcept override
     {
       return running_;
     }
 
-    bool stop() override
+    [[nodiscard]] std::optional<int> exit_code() noexcept override
     {
-      running_ = false;
-      return true;
+      return exit_code_;
     }
 
   private:
     bool running_{true};
+    std::optional<int> exit_code_;
   };
 
   class TestProcessLauncher final : public softadastra::ProcessLauncher
@@ -78,6 +88,7 @@ namespace
 
     ASSERT_NE(process, nullptr);
     EXPECT_TRUE(process->is_running());
+    EXPECT_FALSE(process->exit_code().has_value());
   }
 
   TEST(ProcessLauncherTest, ReceivesProcessSpecification)
@@ -88,7 +99,9 @@ namespace
     auto process = launcher.launch(spec);
 
     ASSERT_NE(process, nullptr);
-    EXPECT_EQ(launcher.last_executable(), "/usr/bin/example");
+    EXPECT_EQ(
+        launcher.last_executable(),
+        "/usr/bin/example");
   }
 
   TEST(ProcessLauncherTest, ReturnsNullWhenLaunchFails)
@@ -106,7 +119,8 @@ namespace
   TEST(ProcessLauncherTest, SupportsUseThroughProcessLauncherInterface)
   {
     TestProcessLauncher concrete_launcher;
-    softadastra::ProcessLauncher &launcher = concrete_launcher;
+    softadastra::ProcessLauncher &launcher =
+        concrete_launcher;
 
     const softadastra::ProcessSpec spec("/usr/bin/example");
 
@@ -114,6 +128,12 @@ namespace
 
     ASSERT_NE(process, nullptr);
     EXPECT_TRUE(process->is_running());
+
+    EXPECT_TRUE(process->stop());
+    EXPECT_FALSE(process->is_running());
+
+    ASSERT_TRUE(process->exit_code().has_value());
+    EXPECT_EQ(process->exit_code().value(), 0);
   }
 
 } // namespace

@@ -13,7 +13,10 @@
  */
 
 #include "platform/Process.hpp"
+
 #include <gtest/gtest.h>
+
+#include <optional>
 
 namespace
 {
@@ -24,11 +27,16 @@ namespace
     explicit TestProcess(bool running = true) noexcept
         : running_(running)
     {
+      if (!running_)
+      {
+        exit_code_ = 0;
+      }
     }
 
     bool stop() override
     {
       running_ = false;
+      exit_code_ = 0;
       return true;
     }
 
@@ -37,22 +45,52 @@ namespace
       return running_;
     }
 
+    [[nodiscard]] std::optional<int> exit_code() noexcept override
+    {
+      return exit_code_;
+    }
+
+    void finish(int code) noexcept
+    {
+      running_ = false;
+      exit_code_ = code;
+    }
+
   private:
     bool running_;
+    std::optional<int> exit_code_;
   };
 
   TEST(ProcessTest, RepresentsRunningProcess)
   {
-    const TestProcess process;
+    TestProcess process;
 
     EXPECT_TRUE(process.is_running());
+    EXPECT_FALSE(process.exit_code().has_value());
   }
 
-  TEST(ProcessTest, CanRepresentStoppedProcess)
+  TEST(ProcessTest, ReportsSuccessfulExit)
   {
-    const TestProcess process(false);
+    TestProcess process;
+
+    process.finish(0);
 
     EXPECT_FALSE(process.is_running());
+
+    ASSERT_TRUE(process.exit_code().has_value());
+    EXPECT_EQ(process.exit_code().value(), 0);
+  }
+
+  TEST(ProcessTest, ReportsFailedExit)
+  {
+    TestProcess process;
+
+    process.finish(7);
+
+    EXPECT_FALSE(process.is_running());
+
+    ASSERT_TRUE(process.exit_code().has_value());
+    EXPECT_EQ(process.exit_code().value(), 7);
   }
 
   TEST(ProcessTest, CanStopProcess)
@@ -61,6 +99,9 @@ namespace
 
     EXPECT_TRUE(process.stop());
     EXPECT_FALSE(process.is_running());
+
+    ASSERT_TRUE(process.exit_code().has_value());
+    EXPECT_EQ(process.exit_code().value(), 0);
   }
 
   TEST(ProcessTest, SupportsUseThroughProcessInterface)
@@ -69,8 +110,14 @@ namespace
     softadastra::Process &process = concrete_process;
 
     EXPECT_TRUE(process.is_running());
-    EXPECT_TRUE(process.stop());
+    EXPECT_FALSE(process.exit_code().has_value());
+
+    concrete_process.finish(3);
+
     EXPECT_FALSE(process.is_running());
+
+    ASSERT_TRUE(process.exit_code().has_value());
+    EXPECT_EQ(process.exit_code().value(), 3);
   }
 
 } // namespace
