@@ -203,6 +203,7 @@ namespace
     EXPECT_NE(started.find("local control: ready"), std::string::npos);
     EXPECT_NE(started.find("network: "), std::string::npos);
     EXPECT_NE(started.find("ipv4: "), std::string::npos);
+    EXPECT_NE(started.find("local name: "), std::string::npos);
     EXPECT_NE(started.find("remote access: disabled"), std::string::npos);
     EXPECT_NE(started.find("Press Ctrl+C to stop."), std::string::npos);
 

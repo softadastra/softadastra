@@ -24,6 +24,7 @@
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
 #include "platform/NativeDataDirectory.hpp"
+#include "platform/MdnsPublisher.hpp"
 #include "platform/NativePlatform.hpp"
 
 #include <chrono>
@@ -44,7 +45,9 @@ namespace
 {
   void print_host_started(
       const softadastra::HostService &host_service,
-      const softadastra::RemoteAccessSettings &remote_settings)
+      const softadastra::RemoteAccessSettings &remote_settings,
+      const softadastra::MdnsPublisher &mdns_publisher,
+      bool mdns_available)
   {
     const auto access = host_service.local_access();
     const std::string ipv4 = host_service.primary_ipv4();
@@ -56,6 +59,9 @@ namespace
               << "network: "
               << (host_service.connectivity_available() ? "available" : "unavailable")
               << "\nipv4: " << (ipv4.empty() ? "unavailable" : ipv4)
+              << "\nlocal name: "
+              << (mdns_available ? mdns_publisher.name()
+                                 : "unavailable (mDNS unavailable)")
               << "\nremote access: "
               << (remote_settings.enabled ? "enabled" : "disabled")
               << "\n\nPress Ctrl+C to stop.\n"
@@ -65,7 +71,8 @@ namespace
   int run_host(
       softadastra::HostLoop &host_loop,
       const softadastra::HostService &host_service,
-      const softadastra::RemoteAccessSettings &remote_settings)
+      const softadastra::RemoteAccessSettings &remote_settings,
+      softadastra::MdnsPublisher &mdns_publisher)
   {
 #if defined(__linux__)
 
@@ -89,7 +96,13 @@ namespace
     {
       if (host_loop.is_running())
       {
-        print_host_started(host_service, remote_settings);
+        const bool mdns_available =
+            mdns_publisher.start(host_service.primary_ipv4());
+        print_host_started(
+            host_service,
+            remote_settings,
+            mdns_publisher,
+            mdns_available);
         break;
       }
 
@@ -119,6 +132,7 @@ namespace
 
     host_loop.request_stop();
     thread.join();
+    mdns_publisher.stop();
 
     if (result == 0 && completed)
     {
@@ -190,7 +204,12 @@ int main(int argc, char *argv[])
         state_file,
         std::chrono::seconds(1),
         &local_control_server);
-    return run_host(host_loop, host_service, remote_settings);
+    softadastra::MdnsPublisher mdns_publisher(identity.id());
+    return run_host(
+        host_loop,
+        host_service,
+        remote_settings,
+        mdns_publisher);
   }
 
   softadastra::ControlClient control_client(
