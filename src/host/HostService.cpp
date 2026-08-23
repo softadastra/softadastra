@@ -103,4 +103,9 @@ namespace softadastra
         network.local_addresses()};
   }
 
+  std::string HostService::primary_ipv4() const
+  {
+    return host_.platform().network().primary_ipv4();
+  }
+
 } // namespace softadastra

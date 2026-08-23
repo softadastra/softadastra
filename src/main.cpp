@@ -47,16 +47,7 @@ namespace
       const softadastra::RemoteAccessSettings &remote_settings)
   {
     const auto access = host_service.local_access();
-    std::string ipv4 = "unavailable";
-
-    for (const auto &address : access.addresses)
-    {
-      if (address.family == softadastra::LocalAddressFamily::IPv4)
-      {
-        ipv4 = address.value;
-        break;
-      }
-    }
+    const std::string ipv4 = host_service.primary_ipv4();
 
     std::cout << "Softadastra Host is running\n"
               << "hostname: "
@@ -64,7 +55,7 @@ namespace
               << "\nlocal control: ready\n"
               << "network: "
               << (host_service.connectivity_available() ? "available" : "unavailable")
-              << "\nipv4: " << ipv4
+              << "\nipv4: " << (ipv4.empty() ? "unavailable" : ipv4)
               << "\nremote access: "
               << (remote_settings.enabled ? "enabled" : "disabled")
               << "\n\nPress Ctrl+C to stop.\n"

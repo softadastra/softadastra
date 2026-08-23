@@ -481,4 +481,44 @@ namespace softadastra
     return addresses;
   }
 
+  std::string NativeNetwork::primary_ipv4() const
+  {
+#if defined(__linux__)
+
+    const int descriptor = ::socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (descriptor >= 0)
+    {
+      sockaddr_in destination{};
+      destination.sin_family = AF_INET;
+      destination.sin_port = htons(53);
+      const bool connected =
+          ::inet_pton(AF_INET, "1.1.1.1", &destination.sin_addr) == 1 &&
+          ::connect(
+              descriptor,
+              reinterpret_cast<const sockaddr *>(&destination),
+              sizeof(destination)) == 0;
+      sockaddr_in source{};
+      socklen_t source_size = sizeof(source);
+      std::array<char, INET_ADDRSTRLEN> value{};
+
+      if (connected &&
+          ::getsockname(
+              descriptor,
+              reinterpret_cast<sockaddr *>(&source),
+              &source_size) == 0 &&
+          ::inet_ntop(AF_INET, &source.sin_addr, value.data(), value.size()) != nullptr)
+      {
+        ::close(descriptor);
+        return value.data();
+      }
+
+      ::close(descriptor);
+    }
+
+#endif
+
+    return Network::primary_ipv4();
+  }
+
 } // namespace softadastra

@@ -123,6 +123,11 @@ namespace softadastra
      */
     [[nodiscard]] LocalHostAccess local_access() const;
 
+    /**
+     * @brief Returns the current primary local IPv4 address when available.
+     */
+    [[nodiscard]] std::string primary_ipv4() const;
+
   private:
     Host &host_;
     SoftwareManager software_manager_;

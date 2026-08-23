@@ -40,4 +40,31 @@ namespace
                   address.family == softadastra::LocalAddressFamily::IPv6);
     }
   }
+
+  TEST(NativeNetworkTest, ReportsPrimaryIpv4FromCurrentNetworkState)
+  {
+    const softadastra::NativeNetwork network;
+    const auto primary = network.primary_ipv4();
+
+    if (primary.empty())
+    {
+      SUCCEED();
+      return;
+    }
+
+    const auto addresses = network.local_addresses();
+    bool found = false;
+
+    for (const auto &address : addresses)
+    {
+      if (address.family == softadastra::LocalAddressFamily::IPv4 &&
+          address.value == primary)
+      {
+        found = true;
+        break;
+      }
+    }
+
+    EXPECT_TRUE(found);
+  }
 } // namespace

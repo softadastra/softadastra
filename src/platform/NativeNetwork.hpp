@@ -57,6 +57,11 @@ namespace softadastra
      * @brief Returns active non-loopback IPv4 and IPv6 addresses.
      */
     [[nodiscard]] std::vector<LocalNetworkAddress> local_addresses() const override;
+
+    /**
+     * @brief Returns the current IPv4 source address selected by the OS route.
+     */
+    [[nodiscard]] std::string primary_ipv4() const override;
   };
 
 } // namespace softadastra

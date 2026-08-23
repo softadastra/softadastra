@@ -100,6 +100,26 @@ namespace softadastra
     {
       return {};
     }
+
+    /**
+     * @brief Returns the current primary local IPv4 address when available.
+     *
+     * The default implementation selects the first reported local IPv4
+     * address. Native platforms can use their routing state to provide a more
+     * precise primary address.
+     */
+    [[nodiscard]] virtual std::string primary_ipv4() const
+    {
+      for (const auto &address : local_addresses())
+      {
+        if (address.family == LocalAddressFamily::IPv4)
+        {
+          return address.value;
+        }
+      }
+
+      return {};
+    }
   };
 
 } // namespace softadastra
