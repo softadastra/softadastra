@@ -55,7 +55,7 @@ namespace
   class TestProcessLauncher final : public softadastra::ProcessLauncher
   {
   public:
-    [[nodiscard]] std::unique_ptr<softadastra::Process> launch(
+    [[nodiscard]] softadastra::ProcessLaunchResult launch(
         const softadastra::ProcessSpec &) override
     {
       return std::make_unique<TestProcess>();

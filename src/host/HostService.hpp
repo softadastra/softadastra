@@ -60,17 +60,17 @@ namespace softadastra
     /**
      * @brief Starts registered software.
      */
-    bool start_software(const SoftwareId &id);
+    [[nodiscard]] SoftwareOperationResult start_software(const SoftwareId &id);
 
     /**
      * @brief Stops running software.
      */
-    bool stop_software(const SoftwareId &id);
+    [[nodiscard]] SoftwareOperationResult stop_software(const SoftwareId &id);
 
     /**
      * @brief Restarts registered software.
      */
-    bool restart_software(const SoftwareId &id);
+    [[nodiscard]] SoftwareOperationResult restart_software(const SoftwareId &id);
 
     /**
      * @brief Refreshes software lifecycle state from running processes.
@@ -81,6 +81,12 @@ namespace softadastra
      * @brief Returns the lifecycle state of registered software.
      */
     [[nodiscard]] std::optional<SoftwareState> software_state(
+        const SoftwareId &id) const noexcept;
+
+    /**
+     * @brief Returns the last terminal lifecycle result for registered software.
+     */
+    [[nodiscard]] std::optional<SoftwareOperationResult> software_result(
         const SoftwareId &id) const noexcept;
 
     /**

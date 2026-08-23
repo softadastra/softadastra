@@ -36,10 +36,9 @@ namespace softadastra
      *
      * @param spec Infrastructure information required to launch the process.
      *
-     * @return A NativeProcess handle when launch succeeds, or nullptr when
-     *         launch fails.
+     * @return A NativeProcess handle or a stable platform launch failure.
      */
-    [[nodiscard]] std::unique_ptr<Process> launch(
+    [[nodiscard]] ProcessLaunchResult launch(
         const ProcessSpec &spec) override;
   };
 

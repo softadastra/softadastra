@@ -68,7 +68,7 @@ namespace
     {
       for (const auto &id : ids_)
       {
-        client_.stop_software(id);
+        static_cast<void>(client_.stop_software(id));
       }
     }
 
@@ -130,6 +130,7 @@ namespace
     EXPECT_EQ(
         client.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
+
   }
 
   TEST(HostRuntimeTest, DetectsSuccessfulNaturalExit)
@@ -178,6 +179,13 @@ namespace
     EXPECT_EQ(
         client.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
+
+    const auto result = client.software_result(id);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(
+        result->error(),
+        softadastra::SoftwareOperationError::ProcessExitedSuccessfully);
   }
 
   TEST(HostRuntimeTest, DetectsFailedNaturalExit)
@@ -226,6 +234,14 @@ namespace
     EXPECT_EQ(
         client.software_state(id).value(),
         softadastra::SoftwareState::Failed);
+
+    const auto result = client.software_result(id);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(
+        result->error(),
+        softadastra::SoftwareOperationError::ProcessExitedWithNonZeroCode);
+    EXPECT_EQ(result->exit_code(), 7);
   }
 
   TEST(HostRuntimeTest, RejectsSoftwareThatCannotBeLaunched)
@@ -248,7 +264,13 @@ namespace
             softadastra::ProcessSpec(
                 "softadastra-executable-that-does-not-exist")));
 
-    EXPECT_FALSE(client.start_software(id));
+    const auto result = client.start_software(id);
+
+    EXPECT_FALSE(result);
+
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::ExecutableNotFound);
 
     ASSERT_TRUE(client.software_state(id).has_value());
 

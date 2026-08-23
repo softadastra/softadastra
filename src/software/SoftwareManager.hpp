@@ -20,6 +20,7 @@
 #include "platform/ProcessLauncher.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
+#include "software/SoftwareOperation.hpp"
 #include "software/SoftwareState.hpp"
 
 #include <memory>
@@ -57,12 +58,12 @@ namespace softadastra
     /**
      * @brief Starts registered software.
      */
-    bool start(const SoftwareId &id);
+    [[nodiscard]] SoftwareOperationResult start(const SoftwareId &id);
 
     /**
      * @brief Stops running software.
      */
-    bool stop(const SoftwareId &id);
+    [[nodiscard]] SoftwareOperationResult stop(const SoftwareId &id);
 
     /**
      * @brief Restarts registered software.
@@ -71,9 +72,9 @@ namespace softadastra
      * If no process is managed for the software, a new process is launched
      * directly.
      *
-     * @return true when the replacement process is running, otherwise false.
+     * @return The result of stopping and launching the replacement process.
      */
-    bool restart(const SoftwareId &id);
+    [[nodiscard]] SoftwareOperationResult restart(const SoftwareId &id);
 
     /**
      * @brief Refreshes lifecycle state from managed processes.
@@ -88,6 +89,12 @@ namespace softadastra
      * @brief Returns the lifecycle state of registered software.
      */
     [[nodiscard]] std::optional<SoftwareState> state(
+        const SoftwareId &id) const noexcept;
+
+    /**
+     * @brief Returns the last terminal lifecycle result for registered software.
+     */
+    [[nodiscard]] std::optional<SoftwareOperationResult> result(
         const SoftwareId &id) const noexcept;
 
   private:

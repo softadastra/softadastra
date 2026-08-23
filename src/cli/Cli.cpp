@@ -44,6 +44,57 @@ namespace
     return "unknown";
   }
 
+  void print_operation_error(
+      const softadastra::SoftwareOperationResult &result)
+  {
+    const auto error = result.error();
+
+    if (!error.has_value())
+    {
+      return;
+    }
+
+    switch (error.value())
+    {
+    case softadastra::SoftwareOperationError::SoftwareUnknown:
+      std::cerr << "software is unknown";
+      return;
+
+    case softadastra::SoftwareOperationError::AlreadyRunning:
+      std::cerr << "software is already running";
+      return;
+
+    case softadastra::SoftwareOperationError::NotRunning:
+      std::cerr << "software is not running";
+      return;
+
+    case softadastra::SoftwareOperationError::ExecutableNotFound:
+      std::cerr << "executable not found";
+      return;
+
+    case softadastra::SoftwareOperationError::PermissionDenied:
+      std::cerr << "permission denied";
+      return;
+
+    case softadastra::SoftwareOperationError::LaunchFailed:
+      std::cerr << "launch failed";
+      return;
+
+    case softadastra::SoftwareOperationError::ProcessExitedSuccessfully:
+      std::cerr << "process exited successfully";
+      return;
+
+    case softadastra::SoftwareOperationError::ProcessExitedWithNonZeroCode:
+      std::cerr << "process exited with code "
+                << result.exit_code().value_or(-1);
+      return;
+
+    case softadastra::SoftwareOperationError::StopFailed:
+      std::cerr << "stop failed";
+      return;
+    }
+  }
+
   void print_usage()
   {
     std::cout
@@ -159,11 +210,17 @@ namespace softadastra
 
     if (command == "start")
     {
-      if (!client_.start_software(id))
+      const SoftwareOperationResult result =
+          client_.start_software(id);
+
+      if (!result)
       {
         std::cerr
-            << "failed to start software: "
+            << "failed to start "
             << id.value()
+            << ": ";
+        print_operation_error(result);
+        std::cerr
             << '\n';
 
         return 1;
@@ -179,11 +236,17 @@ namespace softadastra
 
     if (command == "stop")
     {
-      if (!client_.stop_software(id))
+      const SoftwareOperationResult result =
+          client_.stop_software(id);
+
+      if (!result)
       {
         std::cerr
-            << "failed to stop software: "
+            << "cannot stop "
             << id.value()
+            << ": ";
+        print_operation_error(result);
+        std::cerr
             << '\n';
 
         return 1;
@@ -209,6 +272,37 @@ namespace softadastra
             << '\n';
 
         return 1;
+      }
+
+      const auto result = client_.software_result(id);
+
+      if (result.has_value() && !result.value())
+      {
+        std::cout
+            << id.value()
+            << " "
+            << software_state_name(state.value())
+            << ": ";
+        const auto error = result->error();
+
+        switch (error.value())
+        {
+        case SoftwareOperationError::ProcessExitedWithNonZeroCode:
+          std::cout << "process exited with code "
+                    << result->exit_code().value_or(-1);
+          break;
+
+        case SoftwareOperationError::ProcessExitedSuccessfully:
+          std::cout << "process exited successfully";
+          break;
+
+        default:
+          std::cout << software_state_name(state.value());
+          break;
+        }
+
+        std::cout << '\n';
+        return 0;
       }
 
       std::cout

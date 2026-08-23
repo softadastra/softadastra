@@ -32,17 +32,17 @@ namespace softadastra
         std::move(process_spec));
   }
 
-  bool ControlClient::start_software(const SoftwareId &id)
+  SoftwareOperationResult ControlClient::start_software(const SoftwareId &id)
   {
     return server_.start_software(id);
   }
 
-  bool ControlClient::stop_software(const SoftwareId &id)
+  SoftwareOperationResult ControlClient::stop_software(const SoftwareId &id)
   {
     return server_.stop_software(id);
   }
 
-  bool ControlClient::restart_software(const SoftwareId &id)
+  SoftwareOperationResult ControlClient::restart_software(const SoftwareId &id)
   {
     return server_.restart_software(id);
   }
@@ -56,6 +56,12 @@ namespace softadastra
       const SoftwareId &id) const noexcept
   {
     return server_.software_state(id);
+  }
+
+  std::optional<SoftwareOperationResult> ControlClient::software_result(
+      const SoftwareId &id) const noexcept
+  {
+    return server_.software_result(id);
   }
 
   bool ControlClient::connectivity_available() const noexcept

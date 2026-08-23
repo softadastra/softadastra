@@ -74,7 +74,7 @@ namespace
   class TestProcessLauncher final : public softadastra::ProcessLauncher
   {
   public:
-    [[nodiscard]] std::unique_ptr<softadastra::Process> launch(
+    [[nodiscard]] softadastra::ProcessLaunchResult launch(
         const softadastra::ProcessSpec &spec) override
     {
       last_executable_ = spec.executable();
@@ -82,7 +82,7 @@ namespace
 
       if (launch_fails_)
       {
-        return nullptr;
+        return launch_error_;
       }
 
       auto process = std::make_shared<TestProcessState>();
@@ -97,6 +97,12 @@ namespace
     void set_launch_fails(bool value) noexcept
     {
       launch_fails_ = value;
+    }
+
+    void set_launch_error(
+        softadastra::ProcessLaunchError error) noexcept
+    {
+      launch_error_ = error;
     }
 
     void set_process_running(bool value) noexcept
@@ -130,8 +136,15 @@ namespace
           }));
     }
 
+    [[nodiscard]] std::shared_ptr<TestProcessState> last_process() const noexcept
+    {
+      return processes_.empty() ? nullptr : processes_.back();
+    }
+
   private:
     bool launch_fails_{false};
+    softadastra::ProcessLaunchError launch_error_{
+        softadastra::ProcessLaunchError::LaunchFailed};
     bool process_running_{true};
     bool stop_succeeds_{true};
     int launch_count_{0};
@@ -224,7 +237,12 @@ namespace
 
     ASSERT_TRUE(manager.start(id));
 
-    EXPECT_FALSE(manager.start(id));
+    const auto result = manager.start(id);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::AlreadyRunning);
     EXPECT_EQ(launcher.launch_count(), 1);
   }
 
@@ -245,7 +263,12 @@ namespace
             id,
             softadastra::ProcessSpec("/usr/bin/example")));
 
-    EXPECT_FALSE(manager.start(id));
+    const auto result = manager.start(id);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::LaunchFailed);
 
     ASSERT_TRUE(manager.state(id).has_value());
     EXPECT_EQ(
@@ -323,7 +346,12 @@ namespace
 
     ASSERT_TRUE(manager.start(id));
 
-    EXPECT_FALSE(manager.stop(id));
+    const auto result = manager.stop(id);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::StopFailed);
 
     ASSERT_TRUE(manager.state(id).has_value());
     EXPECT_EQ(
@@ -340,9 +368,13 @@ namespace
         host_state,
         launcher);
 
-    EXPECT_FALSE(
-        manager.start(
-            softadastra::SoftwareId("unknown")));
+    const auto result = manager.start(
+        softadastra::SoftwareId("unknown"));
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::SoftwareUnknown);
 
     EXPECT_EQ(launcher.launch_count(), 0);
   }
@@ -356,9 +388,13 @@ namespace
         host_state,
         launcher);
 
-    EXPECT_FALSE(
-        manager.stop(
-            softadastra::SoftwareId("unknown")));
+    const auto result = manager.stop(
+        softadastra::SoftwareId("unknown"));
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::SoftwareUnknown);
   }
 
   TEST(SoftwareManagerTest, RejectsStopWhenSoftwareIsNotRunning)
@@ -377,7 +413,12 @@ namespace
             id,
             softadastra::ProcessSpec("/usr/bin/example")));
 
-    EXPECT_FALSE(manager.stop(id));
+    const auto result = manager.stop(id);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::NotRunning);
 
     ASSERT_TRUE(manager.state(id).has_value());
     EXPECT_EQ(
@@ -560,6 +601,82 @@ namespace
     EXPECT_EQ(
         manager.state(id).value(),
         softadastra::SoftwareState::Failed);
+  }
+
+  TEST(SoftwareManagerTest, ReportsExecutableNotFound)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_launch_fails(true);
+    launcher.set_launch_error(
+        softadastra::ProcessLaunchError::ExecutableNotFound);
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(manager.register_software(
+        id,
+        softadastra::ProcessSpec("/usr/bin/example")));
+
+    const auto result = manager.start(id);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::ExecutableNotFound);
+  }
+
+  TEST(SoftwareManagerTest, ReportsPermissionDenied)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    launcher.set_launch_fails(true);
+    launcher.set_launch_error(
+        softadastra::ProcessLaunchError::PermissionDenied);
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(manager.register_software(
+        id,
+        softadastra::ProcessSpec("/usr/bin/example")));
+
+    const auto result = manager.start(id);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(
+        result.error(),
+        softadastra::SoftwareOperationError::PermissionDenied);
+  }
+
+  TEST(SoftwareManagerTest, ReportsNonZeroProcessExit)
+  {
+    softadastra::HostState host_state;
+    TestProcessLauncher launcher;
+    softadastra::SoftwareManager manager(host_state, launcher);
+
+    const softadastra::SoftwareId id("example");
+
+    ASSERT_TRUE(manager.register_software(
+        id,
+        softadastra::ProcessSpec("/usr/bin/example")));
+    ASSERT_TRUE(manager.start(id));
+
+    const auto process = launcher.last_process();
+
+    ASSERT_NE(process, nullptr);
+    process->running = false;
+    process->exit_code = 7;
+
+    manager.refresh();
+
+    const auto result = manager.result(id);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(
+        result->error(),
+        softadastra::SoftwareOperationError::ProcessExitedWithNonZeroCode);
+    EXPECT_EQ(result->exit_code(), 7);
   }
 
 } // namespace

@@ -17,8 +17,10 @@
 
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
+#include "software/SoftwareOperation.hpp"
 #include "software/SoftwareState.hpp"
 
+#include <optional>
 #include <utility>
 
 namespace softadastra
@@ -81,10 +83,35 @@ namespace softadastra
       state_ = state;
     }
 
+    /**
+     * @brief Returns the last terminal lifecycle result, when available.
+     */
+    [[nodiscard]] std::optional<SoftwareOperationResult> result() const noexcept
+    {
+      return result_;
+    }
+
+    /**
+     * @brief Records a terminal lifecycle result for the software.
+     */
+    void set_result(SoftwareOperationResult result) noexcept
+    {
+      result_ = result;
+    }
+
+    /**
+     * @brief Clears the last terminal lifecycle result.
+     */
+    void clear_result() noexcept
+    {
+      result_.reset();
+    }
+
   private:
     SoftwareId id_;
     ProcessSpec process_spec_;
     SoftwareState state_{SoftwareState::Stopped};
+    std::optional<SoftwareOperationResult> result_;
   };
 
 } // namespace softadastra

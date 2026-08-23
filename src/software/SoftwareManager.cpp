@@ -21,6 +21,27 @@
 
 namespace softadastra
 {
+  namespace
+  {
+    SoftwareOperationError software_error(
+        ProcessLaunchError error) noexcept
+    {
+      switch (error)
+      {
+      case ProcessLaunchError::ExecutableNotFound:
+        return SoftwareOperationError::ExecutableNotFound;
+
+      case ProcessLaunchError::PermissionDenied:
+        return SoftwareOperationError::PermissionDenied;
+
+      case ProcessLaunchError::LaunchFailed:
+        return SoftwareOperationError::LaunchFailed;
+      }
+
+      return SoftwareOperationError::LaunchFailed;
+    }
+  } // namespace
+
   SoftwareManager::SoftwareManager(
       HostState &state,
       ProcessLauncher &process_launcher) noexcept
@@ -39,13 +60,13 @@ namespace softadastra
             std::move(process_spec)));
   }
 
-  bool SoftwareManager::start(const SoftwareId &id)
+  SoftwareOperationResult SoftwareManager::start(const SoftwareId &id)
   {
     SoftwareEntry *entry = state_.find_software(id);
 
     if (entry == nullptr)
     {
-      return false;
+      return SoftwareOperationError::SoftwareUnknown;
     }
 
     ManagedProcess *existing = find_process(id);
@@ -54,7 +75,7 @@ namespace softadastra
     {
       if (existing->process->is_running())
       {
-        return false;
+        return SoftwareOperationError::AlreadyRunning;
       }
 
       processes_.erase(
@@ -69,26 +90,42 @@ namespace softadastra
     }
 
     entry->set_state(SoftwareState::Starting);
+    entry->clear_result();
 
-    std::unique_ptr<Process> process =
+    ProcessLaunchResult launch =
         process_launcher_.launch(entry->process_spec());
 
-    if (process == nullptr)
+    if (!launch)
     {
+      const SoftwareOperationResult result(
+          software_error(launch.error().value()));
+
       entry->set_state(SoftwareState::Failed);
-      return false;
+      entry->set_result(result);
+      return result;
     }
+
+    std::unique_ptr<Process> process = std::move(launch).take_process();
 
     if (!process->is_running())
     {
       const auto code = process->exit_code();
 
+      const SoftwareOperationResult result(
+          code.has_value() && code.value() == 0
+              ? SoftwareOperationError::ProcessExitedSuccessfully
+              : code.has_value()
+                    ? SoftwareOperationError::ProcessExitedWithNonZeroCode
+                    : SoftwareOperationError::LaunchFailed,
+          code);
+
       entry->set_state(
           code.has_value() && code.value() == 0
               ? SoftwareState::Stopped
               : SoftwareState::Failed);
+      entry->set_result(result);
 
-      return false;
+      return result;
     }
 
     processes_.push_back(
@@ -98,29 +135,32 @@ namespace softadastra
 
     entry->set_state(SoftwareState::Running);
 
-    return true;
+    return {};
   }
 
-  bool SoftwareManager::stop(const SoftwareId &id)
+  SoftwareOperationResult SoftwareManager::stop(const SoftwareId &id)
   {
     SoftwareEntry *entry = state_.find_software(id);
 
     if (entry == nullptr)
     {
-      return false;
+      return SoftwareOperationError::SoftwareUnknown;
     }
 
     ManagedProcess *managed = find_process(id);
 
     if (managed == nullptr)
     {
-      return false;
+      return SoftwareOperationError::NotRunning;
     }
 
     if (!managed->process->stop())
     {
       entry->set_state(SoftwareState::Failed);
-      return false;
+      const SoftwareOperationResult result(
+          SoftwareOperationError::StopFailed);
+      entry->set_result(result);
+      return result;
     }
 
     processes_.erase(
@@ -134,17 +174,18 @@ namespace softadastra
         processes_.end());
 
     entry->set_state(SoftwareState::Stopped);
+    entry->clear_result();
 
-    return true;
+    return {};
   }
 
-  bool SoftwareManager::restart(const SoftwareId &id)
+  SoftwareOperationResult SoftwareManager::restart(const SoftwareId &id)
   {
     SoftwareEntry *entry = state_.find_software(id);
 
     if (entry == nullptr)
     {
-      return false;
+      return SoftwareOperationError::SoftwareUnknown;
     }
 
     ManagedProcess *managed = find_process(id);
@@ -154,7 +195,10 @@ namespace softadastra
       if (!managed->process->stop())
       {
         entry->set_state(SoftwareState::Failed);
-        return false;
+        const SoftwareOperationResult result(
+            SoftwareOperationError::StopFailed);
+        entry->set_result(result);
+        return result;
       }
 
       processes_.erase(
@@ -168,6 +212,7 @@ namespace softadastra
           processes_.end());
 
       entry->set_state(SoftwareState::Stopped);
+      entry->clear_result();
     }
 
     return start(id);
@@ -196,10 +241,18 @@ namespace softadastra
         if (code.has_value() && code.value() == 0)
         {
           entry->set_state(SoftwareState::Stopped);
+          entry->set_result(
+              SoftwareOperationResult(
+                  SoftwareOperationError::ProcessExitedSuccessfully,
+                  code));
         }
         else
         {
           entry->set_state(SoftwareState::Failed);
+          entry->set_result(
+              SoftwareOperationResult(
+                  SoftwareOperationError::ProcessExitedWithNonZeroCode,
+                  code));
         }
       }
 
@@ -219,6 +272,19 @@ namespace softadastra
     }
 
     return entry->state();
+  }
+
+  std::optional<SoftwareOperationResult> SoftwareManager::result(
+      const SoftwareId &id) const noexcept
+  {
+    const SoftwareEntry *entry = state_.find_software(id);
+
+    if (entry == nullptr)
+    {
+      return std::nullopt;
+    }
+
+    return entry->result();
   }
 
   SoftwareManager::ManagedProcess *SoftwareManager::find_process(

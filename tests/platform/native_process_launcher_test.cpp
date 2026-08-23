@@ -64,6 +64,9 @@ namespace
             "softadastra-executable-that-does-not-exist"));
 
     EXPECT_EQ(process, nullptr);
+    EXPECT_EQ(
+        process.error(),
+        softadastra::ProcessLaunchError::ExecutableNotFound);
   }
 
   TEST(NativeProcessLauncherTest, LaunchesRunningProcess)
