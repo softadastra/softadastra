@@ -15,7 +15,9 @@
 #ifndef SOFTADASTRA_PLATFORM_MDNS_PUBLISHER_HPP
 #define SOFTADASTRA_PLATFORM_MDNS_PUBLISHER_HPP
 
+#include <array>
 #include <string>
+#include <string_view>
 
 namespace softadastra
 {
@@ -34,6 +36,11 @@ namespace softadastra
 
     /** @brief Returns the stable local mDNS name. */
     [[nodiscard]] const std::string &name() const noexcept;
+
+    /** @brief Returns the Avahi arguments for direct address publication. */
+    [[nodiscard]] static std::array<std::string, 3> publisher_arguments(
+        std::string_view name,
+        std::string_view ipv4);
 
     /** @brief Starts publishing the provided current IPv4 address. */
     [[nodiscard]] bool start(const std::string &ipv4) noexcept;

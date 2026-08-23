@@ -24,6 +24,14 @@ namespace
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
     EXPECT_EQ(publisher.name(), "softadastra-01234567.local");
+    EXPECT_EQ(
+        softadastra::MdnsPublisher::publisher_arguments(
+            publisher.name(), "192.168.1.6"),
+        (std::array<std::string, 3>{
+            "-R",
+            "softadastra-01234567.local",
+            "192.168.1.6",
+        }));
     EXPECT_FALSE(publisher.start(""));
   }
 } // namespace

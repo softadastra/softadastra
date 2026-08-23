@@ -53,6 +53,13 @@ namespace softadastra
     return name_;
   }
 
+  std::array<std::string, 3> MdnsPublisher::publisher_arguments(
+      std::string_view name,
+      std::string_view ipv4)
+  {
+    return {"-R", std::string(name), std::string(ipv4)};
+  }
+
   bool MdnsPublisher::start(const std::string &ipv4) noexcept
   {
 #if defined(__linux__)
@@ -72,11 +79,13 @@ namespace softadastra
 
     if (child == 0)
     {
+      const auto arguments = publisher_arguments(name_, ipv4);
       ::execl(
           "/usr/bin/avahi-publish-address",
           "avahi-publish-address",
-          name_.c_str(),
-          ipv4.c_str(),
+          arguments[0].c_str(),
+          arguments[1].c_str(),
+          arguments[2].c_str(),
           nullptr);
       ::_exit(127);
     }
