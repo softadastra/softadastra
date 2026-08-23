@@ -21,7 +21,7 @@
 namespace softadastra
 {
   /**
-   * @brief Stores the persistent identifier and remote administration secret.
+   * @brief Stores the persistent cryptographic Host identity and admin secret.
    */
   class HostIdentity
   {
@@ -32,8 +32,11 @@ namespace softadastra
     /** @brief Loads an existing identity or creates it once. */
     [[nodiscard]] bool load_or_create();
 
-    /** @brief Returns the persistent public Host identifier. */
+    /** @brief Returns the SHA-256 fingerprint of the Ed25519 public key. */
     [[nodiscard]] const std::string &id() const noexcept;
+
+    /** @brief Returns the persistent Ed25519 public key as hexadecimal text. */
+    [[nodiscard]] const std::string &public_key() const noexcept;
 
     /** @brief Returns the remote administration secret. */
     [[nodiscard]] const std::string &secret() const noexcept;
@@ -42,6 +45,8 @@ namespace softadastra
     std::filesystem::path path_;
     std::string id_;
     std::string secret_;
+    std::string public_key_;
+    std::string private_key_;
   };
 }
 

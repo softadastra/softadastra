@@ -16,6 +16,7 @@
 
 #include <array>
 #include <fstream>
+#include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <utility>
 
@@ -23,7 +24,22 @@ namespace softadastra
 {
   namespace
   {
-    std::string random_hex()
+    std::string hexadecimal(const unsigned char *bytes, std::size_t size)
+    {
+      constexpr char digits[] = "0123456789abcdef";
+      std::string value;
+      value.reserve(size * 2);
+
+      for (std::size_t index = 0; index < size; ++index)
+      {
+        value += digits[bytes[index] >> 4U];
+        value += digits[bytes[index] & 0x0fU];
+      }
+
+      return value;
+    }
+
+    std::string random_secret()
     {
       std::array<unsigned char, 32> bytes{};
 
@@ -32,19 +48,9 @@ namespace softadastra
         return {};
       }
 
-      constexpr char digits[] = "0123456789abcdef";
-      std::string value;
-      value.reserve(bytes.size() * 2);
-
-      for (const unsigned char byte : bytes)
-      {
-        value += digits[byte >> 4U];
-        value += digits[byte & 0x0fU];
-      }
-
-      return value;
+      return hexadecimal(bytes.data(), bytes.size());
     }
-  }
+  } // namespace
 
   HostIdentity::HostIdentity(std::filesystem::path path) noexcept
       : path_(std::move(path))
@@ -54,18 +60,54 @@ namespace softadastra
   bool HostIdentity::load_or_create()
   {
     std::ifstream input(path_);
+    std::string version;
 
     if (input)
     {
+      std::getline(input, version);
       std::getline(input, id_);
       std::getline(input, secret_);
-      return !id_.empty() && !secret_.empty();
+      std::getline(input, public_key_);
+      std::getline(input, private_key_);
+
+      if (version == "ed25519-v1" && id_.size() == 64 &&
+          secret_.size() == 64 && public_key_.size() == 64 &&
+          private_key_.size() == 64)
+      {
+        return true;
+      }
     }
 
-    id_ = random_hex();
-    secret_ = random_hex();
+    std::array<unsigned char, 32> private_key{};
+    std::array<unsigned char, 32> public_key{};
+    std::array<unsigned char, 32> fingerprint{};
+    std::size_t private_key_size = private_key.size();
+    std::size_t public_key_size = public_key.size();
+    std::size_t fingerprint_size = fingerprint.size();
+    EVP_PKEY *key = EVP_PKEY_Q_keygen(nullptr, nullptr, "ED25519");
 
-    if (id_.empty() || secret_.empty())
+    const bool generated = key != nullptr &&
+                           EVP_PKEY_get_raw_private_key(
+                               key, private_key.data(), &private_key_size) == 1 &&
+                           EVP_PKEY_get_raw_public_key(
+                               key, public_key.data(), &public_key_size) == 1 &&
+                           EVP_Q_digest(
+                               nullptr, "SHA256", nullptr, public_key.data(),
+                               public_key_size, fingerprint.data(), &fingerprint_size) == 1;
+    EVP_PKEY_free(key);
+
+    if (!generated || private_key_size != private_key.size() ||
+        public_key_size != public_key.size() || fingerprint_size != fingerprint.size())
+    {
+      return false;
+    }
+
+    id_ = hexadecimal(fingerprint.data(), fingerprint.size());
+    secret_ = random_secret();
+    public_key_ = hexadecimal(public_key.data(), public_key.size());
+    private_key_ = hexadecimal(private_key.data(), private_key.size());
+
+    if (secret_.empty())
     {
       return false;
     }
@@ -85,8 +127,10 @@ namespace softadastra
       return false;
     }
 
-    output << id_ << '\n' << secret_ << '\n';
+    output << "ed25519-v1\n" << id_ << '\n' << secret_ << '\n'
+           << public_key_ << '\n' << private_key_ << '\n';
     output.close();
+
     if (!output)
     {
       return false;
@@ -100,6 +144,19 @@ namespace softadastra
     return !error;
   }
 
-  const std::string &HostIdentity::id() const noexcept { return id_; }
-  const std::string &HostIdentity::secret() const noexcept { return secret_; }
-}
+  const std::string &HostIdentity::id() const noexcept
+  {
+    return id_;
+  }
+
+  const std::string &HostIdentity::public_key() const noexcept
+  {
+    return public_key_;
+  }
+
+  const std::string &HostIdentity::secret() const noexcept
+  {
+    return secret_;
+  }
+
+} // namespace softadastra
