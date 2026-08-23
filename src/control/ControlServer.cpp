@@ -74,4 +74,9 @@ namespace softadastra
     return host_service_.connected();
   }
 
+  LocalHostAccess ControlServer::local_access() const
+  {
+    return host_service_.local_access();
+  }
+
 } // namespace softadastra

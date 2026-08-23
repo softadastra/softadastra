@@ -95,4 +95,12 @@ namespace softadastra
     return connectivity_manager_.is_connected();
   }
 
+  LocalHostAccess HostService::local_access() const
+  {
+    Network &network = host_.platform().network();
+    return LocalHostAccess{
+        network.host_name(),
+        network.local_addresses()};
+  }
+
 } // namespace softadastra

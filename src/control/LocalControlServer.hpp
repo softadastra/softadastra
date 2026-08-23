@@ -18,6 +18,8 @@
 #include "control/ControlServer.hpp"
 
 #include <filesystem>
+#include <string>
+#include <string_view>
 
 namespace softadastra
 {

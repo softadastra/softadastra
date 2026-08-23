@@ -242,6 +242,58 @@ namespace softadastra
     return fields.size() == 3 && fields[0] == "connectivity" && fields[2] == "1";
   }
 
+  std::optional<LocalHostAccess> ControlClient::local_access() const noexcept
+  {
+    if (server_ != nullptr)
+    {
+      return server_->local_access();
+    }
+
+    const auto response = request("access");
+    const auto fields = response.has_value()
+                            ? LocalControlProtocol::fields(response.value())
+                            : std::vector<std::string>{};
+
+    if (fields.size() < 3 || fields[0] != "access")
+    {
+      return std::nullopt;
+    }
+
+    const auto name = LocalControlProtocol::decode(fields[1]);
+    const auto count = LocalControlProtocol::integer(fields[2]);
+
+    if (!name.has_value() || !count.has_value() || count.value() < 0 ||
+        fields.size() != static_cast<std::size_t>(count.value()) * 3 + 3)
+    {
+      return std::nullopt;
+    }
+
+    LocalHostAccess access{name.value(), {}};
+    access.addresses.reserve(static_cast<std::size_t>(count.value()));
+
+    for (std::size_t index = 3; index < fields.size(); index += 3)
+    {
+      const auto family = LocalControlProtocol::integer(fields[index]);
+      const auto interface_name = LocalControlProtocol::decode(fields[index + 1]);
+      const auto value = LocalControlProtocol::decode(fields[index + 2]);
+
+      if (!family.has_value() || !interface_name.has_value() ||
+          !value.has_value() || (family.value() != 4 && family.value() != 6))
+      {
+        return std::nullopt;
+      }
+
+      access.addresses.push_back(
+          LocalNetworkAddress{
+              family.value() == 4 ? LocalAddressFamily::IPv4
+                                  : LocalAddressFamily::IPv6,
+              interface_name.value(),
+              value.value()});
+    }
+
+    return access;
+  }
+
   std::optional<std::string> ControlClient::request(
       const std::string &message) const noexcept
   {

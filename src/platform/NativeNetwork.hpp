@@ -47,6 +47,16 @@ namespace softadastra
      *         an IPv4 or IPv6 address, otherwise false.
      */
     [[nodiscard]] bool is_connected() const noexcept override;
+
+    /**
+     * @brief Returns the native hostname when the operating system provides it.
+     */
+    [[nodiscard]] std::string host_name() const override;
+
+    /**
+     * @brief Returns active non-loopback IPv4 and IPv6 addresses.
+     */
+    [[nodiscard]] std::vector<LocalNetworkAddress> local_addresses() const override;
   };
 
 } // namespace softadastra

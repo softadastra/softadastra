@@ -84,6 +84,11 @@ namespace softadastra
      */
     [[nodiscard]] bool connected() const noexcept;
 
+    /**
+     * @brief Returns infrastructure information for reaching the Host locally.
+     */
+    [[nodiscard]] LocalHostAccess local_access() const;
+
   private:
     HostService &host_service_;
   };

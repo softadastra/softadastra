@@ -158,6 +158,10 @@ namespace
                            return std::filesystem::exists(socket);
                          }));
 
+    const auto access = invoke_cli(state_home, {"access"});
+    EXPECT_EQ(access.exit_code, 0);
+    EXPECT_NE(access.output.find("hosted software endpoints"), std::string::npos);
+
     EXPECT_EQ(invoke_cli(state_home, {"register", "demo", "sleep", "30"}).exit_code, 0);
     EXPECT_EQ(invoke_cli(state_home, {"start", "demo"}).exit_code, 0);
     const auto running = invoke_cli(state_home, {"status", "demo"});

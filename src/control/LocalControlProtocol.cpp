@@ -41,6 +41,11 @@ namespace softadastra
 
   std::string LocalControlProtocol::encode(std::string_view value)
   {
+    if (value.empty())
+    {
+      return "-";
+    }
+
     std::string encoded;
     encoded.reserve(value.size() * 2);
 
@@ -56,6 +61,11 @@ namespace softadastra
   std::optional<std::string> LocalControlProtocol::decode(
       std::string_view value)
   {
+    if (value == "-")
+    {
+      return std::string{};
+    }
+
     if (value.size() % 2 != 0)
     {
       return std::nullopt;

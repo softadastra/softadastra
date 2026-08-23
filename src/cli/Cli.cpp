@@ -105,6 +105,7 @@ namespace
         << "  softadastra restart <software-id>\n"
         << "  softadastra status <software-id>\n"
         << "  softadastra connectivity\n"
+        << "  softadastra access\n"
         << "  softadastra help\n";
   }
 
@@ -161,6 +162,45 @@ namespace softadastra
                 << (client_.connected() ? "yes" : "no")
                 << '\n';
 
+      return 0;
+    }
+
+    if (command == "access")
+    {
+      if (argc != 2)
+      {
+        std::cerr << "access does not accept arguments\n";
+        return 2;
+      }
+
+      const auto access = client_.local_access();
+
+      if (!access.has_value())
+      {
+        std::cerr << "Host access information is unavailable\n";
+        return 1;
+      }
+
+      if (!access->host_name.empty())
+      {
+        std::cout << "hostname: " << access->host_name << '\n';
+      }
+
+      for (const auto &address : access->addresses)
+      {
+        std::cout << (address.family == LocalAddressFamily::IPv4
+                          ? "ipv4"
+                          : "ipv6")
+                  << " " << address.interface_name
+                  << ": " << address.value << '\n';
+      }
+
+      if (access->host_name.empty() && access->addresses.empty())
+      {
+        std::cout << "no active non-loopback address\n";
+      }
+
+      std::cout << "hosted software endpoints are managed by the software\n";
       return 0;
     }
 

@@ -296,6 +296,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
+    softadastra_local_control_protocol_test
+    tests/control/local_control_protocol_test.cpp
+  )
+
+  softadastra_add_test(
     softadastra_host_runtime_test
     tests/integration/host_runtime_test.cpp
   )

@@ -95,6 +95,13 @@ namespace softadastra
      */
     [[nodiscard]] bool connected() const noexcept;
 
+    /**
+     * @brief Returns infrastructure information for reaching the Host locally.
+     *
+     * @return Local Host information when the Host control endpoint responds.
+     */
+    [[nodiscard]] std::optional<LocalHostAccess> local_access() const noexcept;
+
   private:
     [[nodiscard]] std::optional<std::string> request(
         const std::string &message) const noexcept;

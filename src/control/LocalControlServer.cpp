@@ -185,6 +185,26 @@ namespace softadastra
              " " + std::to_string(server_.connected() ? 1 : 0);
     }
 
+    if (fields[0] == "access" && fields.size() == 1)
+    {
+      const LocalHostAccess access = server_.local_access();
+      std::string response = "access " +
+                             LocalControlProtocol::encode(access.host_name) +
+                             " " + std::to_string(access.addresses.size());
+
+      for (const auto &address : access.addresses)
+      {
+        response += " ";
+        response += address.family == LocalAddressFamily::IPv4 ? "4" : "6";
+        response += " ";
+        response += LocalControlProtocol::encode(address.interface_name);
+        response += " ";
+        response += LocalControlProtocol::encode(address.value);
+      }
+
+      return response;
+    }
+
     if (fields[0] == "register" && fields.size() >= 4)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);

@@ -17,6 +17,7 @@
 
 #include "connectivity/ConnectivityManager.hpp"
 #include "host/Host.hpp"
+#include "platform/Network.hpp"
 #include "platform/ProcessLauncher.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
@@ -24,9 +25,20 @@
 #include "software/SoftwareState.hpp"
 
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace softadastra
 {
+  /**
+   * @brief Describes infrastructure information for reaching a Host locally.
+   */
+  struct LocalHostAccess
+  {
+    std::string host_name;
+    std::vector<LocalNetworkAddress> addresses;
+  };
+
   /**
    * @brief Coordinates Host infrastructure capabilities.
    */
@@ -105,6 +117,11 @@ namespace softadastra
      * @brief Returns whether the Host is currently connected.
      */
     [[nodiscard]] bool connected() const noexcept;
+
+    /**
+     * @brief Returns infrastructure information for reaching the Host locally.
+     */
+    [[nodiscard]] LocalHostAccess local_access() const;
 
   private:
     Host &host_;

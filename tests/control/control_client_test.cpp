@@ -172,6 +172,23 @@ namespace
       return connected_;
     }
 
+    [[nodiscard]] std::string host_name() const override
+    {
+      return "host";
+    }
+
+    [[nodiscard]] std::vector<softadastra::LocalNetworkAddress>
+    local_addresses() const override
+    {
+      return {
+          {
+              softadastra::LocalAddressFamily::IPv4,
+              "ethernet",
+              "192.168.1.10",
+          },
+      };
+    }
+
   private:
     bool available_{false};
     bool connected_{false};
@@ -235,6 +252,25 @@ namespace
         client.register_software(
             softadastra::SoftwareId("example"),
             softadastra::ProcessSpec("/usr/bin/example")));
+  }
+
+  TEST(ControlClientTest, ReturnsLocalHostAccessInformation)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+
+    const auto access = client.local_access();
+
+    ASSERT_TRUE(access.has_value());
+    EXPECT_EQ(access->host_name, "host");
+    ASSERT_EQ(access->addresses.size(), 1U);
+    EXPECT_EQ(access->addresses[0].family, softadastra::LocalAddressFamily::IPv4);
+    EXPECT_EQ(access->addresses[0].interface_name, "ethernet");
+    EXPECT_EQ(access->addresses[0].value, "192.168.1.10");
   }
 
   TEST(ControlClientTest, StartsRegisteredSoftware)

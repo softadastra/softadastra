@@ -15,8 +15,30 @@
 #ifndef SOFTADASTRA_PLATFORM_NETWORK_HPP
 #define SOFTADASTRA_PLATFORM_NETWORK_HPP
 
+#include <string>
+#include <vector>
+
 namespace softadastra
 {
+  /**
+   * @brief Identifies the address family of a local network address.
+   */
+  enum class LocalAddressFamily
+  {
+    IPv4,
+    IPv6
+  };
+
+  /**
+   * @brief Describes an active non-loopback address of the Host machine.
+   */
+  struct LocalNetworkAddress
+  {
+    LocalAddressFamily family;
+    std::string interface_name;
+    std::string value;
+  };
+
   /**
    * @brief Defines the network capability exposed by a Host platform.
    *
@@ -56,6 +78,28 @@ namespace softadastra
      * @return true if network connectivity is currently present, otherwise false.
      */
     [[nodiscard]] virtual bool is_connected() const noexcept = 0;
+
+    /**
+     * @brief Returns the native hostname of the Host machine when available.
+     *
+     * The hostname is informational only. It is not a promise that a local
+     * name is resolvable by another device.
+     */
+    [[nodiscard]] virtual std::string host_name() const
+    {
+      return {};
+    }
+
+    /**
+     * @brief Returns active non-loopback local addresses of the Host.
+     *
+     * Returned addresses describe the existing local network only. They do
+     * not expose a hosted software port or guarantee Internet access.
+     */
+    [[nodiscard]] virtual std::vector<LocalNetworkAddress> local_addresses() const
+    {
+      return {};
+    }
   };
 
 } // namespace softadastra
