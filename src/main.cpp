@@ -24,6 +24,7 @@
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
 #include "platform/NativeDataDirectory.hpp"
+#include "platform/HostInstanceLock.hpp"
 #include "platform/MdnsPublisher.hpp"
 #include "platform/NativePlatform.hpp"
 
@@ -43,6 +44,17 @@
 
 namespace
 {
+#if defined(__linux__)
+  bool block_host_signals()
+  {
+    sigset_t signals;
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGTERM);
+    return pthread_sigmask(SIG_BLOCK, &signals, nullptr) == 0;
+  }
+#endif
+
   void print_host_started(
       const softadastra::HostService &host_service,
       const softadastra::RemoteAccessSettings &remote_settings,
@@ -162,8 +174,31 @@ int main(int argc, char *argv[])
 
   if (argc == 2 && std::string(argv[1]) == "host")
   {
+#if defined(__linux__)
+    if (!block_host_signals())
+    {
+      return 1;
+    }
+#endif
+
+    const auto data_directory = softadastra::NativeDataDirectory::path();
+
+    if (!softadastra::NativeDataDirectory::ensure_exists())
+    {
+      std::cerr << "failed to initialize Host data directory\n";
+      return 1;
+    }
+
+    softadastra::HostInstanceLock instance_lock;
+
+    if (!instance_lock.acquire(data_directory))
+    {
+      std::cerr << "Softadastra Host is already running\n";
+      return 1;
+    }
+
     softadastra::HostIdentity identity(
-        softadastra::NativeDataDirectory::path() / "identity");
+        data_directory / "identity");
 
     if (!identity.load_or_create())
     {
@@ -177,10 +212,10 @@ int main(int argc, char *argv[])
         host,
         platform.process_launcher());
     softadastra::HostStateFile state_file(
-        softadastra::NativeDataDirectory::path() / "host-state");
+        data_directory / "host-state");
     softadastra::ControlServer control_server(host_service);
     softadastra::RemoteAccessConfig remote_config(
-        softadastra::NativeDataDirectory::path() / "remote-access");
+        data_directory / "remote-access");
     softadastra::RemoteAccessSettings remote_settings;
     if (!remote_config.load(remote_settings) && !remote_config.save(remote_settings))
     {
@@ -189,7 +224,7 @@ int main(int argc, char *argv[])
     }
     softadastra::RemoteControlServer remote_server(
         control_server, remote_config, identity.secret(),
-        softadastra::NativeDataDirectory::path());
+        data_directory);
     if (!remote_server.apply())
     {
       std::cerr << "failed to apply remote access configuration\n";
@@ -197,7 +232,7 @@ int main(int argc, char *argv[])
     }
     softadastra::LocalControlServer local_control_server(
         control_server,
-        softadastra::NativeDataDirectory::path() / "control.sock",
+        data_directory / "control.sock",
         &remote_config, &remote_server);
     softadastra::HostLoop host_loop(
         host_service,

@@ -36,6 +36,7 @@ namespace softadastra
   struct LocalHostAccess
   {
     std::string host_name;
+    std::string primary_ipv4;
     std::vector<LocalNetworkAddress> addresses;
   };
 

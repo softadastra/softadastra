@@ -51,6 +51,7 @@ namespace softadastra
      * softadastra status <software-id>
      * softadastra status
      * softadastra connectivity
+     * softadastra access [port]
      * softadastra help
      * @endcode
      *

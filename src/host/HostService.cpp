@@ -100,6 +100,7 @@ namespace softadastra
     Network &network = host_.platform().network();
     return LocalHostAccess{
         network.host_name(),
+        network.primary_ipv4(),
         network.local_addresses()};
   }
 

@@ -254,24 +254,26 @@ namespace softadastra
                             ? LocalControlProtocol::fields(response.value())
                             : std::vector<std::string>{};
 
-    if (fields.size() < 3 || fields[0] != "access")
+    if (fields.size() < 4 || fields[0] != "access")
     {
       return std::nullopt;
     }
 
     const auto name = LocalControlProtocol::decode(fields[1]);
-    const auto count = LocalControlProtocol::integer(fields[2]);
+    const auto primary_ipv4 = LocalControlProtocol::decode(fields[2]);
+    const auto count = LocalControlProtocol::integer(fields[3]);
 
-    if (!name.has_value() || !count.has_value() || count.value() < 0 ||
-        fields.size() != static_cast<std::size_t>(count.value()) * 3 + 3)
+    if (!name.has_value() || !primary_ipv4.has_value() ||
+        !count.has_value() || count.value() < 0 ||
+        fields.size() != static_cast<std::size_t>(count.value()) * 3 + 4)
     {
       return std::nullopt;
     }
 
-    LocalHostAccess access{name.value(), {}};
+    LocalHostAccess access{name.value(), primary_ipv4.value(), {}};
     access.addresses.reserve(static_cast<std::size_t>(count.value()));
 
-    for (std::size_t index = 3; index < fields.size(); index += 3)
+    for (std::size_t index = 4; index < fields.size(); index += 3)
     {
       const auto family = LocalControlProtocol::integer(fields[index]);
       const auto interface_name = LocalControlProtocol::decode(fields[index + 1]);

@@ -24,6 +24,7 @@ add_library(
   softadastra_internal
   STATIC
   src/cli/Cli.cpp
+  src/cli/AccessUrl.cpp
   src/connectivity/ConnectivityManager.cpp
   src/control/ControlClient.cpp
   src/control/ControlServer.cpp
@@ -44,8 +45,10 @@ add_library(
   src/host/HostStateFile.cpp
   src/platform/NativeNetwork.cpp
   src/platform/NativeDataDirectory.cpp
+  src/platform/HostInstanceLock.cpp
   src/platform/MdnsPublisher.cpp
   src/platform/NativePlatform.cpp
+  src/platform/QrCode.cpp
   src/platform/NativeProcess.cpp
   src/platform/NativeProcessLauncher.cpp
   src/platform/NativeService.cpp
@@ -246,6 +249,16 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_service_test
     tests/platform/service_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_instance_lock_test
+    tests/platform/host_instance_lock_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_access_url_test
+    tests/cli/access_url_test.cpp
   )
 
   softadastra_add_test(

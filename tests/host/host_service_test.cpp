@@ -27,6 +27,8 @@
 
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 
 namespace
 {
@@ -170,6 +172,11 @@ namespace
       return connected_;
     }
 
+    [[nodiscard]] std::string primary_ipv4() const override
+    {
+      return primary_ipv4_;
+    }
+
     void set_available(bool value) noexcept
     {
       available_ = value;
@@ -180,9 +187,15 @@ namespace
       connected_ = value;
     }
 
+    void set_primary_ipv4(std::string value)
+    {
+      primary_ipv4_ = std::move(value);
+    }
+
   private:
     bool available_{false};
     bool connected_{false};
+    std::string primary_ipv4_;
   };
 
   class TestPlatform final : public softadastra::Platform
@@ -486,6 +499,18 @@ namespace
 
     EXPECT_FALSE(service.connectivity_available());
     EXPECT_FALSE(service.connected());
+  }
+
+  TEST(HostServiceTest, ReportsCurrentPrimaryIpv4InLocalAccess)
+  {
+    TestPlatform platform;
+    platform.test_network().set_primary_ipv4("192.168.1.6");
+
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    const softadastra::HostService service(host, launcher);
+
+    EXPECT_EQ(service.local_access().primary_ipv4, "192.168.1.6");
   }
 
 } // namespace

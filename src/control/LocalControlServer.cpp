@@ -214,6 +214,7 @@ namespace softadastra
       const LocalHostAccess access = server.local_access();
       std::string response = "access " +
                              LocalControlProtocol::encode(access.host_name) +
+                             " " + LocalControlProtocol::encode(access.primary_ipv4) +
                              " " + std::to_string(access.addresses.size());
 
       for (const auto &address : access.addresses)

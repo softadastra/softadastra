@@ -102,7 +102,7 @@ namespace softadastra
 
     command.args(spec.arguments());
     command.search_in_path(true);
-    command.detach(false);
+    command.detach(true);
 
 #if defined(__linux__)
 

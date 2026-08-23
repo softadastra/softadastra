@@ -14,6 +14,8 @@
 
 #include "cli/Cli.hpp"
 
+#include "cli/AccessUrl.hpp"
+#include "platform/QrCode.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareState.hpp"
@@ -106,7 +108,7 @@ namespace
         << "  softadastra status <software-id>\n"
         << "  softadastra status\n"
         << "  softadastra connectivity\n"
-        << "  softadastra access\n"
+        << "  softadastra access [port]\n"
         << "  softadastra remote enable <ipv4-address> <port>\n"
         << "  softadastra remote disable\n"
         << "  softadastra help\n";
@@ -190,10 +192,23 @@ namespace softadastra
 
     if (command == "access")
     {
-      if (argc != 2)
+      if (argc != 2 && argc != 3)
       {
-        std::cerr << "access does not accept arguments\n";
+        std::cerr << "access accepts an optional port from 1 to 65535\n";
         return 2;
+      }
+
+      std::optional<std::uint16_t> port;
+
+      if (argc == 3)
+      {
+        port = AccessUrl::port(argv[2]);
+
+        if (!port.has_value())
+        {
+          std::cerr << "port must be between 1 and 65535\n";
+          return 2;
+        }
       }
 
       const auto access = client_.local_access();
@@ -202,6 +217,32 @@ namespace softadastra
       {
         std::cerr << "Host access information is unavailable\n";
         return 1;
+      }
+
+      if (port.has_value())
+      {
+        if (access->primary_ipv4.empty())
+        {
+          std::cerr << "current IPv4 address is unavailable\n";
+          return 1;
+        }
+
+        const std::string url = AccessUrl::http(
+            access->primary_ipv4,
+            port.value());
+
+        std::cout << "hostname: "
+                  << (access->host_name.empty() ? "unavailable" : access->host_name)
+                  << "\nipv4: " << access->primary_ipv4
+                  << "\nurl: " << url << "\n\n";
+
+        if (!QrCode::print(url))
+        {
+          std::cout << "QR generation is unavailable.\n";
+        }
+
+        std::cout << "\nScan with your phone.\n";
+        return 0;
       }
 
       if (!access->host_name.empty())

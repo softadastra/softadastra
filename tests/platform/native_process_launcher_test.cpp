@@ -23,6 +23,12 @@
 #include <optional>
 #include <thread>
 
+#if defined(__linux__)
+
+#include <unistd.h>
+
+#endif
+
 namespace
 {
 
@@ -100,6 +106,30 @@ namespace
     EXPECT_FALSE(process->exit_code().has_value());
 
     EXPECT_TRUE(process->stop());
+  }
+
+  TEST(NativeProcessLauncherTest, IsolatesManagedProcessFromTerminalGroup)
+  {
+#if defined(__linux__)
+    softadastra::NativeProcessLauncher launcher;
+    const softadastra::ProcessSpec spec(
+        "sh",
+        {
+            "-c",
+            "sleep 30",
+        });
+
+    auto process = launcher.launch(spec);
+
+    ASSERT_NE(process, nullptr);
+    const auto *native_process = dynamic_cast<softadastra::NativeProcess *>(
+        &*process);
+    ASSERT_NE(native_process, nullptr);
+    EXPECT_EQ(
+        ::getpgid(native_process->id()),
+        native_process->id());
+    EXPECT_TRUE(process->stop());
+#endif
   }
 
   TEST(NativeProcessLauncherTest, ReportsSuccessfulNaturalExit)

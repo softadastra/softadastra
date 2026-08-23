@@ -21,6 +21,8 @@
 #if defined(__linux__)
 
 #include <csignal>
+#include <pthread.h>
+#include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -79,6 +81,15 @@ namespace softadastra
 
     if (child == 0)
     {
+      sigset_t signals;
+      sigemptyset(&signals);
+      static_cast<void>(pthread_sigmask(SIG_SETMASK, &signals, nullptr));
+
+      if (::prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || ::getppid() == 1)
+      {
+        ::_exit(127);
+      }
+
       const auto arguments = publisher_arguments(name_, ipv4);
       ::execl(
           "/usr/bin/avahi-publish-address",
