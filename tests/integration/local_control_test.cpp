@@ -24,6 +24,8 @@
 #if defined(__linux__)
 
 #include <csignal>
+#include <fcntl.h>
+#include <poll.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -100,19 +102,40 @@ namespace
   public:
     explicit HostProcess(const std::filesystem::path &state_home)
     {
+      int output_pipe[2]{};
+      EXPECT_EQ(::pipe(output_pipe), 0);
       process_ = ::fork();
 
       if (process_ == 0)
       {
         ::setenv("XDG_STATE_HOME", state_home.c_str(), 1);
+        ::dup2(output_pipe[1], STDOUT_FILENO);
+        ::dup2(output_pipe[1], STDERR_FILENO);
+        ::close(output_pipe[0]);
+        ::close(output_pipe[1]);
         ::execl(SOFTADASTRA_EXECUTABLE, SOFTADASTRA_EXECUTABLE, "host", nullptr);
         ::_exit(127);
+      }
+
+      ::close(output_pipe[1]);
+      output_descriptor_ = output_pipe[0];
+      const int flags = ::fcntl(output_descriptor_, F_GETFL);
+
+      if (flags != -1)
+      {
+        static_cast<void>(
+            ::fcntl(output_descriptor_, F_SETFL, flags | O_NONBLOCK));
       }
     }
 
     ~HostProcess()
     {
       stop();
+
+      if (output_descriptor_ >= 0)
+      {
+        ::close(output_descriptor_);
+      }
     }
 
     [[nodiscard]] bool valid() const noexcept
@@ -133,8 +156,25 @@ namespace
       process_ = -1;
     }
 
+    [[nodiscard]] std::string output() const
+    {
+      pollfd descriptor{output_descriptor_, POLLIN, 0};
+      static_cast<void>(::poll(&descriptor, 1, 1000));
+      std::string result;
+      char buffer[256];
+      ssize_t received = 0;
+
+      while ((received = ::read(output_descriptor_, buffer, sizeof(buffer))) > 0)
+      {
+        result.append(buffer, static_cast<std::size_t>(received));
+      }
+
+      return result;
+    }
+
   private:
     pid_t process_{-1};
+    int output_descriptor_{-1};
   };
 
   TEST(LocalControlTest, ControlsPersistentHostFromSeparateCliProcesses)
@@ -157,6 +197,14 @@ namespace
                          {
                            return std::filesystem::exists(socket);
                          }));
+    const auto started = host.output();
+    EXPECT_NE(started.find("Softadastra Host is running"), std::string::npos);
+    EXPECT_NE(started.find("hostname: "), std::string::npos);
+    EXPECT_NE(started.find("local control: ready"), std::string::npos);
+    EXPECT_NE(started.find("network: "), std::string::npos);
+    EXPECT_NE(started.find("ipv4: "), std::string::npos);
+    EXPECT_NE(started.find("remote access: disabled"), std::string::npos);
+    EXPECT_NE(started.find("Press Ctrl+C to stop."), std::string::npos);
 
     const auto access = invoke_cli(state_home, {"access"});
     EXPECT_EQ(access.exit_code, 0);
@@ -182,6 +230,13 @@ namespace
     EXPECT_EQ(invoke_cli(state_home, {"stop", "demo"}).exit_code, 0);
 
     host.stop();
+    const auto shutdown_output = host.output();
+    EXPECT_NE(
+        shutdown_output.find("Stopping Softadastra Host..."),
+        std::string::npos);
+    EXPECT_NE(
+        shutdown_output.find("Softadastra Host stopped."),
+        std::string::npos);
     EXPECT_FALSE(std::filesystem::exists(socket));
     std::filesystem::remove_all(state_home);
   }

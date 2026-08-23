@@ -27,6 +27,7 @@
 #include "platform/NativePlatform.hpp"
 
 #include <chrono>
+#include <atomic>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -41,7 +42,39 @@
 
 namespace
 {
-  int run_host(softadastra::HostLoop &host_loop)
+  void print_host_started(
+      const softadastra::HostService &host_service,
+      const softadastra::RemoteAccessSettings &remote_settings)
+  {
+    const auto access = host_service.local_access();
+    std::string ipv4 = "unavailable";
+
+    for (const auto &address : access.addresses)
+    {
+      if (address.family == softadastra::LocalAddressFamily::IPv4)
+      {
+        ipv4 = address.value;
+        break;
+      }
+    }
+
+    std::cout << "Softadastra Host is running\n"
+              << "hostname: "
+              << (access.host_name.empty() ? "unavailable" : access.host_name)
+              << "\nlocal control: ready\n"
+              << "network: "
+              << (host_service.connectivity_available() ? "available" : "unavailable")
+              << "\nipv4: " << ipv4
+              << "\nremote access: "
+              << (remote_settings.enabled ? "enabled" : "disabled")
+              << "\n\nPress Ctrl+C to stop.\n"
+              << std::flush;
+  }
+
+  int run_host(
+      softadastra::HostLoop &host_loop,
+      const softadastra::HostService &host_service,
+      const softadastra::RemoteAccessSettings &remote_settings)
   {
 #if defined(__linux__)
 
@@ -55,20 +88,59 @@ namespace
       return 1;
     }
 
-    bool completed = false;
+    std::atomic_bool completed{false};
     std::thread thread([&host_loop, &completed]()
                        {
                          completed = host_loop.run();
                        });
+
+    for (int attempt = 0; attempt < 1000; ++attempt)
+    {
+      if (host_loop.is_running())
+      {
+        print_host_started(host_service, remote_settings);
+        break;
+      }
+
+      if (completed)
+      {
+        thread.join();
+        return 1;
+      }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    if (!host_loop.is_running())
+    {
+      host_loop.request_stop();
+      thread.join();
+      return 1;
+    }
+
     int signal = 0;
     const int result = sigwait(&signals, &signal);
+
+    if (result == 0)
+    {
+      std::cout << "Stopping Softadastra Host...\n" << std::flush;
+    }
+
     host_loop.request_stop();
     thread.join();
-    return result == 0 && completed ? 0 : 1;
+
+    if (result == 0 && completed)
+    {
+      std::cout << "Softadastra Host stopped.\n" << std::flush;
+      return 0;
+    }
+
+    return 1;
 
 #else
 
-    return host_loop.run() ? 0 : 1;
+    const bool completed = host_loop.run();
+    return completed ? 0 : 1;
 
 #endif
   }
@@ -127,7 +199,7 @@ int main(int argc, char *argv[])
         state_file,
         std::chrono::seconds(1),
         &local_control_server);
-    return run_host(host_loop);
+    return run_host(host_loop, host_service, remote_settings);
   }
 
   softadastra::ControlClient control_client(
