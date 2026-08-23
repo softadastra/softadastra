@@ -25,6 +25,7 @@
 
 #include <chrono>
 #include <thread>
+#include <vector>
 
 namespace
 {
@@ -53,6 +54,33 @@ namespace
           std::chrono::milliseconds(10));
     }
   }
+
+  class RunningSoftwareCleanup
+  {
+  public:
+    explicit RunningSoftwareCleanup(
+        softadastra::ControlClient &client) noexcept
+        : client_(client)
+    {
+    }
+
+    ~RunningSoftwareCleanup()
+    {
+      for (const auto &id : ids_)
+      {
+        client_.stop_software(id);
+      }
+    }
+
+    void track(const softadastra::SoftwareId &id)
+    {
+      ids_.push_back(id);
+    }
+
+  private:
+    softadastra::ControlClient &client_;
+    std::vector<softadastra::SoftwareId> ids_;
+  };
 
   TEST(HostRuntimeTest, RunsAndStopsRealSoftware)
   {
@@ -275,6 +303,159 @@ namespace
         softadastra::SoftwareState::Running);
 
     EXPECT_TRUE(client.stop_software(id));
+  }
+
+  TEST(HostRuntimeTest, StopsOnlyTheRequestedSoftwareProcess)
+  {
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+
+    softadastra::HostService host_service(
+        host,
+        platform.process_launcher());
+
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    RunningSoftwareCleanup cleanup(client);
+
+    const softadastra::SoftwareId first("first-running");
+    const softadastra::SoftwareId second("second-stopped");
+    const softadastra::SoftwareId third("third-running");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec spec(
+        "ping.exe",
+        {
+            "-n",
+            "30",
+            "127.0.0.1",
+        });
+
+#else
+
+    const softadastra::ProcessSpec spec(
+        "sleep",
+        {
+            "30",
+        });
+
+#endif
+
+    ASSERT_TRUE(client.register_software(first, spec));
+    ASSERT_TRUE(client.register_software(second, spec));
+    ASSERT_TRUE(client.register_software(third, spec));
+
+    ASSERT_TRUE(client.start_software(first));
+    cleanup.track(first);
+    ASSERT_TRUE(client.start_software(second));
+    cleanup.track(second);
+    ASSERT_TRUE(client.start_software(third));
+    cleanup.track(third);
+
+    EXPECT_TRUE(client.stop_software(second));
+
+    client.refresh();
+
+    EXPECT_EQ(
+        client.software_state(first).value(),
+        softadastra::SoftwareState::Running);
+    EXPECT_EQ(
+        client.software_state(second).value(),
+        softadastra::SoftwareState::Stopped);
+    EXPECT_EQ(
+        client.software_state(third).value(),
+        softadastra::SoftwareState::Running);
+  }
+
+  TEST(HostRuntimeTest, RefreshesIndependentNaturalProcessExits)
+  {
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+
+    softadastra::HostService host_service(
+        host,
+        platform.process_launcher());
+
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    RunningSoftwareCleanup cleanup(client);
+
+    const softadastra::SoftwareId successful("successful-exit");
+    const softadastra::SoftwareId running("still-running");
+    const softadastra::SoftwareId failed("failed-exit");
+
+#if defined(_WIN32)
+
+    const softadastra::ProcessSpec successful_spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 2 127.0.0.1 >NUL & exit 0",
+        });
+    const softadastra::ProcessSpec running_spec(
+        "ping.exe",
+        {
+            "-n",
+            "30",
+            "127.0.0.1",
+        });
+    const softadastra::ProcessSpec failed_spec(
+        "cmd.exe",
+        {
+            "/C",
+            "ping -n 2 127.0.0.1 >NUL & exit 7",
+        });
+
+#else
+
+    const softadastra::ProcessSpec successful_spec(
+        "sh",
+        {
+            "-c",
+            "sleep 0.1; exit 0",
+        });
+    const softadastra::ProcessSpec running_spec(
+        "sleep",
+        {
+            "30",
+        });
+    const softadastra::ProcessSpec failed_spec(
+        "sh",
+        {
+            "-c",
+            "sleep 0.1; exit 7",
+        });
+
+#endif
+
+    ASSERT_TRUE(client.register_software(successful, successful_spec));
+    ASSERT_TRUE(client.register_software(running, running_spec));
+    ASSERT_TRUE(client.register_software(failed, failed_spec));
+
+    ASSERT_TRUE(client.start_software(successful));
+    cleanup.track(successful);
+    ASSERT_TRUE(client.start_software(running));
+    cleanup.track(running);
+    ASSERT_TRUE(client.start_software(failed));
+    cleanup.track(failed);
+
+    refresh_until_settled(client, successful);
+    refresh_until_settled(client, failed);
+
+    ASSERT_TRUE(client.software_state(successful).has_value());
+    ASSERT_TRUE(client.software_state(running).has_value());
+    ASSERT_TRUE(client.software_state(failed).has_value());
+
+    EXPECT_EQ(
+        client.software_state(successful).value(),
+        softadastra::SoftwareState::Stopped);
+    EXPECT_EQ(
+        client.software_state(running).value(),
+        softadastra::SoftwareState::Running);
+    EXPECT_EQ(
+        client.software_state(failed).value(),
+        softadastra::SoftwareState::Failed);
   }
 
 } // namespace
