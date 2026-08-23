@@ -14,14 +14,20 @@
 
 #include "host/HostLoop.hpp"
 
+#include "control/LocalControlServer.hpp"
+
+#include <algorithm>
+
 namespace softadastra
 {
   HostLoop::HostLoop(
       HostService &host_service,
       HostStateFile &state_file,
-      std::chrono::milliseconds interval) noexcept
+      std::chrono::milliseconds interval,
+      LocalControlServer *local_control_server) noexcept
       : host_service_(host_service),
         state_file_(state_file),
+        local_control_server_(local_control_server),
         interval_(interval > std::chrono::milliseconds::zero()
                       ? interval
                       : std::chrono::milliseconds(1))
@@ -32,6 +38,12 @@ namespace softadastra
   {
     if (state_file_.exists() &&
         !state_file_.load(host_service_.host().state()))
+    {
+      return false;
+    }
+
+    if (local_control_server_ != nullptr &&
+        !local_control_server_->start())
     {
       return false;
     }
@@ -54,7 +66,9 @@ namespace softadastra
 
       if (condition_.wait_for(
               lock,
-              interval_,
+              local_control_server_ != nullptr
+                  ? std::min(interval_, std::chrono::milliseconds(100))
+                  : interval_,
               [this]()
               {
                 return stop_requested_;
@@ -68,6 +82,15 @@ namespace softadastra
       }
 
       lock.unlock();
+
+      if (local_control_server_ != nullptr)
+      {
+        if (local_control_server_->process_pending())
+        {
+          static_cast<void>(state_file_.save(host_service_.host().state()));
+        }
+      }
+
       host_service_.refresh();
     }
   }
@@ -92,6 +115,12 @@ namespace softadastra
   {
     const bool stopped = host_service_.shutdown();
     const bool saved = state_file_.save(host_service_.host().state());
+
+    if (local_control_server_ != nullptr)
+    {
+      local_control_server_->stop();
+    }
+
     return stopped && saved;
   }
 

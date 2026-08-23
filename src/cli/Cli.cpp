@@ -102,6 +102,7 @@ namespace
         << "  softadastra register <software-id> <executable> [arguments...]\n"
         << "  softadastra start <software-id>\n"
         << "  softadastra stop <software-id>\n"
+        << "  softadastra restart <software-id>\n"
         << "  softadastra status <software-id>\n"
         << "  softadastra connectivity\n"
         << "  softadastra help\n";
@@ -133,6 +134,12 @@ namespace softadastra
     {
       print_usage();
       return 0;
+    }
+
+    if (!client_.host_available())
+    {
+      std::cerr << "Host is not running\n";
+      return 1;
     }
 
     if (command == "connectivity")
@@ -257,6 +264,29 @@ namespace softadastra
           << id.value()
           << '\n';
 
+      return 0;
+    }
+
+    if (command == "restart")
+    {
+      const SoftwareOperationResult result =
+          client_.restart_software(id);
+
+      if (!result)
+      {
+        std::cerr
+            << "failed to restart "
+            << id.value()
+            << ": ";
+        print_operation_error(result);
+        std::cerr << '\n';
+        return 1;
+      }
+
+      std::cout
+          << "restarted: "
+          << id.value()
+          << '\n';
       return 0;
     }
 

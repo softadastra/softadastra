@@ -21,6 +21,7 @@
 #include "software/SoftwareState.hpp"
 
 #include <optional>
+#include <filesystem>
 
 namespace softadastra
 {
@@ -34,6 +35,16 @@ namespace softadastra
      * @brief Creates a control client.
      */
     explicit ControlClient(ControlServer &server) noexcept;
+
+    /**
+     * @brief Creates a client for a local Host control endpoint.
+     */
+    explicit ControlClient(std::filesystem::path path) noexcept;
+
+    /**
+     * @brief Returns whether a local Host control endpoint is reachable.
+     */
+    [[nodiscard]] bool host_available() const noexcept;
 
     /**
      * @brief Registers software with the Host.
@@ -85,7 +96,11 @@ namespace softadastra
     [[nodiscard]] bool connected() const noexcept;
 
   private:
-    ControlServer &server_;
+    [[nodiscard]] std::optional<std::string> request(
+        const std::string &message) const noexcept;
+
+    ControlServer *server_{nullptr};
+    std::filesystem::path path_;
   };
 
 } // namespace softadastra

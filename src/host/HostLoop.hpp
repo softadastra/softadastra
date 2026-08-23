@@ -18,6 +18,11 @@
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
 
+namespace softadastra
+{
+  class LocalControlServer;
+}
+
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -44,7 +49,8 @@ namespace softadastra
     HostLoop(
         HostService &host_service,
         HostStateFile &state_file,
-        std::chrono::milliseconds interval = std::chrono::seconds(1)) noexcept;
+        std::chrono::milliseconds interval = std::chrono::seconds(1),
+        LocalControlServer *local_control_server = nullptr) noexcept;
 
     /**
      * @brief Restores state and runs until a stop request is received.
@@ -69,6 +75,7 @@ namespace softadastra
 
     HostService &host_service_;
     HostStateFile &state_file_;
+    LocalControlServer *local_control_server_;
     std::chrono::milliseconds interval_;
     mutable std::mutex mutex_;
     std::condition_variable condition_;

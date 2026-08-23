@@ -15,6 +15,7 @@
 #include "cli/Cli.hpp"
 #include "control/ControlClient.hpp"
 #include "control/ControlServer.hpp"
+#include "control/LocalControlServer.hpp"
 #include "host/Host.hpp"
 #include "host/HostLoop.hpp"
 #include "host/HostService.hpp"
@@ -22,6 +23,7 @@
 #include "platform/NativeDataDirectory.hpp"
 #include "platform/NativePlatform.hpp"
 
+#include <chrono>
 #include <string>
 #include <thread>
 #include <vector>
@@ -70,24 +72,29 @@ namespace
 
 int main(int argc, char *argv[])
 {
-  softadastra::NativePlatform platform;
-
-  softadastra::Host host(platform);
-
-  softadastra::HostService host_service(
-      host,
-      platform.process_launcher());
-
   if (argc == 2 && std::string(argv[1]) == "host")
   {
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(
+        host,
+        platform.process_launcher());
     softadastra::HostStateFile state_file(
         softadastra::NativeDataDirectory::path() / "host-state");
-    softadastra::HostLoop host_loop(host_service, state_file);
+    softadastra::ControlServer control_server(host_service);
+    softadastra::LocalControlServer local_control_server(
+        control_server,
+        softadastra::NativeDataDirectory::path() / "control.sock");
+    softadastra::HostLoop host_loop(
+        host_service,
+        state_file,
+        std::chrono::seconds(1),
+        &local_control_server);
     return run_host(host_loop);
   }
 
-  softadastra::ControlServer control_server(host_service);
-  softadastra::ControlClient control_client(control_server);
+  softadastra::ControlClient control_client(
+      softadastra::NativeDataDirectory::path() / "control.sock");
 
   softadastra::Cli cli(control_client);
 

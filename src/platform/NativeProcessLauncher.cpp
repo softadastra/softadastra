@@ -18,12 +18,20 @@
 
 #include <cstdlib>
 #include <filesystem>
-#include <string_view>
 #include <memory>
+#include <string_view>
 #include <utility>
+#include <vector>
 #include <vix/error/ErrorCode.hpp>
 #include <vix/process/Command.hpp>
 #include <vix/process/Spawn.hpp>
+
+#if defined(__linux__)
+
+#include <pthread.h>
+#include <signal.h>
+
+#endif
 
 namespace softadastra
 {
@@ -74,6 +82,7 @@ namespace softadastra
 
       return false;
     }
+
   } // namespace
 
   ProcessLaunchResult NativeProcessLauncher::launch(
@@ -95,7 +104,30 @@ namespace softadastra
     command.search_in_path(true);
     command.detach(false);
 
+#if defined(__linux__)
+
+    sigset_t signals;
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGTERM);
+    sigset_t previous_signals;
+    const bool reset_signals = pthread_sigmask(
+                                   SIG_UNBLOCK,
+                                   &signals,
+                                   &previous_signals) == 0;
+
+#endif
+
     auto result = vix::process::spawn(std::move(command));
+
+#if defined(__linux__)
+
+    if (reset_signals)
+    {
+      pthread_sigmask(SIG_SETMASK, &previous_signals, nullptr);
+    }
+
+#endif
 
     if (!result)
     {
@@ -121,6 +153,7 @@ namespace softadastra
 
     return std::make_unique<NativeProcess>(
         std::move(child));
+
   }
 
 } // namespace softadastra

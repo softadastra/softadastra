@@ -47,6 +47,7 @@ namespace softadastra
      * softadastra register <software-id> <executable> [arguments...]
      * softadastra start <software-id>
      * softadastra stop <software-id>
+     * softadastra restart <software-id>
      * softadastra status <software-id>
      * softadastra connectivity
      * softadastra help

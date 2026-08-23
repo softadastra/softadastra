@@ -26,6 +26,8 @@ add_library(
   src/connectivity/ConnectivityManager.cpp
   src/control/ControlClient.cpp
   src/control/ControlServer.cpp
+  src/control/LocalControlProtocol.cpp
+  src/control/LocalControlServer.cpp
   src/host/Host.cpp
   src/host/HostLoop.cpp
   src/host/HostService.cpp
@@ -296,5 +298,16 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_host_runtime_test
     tests/integration/host_runtime_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_local_control_test
+    tests/integration/local_control_test.cpp
+  )
+
+  target_compile_definitions(
+    softadastra_local_control_test
+    PRIVATE
+      SOFTADASTRA_EXECUTABLE="$<TARGET_FILE:softadastra>"
   )
 endif()
