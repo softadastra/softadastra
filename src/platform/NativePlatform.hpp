@@ -20,6 +20,8 @@
 #include "platform/NativeService.hpp"
 #include "platform/Platform.hpp"
 
+#include <string_view>
+
 namespace softadastra
 {
   /**
@@ -35,6 +37,32 @@ namespace softadastra
   class NativePlatform final : public Platform
   {
   public:
+    /**
+     * @brief Returns whether the complete native Host is supported.
+     *
+     * Linux is the first platform with a validated service model and local
+     * control channel. Other platform primitives may compile independently,
+     * but do not represent a supported Host until their complete lifecycle is
+     * validated.
+     */
+    [[nodiscard]] static constexpr bool host_supported() noexcept
+    {
+#if defined(__linux__)
+      return true;
+#else
+      return false;
+#endif
+    }
+
+    /**
+     * @brief Returns the diagnostic for an unsupported native Host.
+     */
+    [[nodiscard]] static constexpr std::string_view
+    host_support_diagnostic() noexcept
+    {
+      return "Softadastra Host is unsupported on this platform";
+    }
+
     /**
      * @brief Returns the native process launching capability.
      */

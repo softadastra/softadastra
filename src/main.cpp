@@ -24,6 +24,7 @@
 #include "platform/NativePlatform.hpp"
 
 #include <chrono>
+#include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -72,6 +73,13 @@ namespace
 
 int main(int argc, char *argv[])
 {
+  if (!softadastra::NativePlatform::host_supported())
+  {
+    std::cerr << softadastra::NativePlatform::host_support_diagnostic()
+              << '\n';
+    return 1;
+  }
+
   if (argc == 2 && std::string(argv[1]) == "host")
   {
     softadastra::NativePlatform platform;

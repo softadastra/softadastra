@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vix.cpp on Linux
+        if: runner.os == 'Linux'
+        run: curl -fsSL https://vixcpp.com/install.sh | bash
+      - name: Install Vix.cpp on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: irm https://vixcpp.com/install.ps1 | iex
+      - name: Build
+        run: vix build
+      - name: Test
+        run: vix tests

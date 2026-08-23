@@ -24,9 +24,9 @@ namespace softadastra
   /**
    * @brief Provides access to platform-specific infrastructure capabilities.
    *
-   * Platform defines the operating-system capabilities required by Softadastra
-   * while keeping the Host model independent from a particular platform
-   * implementation.
+   * Platform defines process, service, and network capabilities used by the
+   * Host. It owns neither process lifecycle policy nor Host state, keeping the
+   * Host model independent from a particular operating system.
    */
   class Platform
   {
