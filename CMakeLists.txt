@@ -27,6 +27,7 @@ add_library(
   src/control/ControlClient.cpp
   src/control/ControlServer.cpp
   src/host/Host.cpp
+  src/host/HostLoop.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
   src/host/HostStateFile.cpp
@@ -265,6 +266,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_host_test
     tests/host/host_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_loop_test
+    tests/host/host_loop_test.cpp
   )
 
   softadastra_add_test(

@@ -77,6 +77,17 @@ namespace softadastra
     [[nodiscard]] SoftwareOperationResult restart(const SoftwareId &id);
 
     /**
+     * @brief Stops every process managed by this manager.
+     *
+     * Registration metadata remains in HostState. Each process that cannot be
+     * stopped remains associated with a Failed software entry carrying its
+     * stop diagnostic.
+     *
+     * @return true when every managed process stops successfully.
+     */
+    [[nodiscard]] bool stop_all();
+
+    /**
      * @brief Refreshes lifecycle state from managed processes.
      *
      * Running software remains Running while its process is active.

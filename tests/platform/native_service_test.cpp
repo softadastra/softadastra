@@ -54,4 +54,35 @@ namespace
         static_cast<void>(service.is_running()));
   }
 
+#if defined(__linux__)
+  TEST(NativeServiceTest, GeneratesSystemdHostUnit)
+  {
+    EXPECT_EQ(
+        softadastra::NativeService::unit_file_path(),
+        std::filesystem::path("/etc/systemd/system/softadastra.service"));
+    EXPECT_EQ(
+        softadastra::NativeService::unit_file_content("/opt/softadastra/bin/softadastra"),
+        "[Unit]\n"
+        "Description=Softadastra Host\n"
+        "After=network.target\n"
+        "\n"
+        "[Service]\n"
+        "Type=simple\n"
+        "ExecStart=\"/opt/softadastra/bin/softadastra\" host\n"
+        "Restart=on-failure\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=multi-user.target\n");
+  }
+
+  TEST(NativeServiceTest, ExposesSystemdAutoStartOperation)
+  {
+    using EnableAutoStart = bool (softadastra::NativeService::*)();
+
+    EXPECT_TRUE((std::is_same_v<
+                decltype(&softadastra::NativeService::enable_auto_start),
+                EnableAutoStart>));
+  }
+#endif
+
 } // namespace

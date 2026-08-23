@@ -44,6 +44,11 @@ namespace softadastra
     explicit HostStateFile(std::filesystem::path path) noexcept;
 
     /**
+     * @brief Returns whether a saved Host state exists.
+     */
+    [[nodiscard]] bool exists() const noexcept;
+
+    /**
      * @brief Saves registered software metadata atomically.
      */
     [[nodiscard]] bool save(const HostState &state) const;

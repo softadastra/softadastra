@@ -14,6 +14,9 @@
 
 #include "platform/NativeService.hpp"
 
+#include <fstream>
+#include <string>
+
 #if defined(_WIN32)
 
 #include <windows.h>
@@ -77,7 +80,8 @@ namespace
 
   int run_systemctl(
       const char *operation,
-      bool quiet = false) noexcept
+      bool quiet = false,
+      bool use_service_name = true) noexcept
   {
     const pid_t child = ::fork();
 
@@ -88,7 +92,7 @@ namespace
 
     if (child == 0)
     {
-      if (quiet)
+      if (quiet && use_service_name)
       {
         ::execlp(
             "systemctl",
@@ -98,13 +102,21 @@ namespace
             "softadastra.service",
             static_cast<char *>(nullptr));
       }
-      else
+      else if (use_service_name)
       {
         ::execlp(
             "systemctl",
             "systemctl",
             operation,
             "softadastra.service",
+            static_cast<char *>(nullptr));
+      }
+      else
+      {
+        ::execlp(
+            "systemctl",
+            "systemctl",
+            operation,
             static_cast<char *>(nullptr));
       }
 
@@ -139,12 +151,120 @@ namespace
     return WEXITSTATUS(status);
   }
 
+  std::string escape_systemd_argument(const std::string &value)
+  {
+    std::string escaped;
+    escaped.reserve(value.size() + 2);
+    escaped += '"';
+
+    for (const char character : value)
+    {
+      if (character == '"' || character == '\\')
+      {
+        escaped += '\\';
+      }
+
+      escaped += character;
+    }
+
+    escaped += '"';
+    return escaped;
+  }
+
 #endif
 
 } // namespace
 
 namespace softadastra
 {
+
+#if defined(__linux__)
+  std::filesystem::path NativeService::unit_file_path()
+  {
+    return "/etc/systemd/system/softadastra.service";
+  }
+
+  std::string NativeService::unit_file_content(
+      const std::filesystem::path &executable)
+  {
+    return "[Unit]\n"
+           "Description=Softadastra Host\n"
+           "After=network.target\n"
+           "\n"
+           "[Service]\n"
+           "Type=simple\n"
+           "ExecStart=" + escape_systemd_argument(executable.string()) + " host\n"
+           "Restart=on-failure\n"
+           "\n"
+           "[Install]\n"
+           "WantedBy=multi-user.target\n";
+  }
+
+  bool NativeService::install(const std::filesystem::path &executable)
+  {
+    if (executable.empty())
+    {
+      return false;
+    }
+
+    const auto unit = unit_file_path();
+    const auto temporary = unit.string() + ".tmp";
+    std::ofstream output(temporary, std::ios::trunc);
+
+    if (!output)
+    {
+      return false;
+    }
+
+    output << unit_file_content(executable);
+    output.close();
+
+    if (!output)
+    {
+      return false;
+    }
+
+    std::error_code error;
+    std::filesystem::rename(temporary, unit, error);
+
+    if (error)
+    {
+      return false;
+    }
+
+    return run_systemctl("daemon-reload", false, false) == 0;
+  }
+
+  bool NativeService::enable_auto_start()
+  {
+    return is_installed() && run_systemctl("enable") == 0;
+  }
+#endif
+
+  bool NativeService::is_installed() const noexcept
+  {
+#if defined(_WIN32)
+
+    SC_HANDLE service = open_service(SERVICE_QUERY_STATUS);
+
+    if (service == nullptr)
+    {
+      return false;
+    }
+
+    CloseServiceHandle(service);
+    return true;
+
+#elif defined(__linux__)
+
+    return run_systemctl("cat", true) == 0;
+
+#else
+
+    return false;
+
+#endif
+  }
 
   bool NativeService::start()
   {
@@ -179,6 +299,11 @@ namespace softadastra
     return true;
 
 #elif defined(__linux__)
+
+    if (!is_installed())
+    {
+      return false;
+    }
 
     if (is_running())
     {
@@ -225,6 +350,11 @@ namespace softadastra
     return result != FALSE;
 
 #elif defined(__linux__)
+
+    if (!is_installed())
+    {
+      return false;
+    }
 
     if (!is_running())
     {

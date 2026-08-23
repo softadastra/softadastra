@@ -17,6 +17,8 @@
 
 #include "platform/Service.hpp"
 
+#include <filesystem>
+#include <string>
 #include <string_view>
 
 namespace softadastra
@@ -27,8 +29,7 @@ namespace softadastra
    * NativeService represents the operating-system service responsible for
    * running the Softadastra Host independently from an interactive terminal.
    *
-   * This class controls an existing service installation. Service installation,
-   * removal, and startup policy are intentionally outside the current contract.
+   * On Linux, it manages the systemd unit used to run the Host.
    */
   class NativeService final : public Service
   {
@@ -40,6 +41,47 @@ namespace softadastra
     {
       return "softadastra";
     }
+
+#if defined(__linux__)
+    /**
+     * @brief Returns the systemd unit path used by Softadastra.
+     */
+    [[nodiscard]] static std::filesystem::path unit_file_path();
+
+    /**
+     * @brief Generates the systemd unit for a Host executable.
+     *
+     * @param executable Path to the Softadastra executable.
+     *
+     * @return Complete systemd unit content.
+     */
+    [[nodiscard]] static std::string unit_file_content(
+        const std::filesystem::path &executable);
+
+    /**
+     * @brief Installs the systemd unit for a Host executable.
+     *
+     * This operation writes to the native system service directory and may
+     * require administrative privileges.
+     *
+     * @return true when the unit is installed and systemd reloads it.
+     */
+    [[nodiscard]] bool install(
+        const std::filesystem::path &executable);
+
+    /**
+     * @brief Enables automatic startup through systemd.
+     *
+     * @return true when systemd enables the installed service, otherwise
+     *         false.
+     */
+    [[nodiscard]] bool enable_auto_start();
+#endif
+
+    /**
+     * @brief Returns whether the native Softadastra service is installed.
+     */
+    [[nodiscard]] bool is_installed() const noexcept;
 
     /**
      * @brief Requests startup of the Softadastra system service.

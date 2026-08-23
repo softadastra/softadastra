@@ -73,6 +73,13 @@ namespace softadastra
     [[nodiscard]] SoftwareOperationResult restart_software(const SoftwareId &id);
 
     /**
+     * @brief Stops every process managed by the Host.
+     *
+     * @return true when all managed processes stop successfully.
+     */
+    [[nodiscard]] bool shutdown();
+
+    /**
      * @brief Refreshes software lifecycle state from running processes.
      */
     void refresh();

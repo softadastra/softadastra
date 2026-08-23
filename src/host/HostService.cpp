@@ -61,6 +61,13 @@ namespace softadastra
     return software_manager_.restart(id);
   }
 
+  bool HostService::shutdown()
+  {
+    const bool stopped = software_manager_.stop_all();
+    software_manager_.refresh();
+    return stopped;
+  }
+
   void HostService::refresh()
   {
     software_manager_.refresh();

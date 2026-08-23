@@ -16,10 +16,57 @@
 #include "control/ControlClient.hpp"
 #include "control/ControlServer.hpp"
 #include "host/Host.hpp"
+#include "host/HostLoop.hpp"
 #include "host/HostService.hpp"
+#include "host/HostStateFile.hpp"
+#include "platform/NativeDataDirectory.hpp"
 #include "platform/NativePlatform.hpp"
 
+#include <string>
+#include <thread>
 #include <vector>
+
+#if defined(__linux__)
+
+#include <csignal>
+#include <pthread.h>
+
+#endif
+
+namespace
+{
+  int run_host(softadastra::HostLoop &host_loop)
+  {
+#if defined(__linux__)
+
+    sigset_t signals;
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGTERM);
+
+    if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0)
+    {
+      return 1;
+    }
+
+    bool completed = false;
+    std::thread thread([&host_loop, &completed]()
+                       {
+                         completed = host_loop.run();
+                       });
+    int signal = 0;
+    const int result = sigwait(&signals, &signal);
+    host_loop.request_stop();
+    thread.join();
+    return result == 0 && completed ? 0 : 1;
+
+#else
+
+    return host_loop.run() ? 0 : 1;
+
+#endif
+  }
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -30,6 +77,14 @@ int main(int argc, char *argv[])
   softadastra::HostService host_service(
       host,
       platform.process_launcher());
+
+  if (argc == 2 && std::string(argv[1]) == "host")
+  {
+    softadastra::HostStateFile state_file(
+        softadastra::NativeDataDirectory::path() / "host-state");
+    softadastra::HostLoop host_loop(host_service, state_file);
+    return run_host(host_loop);
+  }
 
   softadastra::ControlServer control_server(host_service);
   softadastra::ControlClient control_client(control_server);

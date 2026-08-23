@@ -26,6 +26,12 @@ namespace softadastra
   {
   }
 
+  bool HostStateFile::exists() const noexcept
+  {
+    std::error_code error;
+    return std::filesystem::exists(path_, error) && !error;
+  }
+
   bool HostStateFile::save(const HostState &state) const
   {
     std::error_code error;

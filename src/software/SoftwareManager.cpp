@@ -218,6 +218,41 @@ namespace softadastra
     return start(id);
   }
 
+  bool SoftwareManager::stop_all()
+  {
+    bool stopped = true;
+    auto current = processes_.begin();
+
+    while (current != processes_.end())
+    {
+      SoftwareEntry *entry = state_.find_software(current->id);
+
+      if (!current->process->stop())
+      {
+        stopped = false;
+
+        if (entry != nullptr)
+        {
+          entry->set_state(SoftwareState::Failed);
+          entry->set_result(SoftwareOperationError::StopFailed);
+        }
+
+        ++current;
+        continue;
+      }
+
+      if (entry != nullptr)
+      {
+        entry->set_state(SoftwareState::Stopped);
+        entry->clear_result();
+      }
+
+      current = processes_.erase(current);
+    }
+
+    return stopped;
+  }
+
   void SoftwareManager::refresh()
   {
     auto current = processes_.begin();
