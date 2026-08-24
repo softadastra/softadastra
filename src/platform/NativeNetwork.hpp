@@ -62,6 +62,11 @@ namespace softadastra
      * @brief Returns the current IPv4 source address selected by the OS route.
      */
     [[nodiscard]] std::string primary_ipv4() const override;
+
+    /**
+     * @brief Returns detailed native network capability without changing it.
+     */
+    [[nodiscard]] NetworkCapability network_capability() const override;
   };
 
 } // namespace softadastra

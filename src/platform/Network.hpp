@@ -39,6 +39,58 @@ namespace softadastra
     std::string value;
   };
 
+  enum class NetworkState
+  {
+    Available,
+    Unavailable
+  };
+
+  enum class NetworkInterfaceType
+  {
+    Wifi,
+    Ethernet,
+    Loopback,
+    Other,
+    Unknown
+  };
+
+  enum class LocalNetworkState
+  {
+    Existing,
+    Unavailable
+  };
+
+  enum class ManagedNetworkCapability
+  {
+    Available,
+    Unavailable
+  };
+
+  /**
+   * @brief Describes the Host's currently observable network capability.
+   *
+   * This describes interfaces and locally observable capabilities only. It
+   * does not assert that another device can reach the Host.
+   */
+  struct NetworkCapability
+  {
+    NetworkState state{NetworkState::Unavailable};
+    std::string primary_ipv4;
+    std::string primary_interface;
+    NetworkInterfaceType interface_type{NetworkInterfaceType::Unknown};
+    LocalNetworkState local_network_state{LocalNetworkState::Unavailable};
+    ManagedNetworkCapability managed_network_capability{
+        ManagedNetworkCapability::Unavailable};
+  };
+
+  [[nodiscard]] const char *network_state_name(NetworkState value) noexcept;
+  [[nodiscard]] const char *network_interface_type_name(
+      NetworkInterfaceType value) noexcept;
+  [[nodiscard]] const char *local_network_state_name(
+      LocalNetworkState value) noexcept;
+  [[nodiscard]] const char *managed_network_capability_name(
+      ManagedNetworkCapability value) noexcept;
+
   /**
    * @brief Defines the network capability exposed by a Host platform.
    *
@@ -115,6 +167,35 @@ namespace softadastra
         if (address.family == LocalAddressFamily::IPv4)
         {
           return address.value;
+        }
+      }
+
+      return {};
+    }
+
+    /**
+     * @brief Returns a detailed, read-only view of Host network capability.
+     *
+     * Platforms that can identify an interface from routing state or inspect
+     * its physical kind should override this method. The default is a safe
+     * unsupported-platform fallback.
+     */
+    [[nodiscard]] virtual NetworkCapability network_capability() const
+    {
+      const std::string primary = primary_ipv4();
+
+      for (const auto &address : local_addresses())
+      {
+        if (address.family == LocalAddressFamily::IPv4 &&
+            address.value == primary && !address.value.starts_with("127."))
+        {
+          return NetworkCapability{
+              NetworkState::Available,
+              primary,
+              address.interface_name,
+              NetworkInterfaceType::Unknown,
+              LocalNetworkState::Existing,
+              ManagedNetworkCapability::Unavailable};
         }
       }
 

@@ -109,4 +109,9 @@ namespace softadastra
     return host_service_.local_access();
   }
 
+  NetworkCapability ControlServer::network_capability() const
+  {
+    return host_service_.network_capability();
+  }
+
 } // namespace softadastra

@@ -67,4 +67,25 @@ namespace
 
     EXPECT_TRUE(found);
   }
+
+  TEST(NativeNetworkTest, ReportsNetworkCapabilityConsistently)
+  {
+    const softadastra::NativeNetwork network;
+    const auto capability = network.network_capability();
+
+    if (capability.state == softadastra::NetworkState::Unavailable)
+    {
+      EXPECT_TRUE(capability.primary_ipv4.empty());
+      EXPECT_TRUE(capability.primary_interface.empty());
+      EXPECT_EQ(capability.local_network_state,
+                softadastra::LocalNetworkState::Unavailable);
+      return;
+    }
+
+    EXPECT_FALSE(capability.primary_ipv4.empty());
+    EXPECT_FALSE(capability.primary_interface.empty());
+    EXPECT_NE(capability.primary_ipv4.rfind("127.", 0), 0U);
+    EXPECT_EQ(capability.local_network_state,
+              softadastra::LocalNetworkState::Existing);
+  }
 } // namespace

@@ -16,6 +16,7 @@
 #define SOFTADASTRA_CLI_CLI_HPP
 
 #include "control/ControlClient.hpp"
+#include "platform/Network.hpp"
 
 namespace softadastra
 {
@@ -37,6 +38,13 @@ namespace softadastra
      * @param client Control client used to communicate with the Host.
      */
     explicit Cli(ControlClient &client) noexcept;
+
+    /**
+     * @brief Creates a CLI with a local read-only network observer.
+     *
+     * This lets `network info` observe the machine without starting the Host.
+     */
+    Cli(ControlClient &client, const Network &network) noexcept;
 
     /**
      * @brief Executes a command-line operation.
@@ -68,6 +76,7 @@ namespace softadastra
 
   private:
     ControlClient &client_;
+    const Network *network_{nullptr};
   };
 
 } // namespace softadastra

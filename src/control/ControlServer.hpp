@@ -103,6 +103,8 @@ namespace softadastra
      */
     [[nodiscard]] LocalHostAccess local_access() const;
 
+    [[nodiscard]] NetworkCapability network_capability() const;
+
   private:
     HostService &host_service_;
   };

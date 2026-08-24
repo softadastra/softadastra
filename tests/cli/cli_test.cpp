@@ -45,6 +45,13 @@ namespace
     [[nodiscard]] bool is_connected() const noexcept override { return false; }
     [[nodiscard]] std::string host_name() const override { return "host"; }
     [[nodiscard]] std::vector<softadastra::LocalNetworkAddress> local_addresses() const override { return {{softadastra::LocalAddressFamily::IPv4, "test", "127.0.0.1"}}; }
+    [[nodiscard]] softadastra::NetworkCapability network_capability() const override
+    {
+      return {softadastra::NetworkState::Available, "10.56.116.55", "wlp108s0",
+              softadastra::NetworkInterfaceType::Wifi,
+              softadastra::LocalNetworkState::Existing,
+              softadastra::ManagedNetworkCapability::Available};
+    }
   };
 
   class Platform final : public softadastra::Platform
@@ -67,6 +74,9 @@ namespace
     std::filesystem::create_directories(old_root / "src");
     const auto identity = softadastra::ProjectIdentity::create(old_root);
     ASSERT_TRUE(identity.has_value());
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        old_root,
+        {identity.value(), "app", "./build/app", std::nullopt}));
 
     Platform platform;
     softadastra::Host host(platform);
@@ -84,7 +94,11 @@ namespace
     EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
     EXPECT_EQ(platform.launcher.last_spec->working_directory(), new_root.string());
     std::filesystem::current_path(new_root / "src");
+    ASSERT_TRUE(client.stop_software(softadastra::SoftwareId(identity->value())));
     EXPECT_EQ(cli.run(2, root_args), 0);
+    ASSERT_TRUE(platform.launcher.last_spec.has_value());
+    EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
+    EXPECT_EQ(platform.launcher.last_spec->working_directory(), new_root.string());
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(base);
   }
@@ -187,6 +201,26 @@ namespace
     EXPECT_EQ(cli.run(2, top_help), 0);
     EXPECT_EQ(cli.run(3, access_help), 0);
     EXPECT_EQ(cli.run(3, run_help), 0);
+  }
+
+  TEST(CliTest, ShowsNetworkCapabilityAndNetworkHelp)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
+    const char *info[] = {"softadastra", "network", "info"};
+    const char *short_help[] = {"softadastra", "network", "-h"};
+    const char *long_help[] = {"softadastra", "network", "--help"};
+    const char *help[] = {"softadastra", "help", "network"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, info), 0);
+    const auto output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("State:            available"), std::string::npos);
+    EXPECT_NE(output.find("Interface:        wlp108s0"), std::string::npos);
+    EXPECT_NE(output.find("Managed network:  available"), std::string::npos);
+    EXPECT_EQ(cli.run(3, short_help), 0);
+    EXPECT_EQ(cli.run(3, long_help), 0);
+    EXPECT_EQ(cli.run(3, help), 0);
   }
 
   TEST(CliTest, ResolvesProjectAndNamedTargetsUniformly)

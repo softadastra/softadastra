@@ -140,6 +140,11 @@ namespace softadastra
     [[nodiscard]] LocalHostAccess local_access() const;
 
     /**
+     * @brief Returns the Host's detailed, read-only network capability.
+     */
+    [[nodiscard]] NetworkCapability network_capability() const;
+
+    /**
      * @brief Returns the current primary local IPv4 address when available.
      */
     [[nodiscard]] std::string primary_ipv4() const;

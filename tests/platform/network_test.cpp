@@ -41,6 +41,23 @@ namespace
     bool connected_;
   };
 
+  class AddressNetwork final : public softadastra::Network
+  {
+  public:
+    explicit AddressNetwork(std::vector<softadastra::LocalNetworkAddress> addresses)
+        : addresses_(std::move(addresses))
+    {
+    }
+
+    [[nodiscard]] bool is_available() const noexcept override { return true; }
+    [[nodiscard]] bool is_connected() const noexcept override { return true; }
+    [[nodiscard]] std::vector<softadastra::LocalNetworkAddress>
+    local_addresses() const override { return addresses_; }
+
+  private:
+    std::vector<softadastra::LocalNetworkAddress> addresses_;
+  };
+
 } // namespace
 
 TEST(NetworkTest, ReportsUnavailableNetwork)
@@ -74,4 +91,52 @@ TEST(NetworkTest, SupportsUseThroughNetworkInterface)
 
   EXPECT_TRUE(network.is_available());
   EXPECT_TRUE(network.is_connected());
+}
+
+TEST(NetworkTest, AssociatesPrimaryIpv4WithItsReportedInterface)
+{
+  const AddressNetwork network({
+      {softadastra::LocalAddressFamily::IPv4, "wlp108s0", "10.56.116.55"}});
+
+  const auto capability = network.network_capability();
+
+  EXPECT_EQ(capability.state, softadastra::NetworkState::Available);
+  EXPECT_EQ(capability.primary_ipv4, "10.56.116.55");
+  EXPECT_EQ(capability.primary_interface, "wlp108s0");
+  EXPECT_EQ(capability.local_network_state,
+            softadastra::LocalNetworkState::Existing);
+}
+
+TEST(NetworkTest, DoesNotReportLoopbackAsLocalNetwork)
+{
+  const AddressNetwork network({
+      {softadastra::LocalAddressFamily::IPv4, "lo", "127.0.0.1"}});
+
+  const auto capability = network.network_capability();
+
+  EXPECT_EQ(capability.state, softadastra::NetworkState::Unavailable);
+  EXPECT_EQ(capability.local_network_state,
+            softadastra::LocalNetworkState::Unavailable);
+}
+
+TEST(NetworkTest, NamesAllInterfaceTypes)
+{
+  EXPECT_STREQ(softadastra::network_interface_type_name(
+                   softadastra::NetworkInterfaceType::Wifi), "wifi");
+  EXPECT_STREQ(softadastra::network_interface_type_name(
+                   softadastra::NetworkInterfaceType::Ethernet), "ethernet");
+  EXPECT_STREQ(softadastra::network_interface_type_name(
+                   softadastra::NetworkInterfaceType::Other), "other");
+  EXPECT_STREQ(softadastra::network_interface_type_name(
+                   softadastra::NetworkInterfaceType::Unknown), "unknown");
+}
+
+TEST(NetworkTest, UnsupportedPlatformFallbackDoesNotClaimManagedNetwork)
+{
+  const AddressNetwork network({});
+
+  const auto capability = network.network_capability();
+
+  EXPECT_EQ(capability.managed_network_capability,
+            softadastra::ManagedNetworkCapability::Unavailable);
 }

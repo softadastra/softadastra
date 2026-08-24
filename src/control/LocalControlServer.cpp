@@ -244,6 +244,18 @@ namespace softadastra
       return response;
     }
 
+    if (fields[0] == "network-capability" && fields.size() == 1)
+    {
+      const NetworkCapability capability = server.network_capability();
+      return "network-capability " +
+             std::to_string(static_cast<int>(capability.state)) + " " +
+             LocalControlProtocol::encode(capability.primary_ipv4) + " " +
+             LocalControlProtocol::encode(capability.primary_interface) + " " +
+             std::to_string(static_cast<int>(capability.interface_type)) + " " +
+             std::to_string(static_cast<int>(capability.local_network_state)) + " " +
+             std::to_string(static_cast<int>(capability.managed_network_capability));
+    }
+
     if (fields[0] == "access-point" && fields.size() == 2)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);

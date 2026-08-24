@@ -27,6 +27,7 @@
 #include "platform/HostInstanceLock.hpp"
 #include "platform/MdnsPublisher.hpp"
 #include "platform/NativePlatform.hpp"
+#include "platform/NativeNetwork.hpp"
 #include "software/ProjectIdentity.hpp"
 #include "software/ProjectConfig.hpp"
 
@@ -313,6 +314,7 @@ int main(int argc, char *argv[])
   const bool needs_host = cli_command != "" && cli_command != "host" &&
                           cli_command != "help" && cli_command != "-h" &&
                           cli_command != "--help" &&
+                          cli_command != "network" &&
                           (cli_command != "init" || legacy_migration) &&
                           !command_help;
   if (needs_host && !control_client.host_available())
@@ -337,7 +339,8 @@ int main(int argc, char *argv[])
     }
   }
 
-  softadastra::Cli cli(control_client);
+  softadastra::NativeNetwork network;
+  softadastra::Cli cli(control_client, network);
 
   std::vector<const char *> arguments;
   arguments.reserve(static_cast<std::size_t>(argc));

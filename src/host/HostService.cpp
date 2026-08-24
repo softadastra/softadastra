@@ -147,6 +147,11 @@ namespace softadastra
         network.local_addresses()};
   }
 
+  NetworkCapability HostService::network_capability() const
+  {
+    return host_.platform().network().network_capability();
+  }
+
   std::string HostService::primary_ipv4() const
   {
     return host_.platform().network().primary_ipv4();

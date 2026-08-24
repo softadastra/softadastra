@@ -15,6 +15,11 @@
 #include "platform/NativeNetwork.hpp"
 
 #include <array>
+#include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -33,6 +38,12 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#if defined(__linux__)
+#include <linux/genetlink.h>
+#include <linux/netlink.h>
+#include <linux/nl80211.h>
+#endif
 
 #if defined(__APPLE__)
 #include <net/if_dl.h>
@@ -214,10 +225,248 @@ namespace
 
 #endif
 
+#if defined(__linux__)
+
+  bool attribute_ok(const nlattr *attribute, int length) noexcept
+  {
+    return length >= static_cast<int>(sizeof(nlattr)) &&
+           attribute->nla_len >= sizeof(nlattr) &&
+           attribute->nla_len <= length;
+  }
+
+  const nlattr *next_attribute(const nlattr *attribute, int &length) noexcept
+  {
+    const int aligned_length = NLA_ALIGN(attribute->nla_len);
+    length -= aligned_length;
+    return reinterpret_cast<const nlattr *>(
+        reinterpret_cast<const char *>(attribute) + aligned_length);
+  }
+
+  void *attribute_data(nlattr *attribute) noexcept
+  {
+    return reinterpret_cast<char *>(attribute) + NLA_HDRLEN;
+  }
+
+  const void *attribute_data(const nlattr *attribute) noexcept
+  {
+    return reinterpret_cast<const char *>(attribute) + NLA_HDRLEN;
+  }
+
+  int attribute_type(const nlattr *attribute) noexcept
+  {
+    return attribute->nla_type & NLA_TYPE_MASK;
+  }
+
+  bool has_attribute(const nlattr *attributes, int length, int wanted) noexcept
+  {
+    for (const nlattr *attribute = attributes;
+         attribute_ok(attribute, length);
+         attribute = next_attribute(attribute, length))
+    {
+      if (attribute_type(attribute) == wanted)
+      {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  std::optional<std::uint16_t> generic_netlink_family(
+      int descriptor,
+      std::uint32_t sequence)
+  {
+    std::array<char, 256> buffer{};
+    auto *message = reinterpret_cast<nlmsghdr *>(buffer.data());
+    message->nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN);
+    message->nlmsg_type = GENL_ID_CTRL;
+    message->nlmsg_flags = NLM_F_REQUEST;
+    message->nlmsg_seq = sequence;
+    auto *header = reinterpret_cast<genlmsghdr *>(NLMSG_DATA(message));
+    header->cmd = CTRL_CMD_GETFAMILY;
+    header->version = 1;
+    auto *attribute = reinterpret_cast<nlattr *>(
+        reinterpret_cast<char *>(header) + GENL_HDRLEN);
+    constexpr char family_name[] = "nl80211";
+    attribute->nla_type = CTRL_ATTR_FAMILY_NAME;
+    attribute->nla_len = NLA_HDRLEN + sizeof(family_name);
+    std::memcpy(attribute_data(attribute), family_name, sizeof(family_name));
+    message->nlmsg_len += NLA_ALIGN(attribute->nla_len);
+
+    if (::send(descriptor, message, message->nlmsg_len, 0) < 0)
+    {
+      return std::nullopt;
+    }
+
+    const ssize_t received = ::recv(descriptor, buffer.data(), buffer.size(), 0);
+    if (received < static_cast<ssize_t>(NLMSG_LENGTH(GENL_HDRLEN)))
+    {
+      return std::nullopt;
+    }
+
+    int remaining = static_cast<int>(received);
+    for (auto *reply = reinterpret_cast<nlmsghdr *>(buffer.data());
+         NLMSG_OK(reply, remaining);
+         reply = NLMSG_NEXT(reply, remaining))
+    {
+      if (reply->nlmsg_type == NLMSG_ERROR)
+      {
+        return std::nullopt;
+      }
+
+      auto *reply_header = reinterpret_cast<genlmsghdr *>(NLMSG_DATA(reply));
+      int attribute_length = reply->nlmsg_len - NLMSG_LENGTH(GENL_HDRLEN);
+      const auto *attributes = reinterpret_cast<const nlattr *>(
+          reinterpret_cast<const char *>(reply_header) + GENL_HDRLEN);
+
+      for (const nlattr *current = attributes;
+           attribute_ok(current, attribute_length);
+           current = next_attribute(current, attribute_length))
+      {
+        if (attribute_type(current) == CTRL_ATTR_FAMILY_ID &&
+            current->nla_len >= NLA_HDRLEN + sizeof(std::uint16_t))
+        {
+          std::uint16_t id = 0;
+          std::memcpy(&id, attribute_data(current), sizeof(id));
+          return id;
+        }
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  bool wifi_hotspot_supported() noexcept
+  {
+    const int descriptor = ::socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+    if (descriptor < 0)
+    {
+      return false;
+    }
+
+    sockaddr_nl address{};
+    address.nl_family = AF_NETLINK;
+    if (::bind(descriptor, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) != 0)
+    {
+      ::close(descriptor);
+      return false;
+    }
+
+    constexpr std::uint32_t sequence = 1;
+    const auto family = generic_netlink_family(descriptor, sequence);
+    if (!family.has_value())
+    {
+      ::close(descriptor);
+      return false;
+    }
+
+    std::array<char, NLMSG_SPACE(GENL_HDRLEN)> request{};
+    auto *message = reinterpret_cast<nlmsghdr *>(request.data());
+    message->nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN);
+    message->nlmsg_type = family.value();
+    message->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    message->nlmsg_seq = sequence + 1;
+    auto *header = reinterpret_cast<genlmsghdr *>(NLMSG_DATA(message));
+    header->cmd = NL80211_CMD_GET_WIPHY;
+    header->version = 0;
+
+    if (::send(descriptor, message, message->nlmsg_len, 0) < 0)
+    {
+      ::close(descriptor);
+      return false;
+    }
+
+    bool supported = false;
+    std::array<char, 8192> buffer{};
+    while (true)
+    {
+      ssize_t received = ::recv(descriptor, buffer.data(), buffer.size(), 0);
+      if (received <= 0)
+      {
+        break;
+      }
+
+      int remaining = static_cast<int>(received);
+      for (auto *reply = reinterpret_cast<nlmsghdr *>(buffer.data());
+           NLMSG_OK(reply, remaining);
+           reply = NLMSG_NEXT(reply, remaining))
+      {
+        if (reply->nlmsg_type == NLMSG_DONE || reply->nlmsg_type == NLMSG_ERROR)
+        {
+          ::close(descriptor);
+          return supported;
+        }
+
+        const auto *header = reinterpret_cast<const genlmsghdr *>(NLMSG_DATA(reply));
+        int attribute_length = reply->nlmsg_len - NLMSG_LENGTH(GENL_HDRLEN);
+        const auto *attributes = reinterpret_cast<const nlattr *>(
+            reinterpret_cast<const char *>(header) + GENL_HDRLEN);
+
+        for (const nlattr *attribute = attributes;
+             attribute_ok(attribute, attribute_length);
+             attribute = next_attribute(attribute, attribute_length))
+        {
+          if (attribute_type(attribute) != NL80211_ATTR_SUPPORTED_IFTYPES)
+          {
+            continue;
+          }
+
+          int types_length = attribute->nla_len - NLA_HDRLEN;
+          const auto *types = reinterpret_cast<const nlattr *>(attribute_data(attribute));
+          if (has_attribute(types, types_length, NL80211_IFTYPE_AP))
+          {
+            supported = true;
+          }
+        }
+      }
+    }
+
+    ::close(descriptor);
+    return supported;
+  }
+
+#endif
+
 } // namespace
 
 namespace softadastra
 {
+
+  const char *network_state_name(NetworkState value) noexcept
+  {
+    return value == NetworkState::Available ? "available" : "unavailable";
+  }
+
+  const char *network_interface_type_name(NetworkInterfaceType value) noexcept
+  {
+    switch (value)
+    {
+    case NetworkInterfaceType::Wifi:
+      return "wifi";
+    case NetworkInterfaceType::Ethernet:
+      return "ethernet";
+    case NetworkInterfaceType::Loopback:
+      return "loopback";
+    case NetworkInterfaceType::Other:
+      return "other";
+    case NetworkInterfaceType::Unknown:
+      return "unknown";
+    }
+
+    return "unknown";
+  }
+
+  const char *local_network_state_name(LocalNetworkState value) noexcept
+  {
+    return value == LocalNetworkState::Existing ? "existing" : "unavailable";
+  }
+
+  const char *managed_network_capability_name(
+      ManagedNetworkCapability value) noexcept
+  {
+    return value == ManagedNetworkCapability::Available ? "available"
+                                                        : "unavailable";
+  }
 
   bool NativeNetwork::is_available() const noexcept
   {
@@ -519,6 +768,54 @@ namespace softadastra
 #endif
 
     return Network::primary_ipv4();
+  }
+
+  NetworkCapability NativeNetwork::network_capability() const
+  {
+    NetworkCapability capability = Network::network_capability();
+
+#if defined(__linux__)
+    capability.managed_network_capability = wifi_hotspot_supported()
+                                               ? ManagedNetworkCapability::Available
+                                               : ManagedNetworkCapability::Unavailable;
+#endif
+
+    if (capability.state == NetworkState::Unavailable)
+    {
+      return capability;
+    }
+
+#if defined(__linux__)
+    const std::filesystem::path interface_path =
+        std::filesystem::path("/sys/class/net") / capability.primary_interface;
+
+    if (std::filesystem::exists(interface_path / "wireless"))
+    {
+      capability.interface_type = NetworkInterfaceType::Wifi;
+    }
+    else
+    {
+      std::ifstream type_file(interface_path / "type");
+      unsigned int hardware_type = 0;
+      type_file >> hardware_type;
+
+      if (hardware_type == 1)
+      {
+        capability.interface_type = NetworkInterfaceType::Ethernet;
+      }
+      else if (hardware_type == 772)
+      {
+        capability.interface_type = NetworkInterfaceType::Loopback;
+      }
+      else if (type_file)
+      {
+        capability.interface_type = NetworkInterfaceType::Other;
+      }
+    }
+
+#endif
+
+    return capability;
   }
 
 } // namespace softadastra

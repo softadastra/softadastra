@@ -420,6 +420,49 @@ namespace softadastra
     return access;
   }
 
+  std::optional<NetworkCapability> ControlClient::network_capability() const noexcept
+  {
+    if (server_ != nullptr)
+    {
+      return server_->network_capability();
+    }
+
+    const auto response = request("network-capability");
+    const auto fields = response.has_value()
+                            ? LocalControlProtocol::fields(response.value())
+                            : std::vector<std::string>{};
+
+    if (fields.size() != 7 || fields[0] != "network-capability")
+    {
+      return std::nullopt;
+    }
+
+    const auto state = LocalControlProtocol::integer(fields[1]);
+    const auto ipv4 = LocalControlProtocol::decode(fields[2]);
+    const auto interface_name = LocalControlProtocol::decode(fields[3]);
+    const auto interface_type = LocalControlProtocol::integer(fields[4]);
+    const auto local_network = LocalControlProtocol::integer(fields[5]);
+    const auto managed_network = LocalControlProtocol::integer(fields[6]);
+
+    if (!state.has_value() || !ipv4.has_value() || !interface_name.has_value() ||
+        !interface_type.has_value() || !local_network.has_value() ||
+        !managed_network.has_value() || state.value() < 0 || state.value() > 1 ||
+        interface_type.value() < 0 || interface_type.value() > 4 ||
+        local_network.value() < 0 || local_network.value() > 1 ||
+        managed_network.value() < 0 || managed_network.value() > 1)
+    {
+      return std::nullopt;
+    }
+
+    return NetworkCapability{
+        static_cast<NetworkState>(state.value()),
+        ipv4.value(),
+        interface_name.value(),
+        static_cast<NetworkInterfaceType>(interface_type.value()),
+        static_cast<LocalNetworkState>(local_network.value()),
+        static_cast<ManagedNetworkCapability>(managed_network.value())};
+  }
+
   std::optional<std::string> ControlClient::request(
       const std::string &message) const noexcept
   {
