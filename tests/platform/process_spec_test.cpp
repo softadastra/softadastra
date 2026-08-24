@@ -17,6 +17,8 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
+#include <fstream>
 
 namespace
 {
@@ -46,6 +48,30 @@ namespace
         "--verbose"};
 
     EXPECT_EQ(spec.arguments(), expected);
+  }
+
+  TEST(ProcessSpecTest, NormalizesExistingRelativeExecutable)
+  {
+    const auto directory = std::filesystem::temp_directory_path() / "softadastra-process-spec";
+    std::filesystem::create_directories(directory);
+    const auto executable = directory / "program";
+    std::ofstream(executable) << "";
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(directory);
+
+    const auto normalized = softadastra::ProcessSpec::normalize_executable("./program");
+
+    std::filesystem::current_path(previous);
+    ASSERT_TRUE(normalized.has_value());
+    EXPECT_EQ(normalized.value(), executable.string());
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(ProcessSpecTest, PreservesAbsoluteAndPathExecutables)
+  {
+    EXPECT_EQ(softadastra::ProcessSpec::normalize_executable("/usr/bin/python3"), "/usr/bin/python3");
+    EXPECT_EQ(softadastra::ProcessSpec::normalize_executable("python3"), "python3");
+    EXPECT_FALSE(softadastra::ProcessSpec::normalize_executable("./missing-program").has_value());
   }
 
 } // namespace

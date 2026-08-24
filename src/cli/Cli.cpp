@@ -308,9 +308,16 @@ namespace softadastra
         arguments.emplace_back(argv[index]);
 
       const SoftwareId id(argv[2]);
-      const ProcessSpec process_spec(
-          argv[executable_index],
-          std::move(arguments));
+      const std::string executable(argv[executable_index]);
+      const auto normalized = ProcessSpec::normalize_executable(executable);
+
+      if (!normalized.has_value())
+      {
+        std::cerr << "relative executable does not exist: " << executable << '\n';
+        return 2;
+      }
+
+      const ProcessSpec process_spec(normalized.value(), std::move(arguments));
 
       if (!client_.register_software(id, process_spec, access_point))
       {

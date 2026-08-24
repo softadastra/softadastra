@@ -15,6 +15,8 @@
 #ifndef SOFTADASTRA_PLATFORM_PROCESS_SPEC_HPP
 #define SOFTADASTRA_PLATFORM_PROCESS_SPEC_HPP
 
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -59,6 +61,37 @@ namespace softadastra
     [[nodiscard]] const std::vector<std::string> &arguments() const noexcept
     {
       return arguments_;
+    }
+
+    /**
+     * @brief Resolves an executable path used during registration.
+     *
+     * A relative value containing a directory component is resolved against
+     * the current working directory. Bare executable names are preserved for
+     * PATH lookup, and absolute paths are preserved unchanged.
+     *
+     * @return The normalized executable, or std::nullopt when a relative path
+     *         does not exist.
+     */
+    [[nodiscard]] static std::optional<std::string> normalize_executable(
+        const std::string &executable)
+    {
+      const std::filesystem::path path(executable);
+
+      if (!path.is_relative() || !path.has_parent_path())
+      {
+        return executable;
+      }
+
+      std::error_code error;
+      const auto normalized = std::filesystem::weakly_canonical(path, error);
+
+      if (error || !std::filesystem::exists(normalized, error) || error)
+      {
+        return std::nullopt;
+      }
+
+      return normalized.string();
     }
 
   private:
