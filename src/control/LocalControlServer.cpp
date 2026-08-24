@@ -207,6 +207,15 @@ namespace softadastra
       return "ok";
     }
 
+    if (fields[0] == "host-pid" && fields.size() == 1)
+    {
+#if defined(__linux__)
+      return "host-pid " + std::to_string(::getpid());
+#else
+      return "host-pid -";
+#endif
+    }
+
     if (fields[0] == "connectivity" && fields.size() == 1)
     {
       return "connectivity " +
