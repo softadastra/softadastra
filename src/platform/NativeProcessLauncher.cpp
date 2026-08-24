@@ -111,6 +111,15 @@ namespace softadastra
       if (pid == 0)
       {
         ::setsid();
+        // The Host blocks its own termination signals so its main loop can
+        // handle them synchronously.  Managed software must not inherit that
+        // mask: NativeProcess::stop() terminates its process group with
+        // SIGTERM.
+        sigset_t signals;
+        sigemptyset(&signals);
+        sigaddset(&signals, SIGINT);
+        sigaddset(&signals, SIGTERM);
+        static_cast<void>(pthread_sigmask(SIG_UNBLOCK, &signals, nullptr));
         const int log = ::open(spec.output_file()->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
         if (log < 0) _exit(126);
         ::dup2(log, STDOUT_FILENO); ::dup2(log, STDERR_FILENO); if (log > STDERR_FILENO) ::close(log);

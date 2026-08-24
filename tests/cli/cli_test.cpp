@@ -67,15 +67,21 @@ namespace
     }
     [[nodiscard]] softadastra::ManagedNetworkStartResult start() override
     {
-      return current.capability == softadastra::ManagedNetworkCapability::Available
-                 ? softadastra::ManagedNetworkStartResult::Failed
-                 : softadastra::ManagedNetworkStartResult::Unavailable;
+      ++start_calls;
+      if (start_result == softadastra::ManagedNetworkStartResult::Started)
+      {
+        current.state = softadastra::ManagedNetworkState::Running;
+      }
+      return start_result;
     }
     bool stop() override { return false; }
 
     softadastra::ManagedNetworkStatus current{
         softadastra::ManagedNetworkCapability::Unavailable,
         softadastra::ManagedNetworkState::Stopped, {}, {}, {}};
+    softadastra::ManagedNetworkStartResult start_result{
+        softadastra::ManagedNetworkStartResult::Unavailable};
+    int start_calls{0};
   };
 
   class Platform final : public softadastra::Platform
@@ -286,8 +292,9 @@ namespace
     testing::internal::CaptureStdout();
     EXPECT_EQ(cli.run(3, access_api), 0);
     output = testing::internal::GetCapturedStdout();
-    EXPECT_NE(output.find("Network:       managed"), std::string::npos);
-    EXPECT_NE(output.find("Local URL:     http://10.42.0.1:8080"), std::string::npos);
+    EXPECT_NE(output.find("Network:       existing"), std::string::npos);
+    EXPECT_NE(output.find("Local URL:     http://10.56.116.55:8080"), std::string::npos);
+    EXPECT_EQ(platform.managed_network_.start_calls, 0);
 
     platform.network_.capability.primary_ipv4 = "192.168.1.6";
     platform.managed_network_.current.state = softadastra::ManagedNetworkState::Stopped;
@@ -331,12 +338,75 @@ namespace
     platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
                                     softadastra::NetworkInterfaceType::Unknown,
                                     softadastra::LocalNetworkState::Unavailable,
-                                    softadastra::ManagedNetworkCapability::Available};
+                                    softadastra::ManagedNetworkCapability::Unavailable};
     testing::internal::CaptureStdout();
     EXPECT_EQ(cli.run(3, access_secure), 1);
     output = testing::internal::GetCapturedStdout();
-    EXPECT_NE(output.find("No active local network is available on this Host."), std::string::npos);
-    EXPECT_NE(output.find("Managed network capability: available"), std::string::npos);
+    EXPECT_NE(output.find("No local network is available on this Host."), std::string::npos);
+    EXPECT_NE(output.find("Managed network: unavailable"), std::string::npos);
+    EXPECT_EQ(platform.managed_network_.start_calls, 0);
+    EXPECT_EQ(output.find("Scan with your phone."), std::string::npos);
+  }
+
+  TEST(CliTest, StartsManagedNetworkOnlyAsFallbackForRunningAccess)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    const auto id = softadastra::SoftwareId("api");
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
+    ASSERT_TRUE(client.start_software(id));
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
+    platform.managed_network_.current = {softadastra::ManagedNetworkCapability::Available, softadastra::ManagedNetworkState::Stopped, "wlan1", "10.42.0.1", "Softadastra-test"};
+    platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Started;
+    const char *access[] = {"softadastra", "access", "api"};
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access), 0);
+    const auto output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(platform.managed_network_.start_calls, 1);
+    EXPECT_NE(output.find("Network:       managed"), std::string::npos);
+    EXPECT_NE(output.find("http://10.42.0.1:8080"), std::string::npos);
+    EXPECT_NE(output.find("Scan with your phone."), std::string::npos);
+
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access), 0);
+    static_cast<void>(testing::internal::GetCapturedStdout());
+    EXPECT_EQ(platform.managed_network_.start_calls, 1);
+  }
+
+  TEST(CliTest, DoesNotStartManagedNetworkForExistingStoppedFailedOrMissingAccess)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    const auto api = softadastra::SoftwareId("api"); const auto worker = softadastra::SoftwareId("worker");
+    ASSERT_TRUE(client.register_software(api, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
+    ASSERT_TRUE(client.register_software(worker, softadastra::ProcessSpec("worker")));
+    platform.managed_network_.current.capability = softadastra::ManagedNetworkCapability::Available;
+    platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Started;
+    const char *access_api[] = {"softadastra", "access", "api"}; const char *access_worker[] = {"softadastra", "access", "worker"};
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access_api), 1); static_cast<void>(testing::internal::GetCapturedStdout());
+    testing::internal::CaptureStderr(); EXPECT_EQ(cli.run(3, access_worker), 1); static_cast<void>(testing::internal::GetCapturedStderr());
+    EXPECT_EQ(platform.managed_network_.start_calls, 0);
+
+    ASSERT_TRUE(client.start_software(api)); ASSERT_TRUE(client.stop_software(api));
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access_api), 1); static_cast<void>(testing::internal::GetCapturedStdout());
+    EXPECT_EQ(platform.managed_network_.start_calls, 0);
+    platform.launcher.process_running = false; EXPECT_FALSE(client.start_software(api));
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access_api), 1); static_cast<void>(testing::internal::GetCapturedStdout());
+    EXPECT_EQ(platform.managed_network_.start_calls, 0);
+  }
+
+  TEST(CliTest, ReportsManagedNetworkStartFailureWithoutUrlOrQr)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    const auto id = softadastra::SoftwareId("api");
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080))); ASSERT_TRUE(client.start_software(id));
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
+    platform.managed_network_.current.capability = softadastra::ManagedNetworkCapability::Available;
+    platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Failed;
+    const char *access[] = {"softadastra", "access", "api"}; testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access), 1);
+    const auto output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(platform.managed_network_.start_calls, 1);
+    EXPECT_NE(output.find("Unable to start a local Softadastra network."), std::string::npos);
+    EXPECT_EQ(output.find("Local URL:"), std::string::npos);
     EXPECT_EQ(output.find("Scan with your phone."), std::string::npos);
   }
 

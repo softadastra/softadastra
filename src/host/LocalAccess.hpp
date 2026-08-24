@@ -47,6 +47,9 @@ namespace softadastra
     LocalNetworkState local_network_state{LocalNetworkState::Unavailable};
     ManagedNetworkCapability managed_network_capability{
         ManagedNetworkCapability::Unavailable};
+    // Access resolution attempted the safe managed-network fallback, but it
+    // did not result in a running network with a usable IPv4 address.
+    bool managed_network_start_failed{false};
   };
 
   [[nodiscard]] LocalAccess resolve_local_access(

@@ -421,7 +421,7 @@ namespace softadastra
   }
 
   std::optional<LocalAccess> ControlClient::local_access(
-      const SoftwareId &id) const noexcept
+      const SoftwareId &id) noexcept
   {
     if (server_ != nullptr)
     {
@@ -432,7 +432,7 @@ namespace softadastra
     const auto fields = response.has_value()
                             ? LocalControlProtocol::fields(response.value())
                             : std::vector<std::string>{};
-    if (fields.size() != 9 || fields[0] != "local-access")
+    if (fields.size() != 10 || fields[0] != "local-access")
     {
       return std::nullopt;
     }
@@ -445,13 +445,15 @@ namespace softadastra
     const auto network = LocalControlProtocol::integer(fields[6]);
     const auto local_network = LocalControlProtocol::integer(fields[7]);
     const auto managed_network = LocalControlProtocol::integer(fields[8]);
+    const auto start_failed = LocalControlProtocol::integer(fields[9]);
     if (!state.has_value() || !protocol.has_value() || !port.has_value() ||
         !ipv4.has_value() || !url.has_value() || !network.has_value() || !local_network.has_value() ||
         !managed_network.has_value() || state.value() < 0 || state.value() > 1 ||
         protocol.value() < 0 || protocol.value() > 1 || port.value() < 1 ||
         port.value() > 65535 || network.value() < 0 || network.value() > 2 || local_network.value() < 0 ||
         local_network.value() > 1 || managed_network.value() < 0 ||
-        managed_network.value() > 1)
+        managed_network.value() > 1 || !start_failed.has_value() ||
+        (start_failed.value() != 0 && start_failed.value() != 1))
     {
       return std::nullopt;
     }
@@ -464,7 +466,8 @@ namespace softadastra
         url.value(),
         static_cast<LocalAccessNetwork>(network.value()),
         static_cast<LocalNetworkState>(local_network.value()),
-        static_cast<ManagedNetworkCapability>(managed_network.value())};
+        static_cast<ManagedNetworkCapability>(managed_network.value()),
+        start_failed.value() != 0};
   }
 
   std::optional<NetworkCapability> ControlClient::network_capability() const noexcept

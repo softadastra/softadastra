@@ -104,7 +104,7 @@ namespace softadastra
     [[nodiscard]] LocalHostAccess local_access() const;
 
     [[nodiscard]] std::optional<LocalAccess> local_access(
-        const SoftwareId &id) const noexcept;
+        const SoftwareId &id) noexcept;
 
     [[nodiscard]] NetworkCapability network_capability() const;
     [[nodiscard]] ManagedNetworkStatus managed_network_status() const;

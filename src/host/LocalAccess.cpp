@@ -83,20 +83,20 @@ namespace softadastra
       return access;
     }
 
-    if (managed_network_status.state == ManagedNetworkState::Running &&
-        usable_ipv4(managed_network_status.ipv4))
-    {
-      access.state = LocalAccessState::Available;
-      access.ipv4 = std::move(managed_network_status.ipv4);
-      access.network = LocalAccessNetwork::Managed;
-    }
-    else if (network_capability.state == NetworkState::Available &&
+    if (network_capability.state == NetworkState::Available &&
              network_capability.local_network_state == LocalNetworkState::Existing &&
              !network_capability.primary_ipv4.empty())
     {
       access.state = LocalAccessState::Available;
       access.ipv4 = std::move(network_capability.primary_ipv4);
       access.network = LocalAccessNetwork::Existing;
+    }
+    else if (managed_network_status.state == ManagedNetworkState::Running &&
+             usable_ipv4(managed_network_status.ipv4))
+    {
+      access.state = LocalAccessState::Available;
+      access.ipv4 = std::move(managed_network_status.ipv4);
+      access.network = LocalAccessNetwork::Managed;
     }
     else
     {

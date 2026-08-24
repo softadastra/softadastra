@@ -277,7 +277,8 @@ namespace softadastra
              LocalControlProtocol::encode(access->url) + " " +
              std::to_string(static_cast<int>(access->network)) + " " +
              std::to_string(static_cast<int>(access->local_network_state)) + " " +
-             std::to_string(static_cast<int>(access->managed_network_capability));
+             std::to_string(static_cast<int>(access->managed_network_capability)) + " " +
+             std::to_string(access->managed_network_start_failed ? 1 : 0);
     }
 
     if (fields[0] == "access-point" && fields.size() == 2)

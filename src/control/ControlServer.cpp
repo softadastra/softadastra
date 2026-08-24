@@ -110,7 +110,7 @@ namespace softadastra
   }
 
   std::optional<LocalAccess> ControlServer::local_access(
-      const SoftwareId &id) const noexcept
+      const SoftwareId &id) noexcept
   {
     return host_service_.local_access(id);
   }

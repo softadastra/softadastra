@@ -146,8 +146,12 @@ namespace softadastra
      *
      * @return No value when the Software has no AccessPoint or is unknown.
      */
+    /**
+     * @brief Resolves local access, starting the managed network only as a
+     * safe fallback for a running Software with an AccessPoint.
+     */
     [[nodiscard]] std::optional<LocalAccess> local_access(
-        const SoftwareId &id) const noexcept;
+        const SoftwareId &id) noexcept;
 
     /**
      * @brief Returns the Host's detailed, read-only network capability.

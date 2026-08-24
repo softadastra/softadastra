@@ -117,7 +117,7 @@ namespace softadastra
     [[nodiscard]] std::optional<LocalHostAccess> local_access() const noexcept;
 
     [[nodiscard]] std::optional<LocalAccess> local_access(
-        const SoftwareId &id) const noexcept;
+        const SoftwareId &id) noexcept;
 
     /**
      * @brief Returns detailed Host network capability when the endpoint responds.

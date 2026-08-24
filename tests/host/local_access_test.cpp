@@ -27,6 +27,14 @@ namespace
             std::move(ipv4), "Softadastra-test"};
   }
 
+  softadastra::NetworkCapability no_local_network()
+  {
+    return {softadastra::NetworkState::Unavailable, {}, {},
+            softadastra::NetworkInterfaceType::Unknown,
+            softadastra::LocalNetworkState::Unavailable,
+            softadastra::ManagedNetworkCapability::Available};
+  }
+
   TEST(LocalAccessTest, ResolvesHttpFromCurrentPrimaryIpv4WhenManagedNetworkIsStopped)
   {
     const auto point = softadastra::AccessPoint::create(
@@ -43,7 +51,7 @@ namespace
     EXPECT_EQ(access.network, softadastra::LocalAccessNetwork::Existing);
   }
 
-  TEST(LocalAccessTest, PrefersRunningManagedNetworkIpv4)
+  TEST(LocalAccessTest, PrefersExistingNetworkOverRunningManagedNetwork)
   {
     const auto point = softadastra::AccessPoint::create(
         softadastra::AccessProtocol::Http, 8080);
@@ -55,9 +63,9 @@ namespace
         true);
 
     EXPECT_EQ(access.state, softadastra::LocalAccessState::Available);
-    EXPECT_EQ(access.network, softadastra::LocalAccessNetwork::Managed);
-    EXPECT_EQ(access.ipv4, "10.42.0.1");
-    EXPECT_EQ(access.url, "http://10.42.0.1:8080");
+    EXPECT_EQ(access.network, softadastra::LocalAccessNetwork::Existing);
+    EXPECT_EQ(access.ipv4, "192.168.1.20");
+    EXPECT_EQ(access.url, "http://192.168.1.20:8080");
   }
 
   TEST(LocalAccessTest, UsesResolvedUrlForQrCode)
@@ -72,7 +80,7 @@ namespace
         true);
 
     EXPECT_EQ(softadastra::QrCode::render(access.url),
-              softadastra::QrCode::render("http://10.42.0.1:8080"));
+              softadastra::QrCode::render("http://192.168.1.20:8080"));
   }
 
   TEST(LocalAccessTest, UsesNewIpv4ForEachResolution)
@@ -99,11 +107,11 @@ namespace
     ASSERT_TRUE(point.has_value());
 
     const auto first = softadastra::resolve_local_access(
-        point.value(), existing_network("192.168.1.20"),
+        point.value(), no_local_network(),
         managed_network(softadastra::ManagedNetworkState::Running, "10.42.0.1"),
         true);
     const auto second = softadastra::resolve_local_access(
-        point.value(), existing_network("192.168.1.20"),
+        point.value(), no_local_network(),
         managed_network(softadastra::ManagedNetworkState::Running, "10.43.0.1"),
         true);
 

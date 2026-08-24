@@ -151,7 +151,7 @@ namespace softadastra
   }
 
   std::optional<LocalAccess> HostService::local_access(
-      const SoftwareId &id) const noexcept
+      const SoftwareId &id) noexcept
   {
     const auto entry = software(id);
     if (!entry.has_value() || !entry->access_point().has_value())
@@ -159,11 +159,38 @@ namespace softadastra
       return std::nullopt;
     }
 
-    return resolve_local_access(
+    auto access = resolve_local_access(
         entry->access_point().value(),
         network_capability(),
         managed_network_status(),
         entry->state() == SoftwareState::Running);
+
+    // `access` may change networking only here: a real, running AccessPoint
+    // has no usable local network and ManagedNetwork has conservatively
+    // declared itself available.  Existing networks and running managed
+    // networks are always used as-is.
+    if (access.state == LocalAccessState::Available ||
+        entry->state() != SoftwareState::Running)
+    {
+      return access;
+    }
+
+    const auto managed = managed_network_status();
+    if (managed.capability != ManagedNetworkCapability::Available ||
+        managed.state != ManagedNetworkState::Stopped)
+    {
+      return access;
+    }
+
+    static_cast<void>(start_managed_network());
+    access = resolve_local_access(
+        entry->access_point().value(), network_capability(),
+        managed_network_status(), true);
+    if (access.state != LocalAccessState::Available)
+    {
+      access.managed_network_start_failed = true;
+    }
+    return access;
   }
 
   NetworkCapability HostService::network_capability() const
