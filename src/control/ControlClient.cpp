@@ -130,20 +130,23 @@ namespace softadastra
     const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
     if (fields.size() < 2 || fields[0] != "software-list") return {};
     const auto count = LocalControlProtocol::integer(fields[1]);
-    if (!count || count.value() < 0 || fields.size() != 2 + static_cast<std::size_t>(count.value()) * 7) return {};
+    if (!count || count.value() < 0 || fields.size() != 2 + static_cast<std::size_t>(count.value()) * 9) return {};
     std::vector<SoftwareEntry> entries;
     for (std::size_t index = 0; index < static_cast<std::size_t>(count.value()); ++index)
     {
-      const auto base = 2 + index * 7;
+      const auto base = 2 + index * 9;
       const auto id = LocalControlProtocol::decode(fields[base]);
       const auto executable = LocalControlProtocol::decode(fields[base + 2]);
       const auto root = LocalControlProtocol::decode(fields[base + 3]);
       const auto identity = LocalControlProtocol::decode(fields[base + 4]);
-      const auto protocol = fields[base + 5] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[base + 5]);
-      const auto port = LocalControlProtocol::integer(fields[base + 6]);
-      if (!id || !executable || !root || !identity || !port || port.value() < 0 || port.value() > 65535 || (fields[base + 5] != "-" && !protocol)) return {};
+      const auto declared = LocalControlProtocol::decode(fields[base + 5]);
+      const auto pid = LocalControlProtocol::integer(fields[base + 6]);
+      const auto protocol = fields[base + 7] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[base + 7]);
+      const auto port = LocalControlProtocol::integer(fields[base + 8]);
+      if (!id || !executable || !root || !identity || !declared || !pid || !port || port.value() < 0 || port.value() > 65535 || (fields[base + 7] != "-" && !protocol)) return {};
       const auto access = protocol ? AccessPoint::create(*protocol, static_cast<std::uint16_t>(*port)) : std::nullopt;
-      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, {}, root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), access);
+      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, {}, root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), access, *declared);
+      if (*pid >= 0) entries.back().set_pid(*pid);
       entries.back().set_state(static_cast<SoftwareState>(std::stoi(fields[base + 1])));
     }
     return entries;

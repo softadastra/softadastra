@@ -47,6 +47,9 @@ namespace softadastra
      *         while the process is still running.
      */
     [[nodiscard]] virtual std::optional<int> exit_code() noexcept = 0;
+
+    /** Returns the principal process identifier when the platform exposes it. */
+    [[nodiscard]] virtual std::optional<long> pid() const noexcept { return std::nullopt; }
   };
 
 } // namespace softadastra

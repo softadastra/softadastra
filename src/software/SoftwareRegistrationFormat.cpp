@@ -24,6 +24,7 @@ namespace softadastra
     constexpr const char *header_v2 = "softadastra-registrations 2\n";
     constexpr const char *header_v3 = "softadastra-registrations 3\n";
     constexpr const char *header_v4 = "softadastra-registrations 4\n";
+    constexpr const char *header_v5 = "softadastra-registrations 5\n";
 
     void append_string(std::string &output, const std::string &value)
     {
@@ -109,7 +110,7 @@ namespace softadastra
   std::string SoftwareRegistrationFormat::serialize(
       const std::vector<SoftwareEntry> &entries)
   {
-    std::string output(header_v4);
+    std::string output(header_v5);
     output += std::to_string(entries.size());
     output += '\n';
 
@@ -138,6 +139,7 @@ namespace softadastra
       {
         append_string(output, argument);
       }
+      append_string(output, entry.declared_command());
     }
 
     return output;
@@ -146,16 +148,17 @@ namespace softadastra
   std::optional<std::vector<SoftwareEntry>>
   SoftwareRegistrationFormat::deserialize(const std::string &text)
   {
+    const bool version_five = text.starts_with(header_v5);
     const bool version_four = text.starts_with(header_v4);
     const bool version_three = text.starts_with(header_v3);
     const bool version_two = text.starts_with(header_v2);
-    if (!version_four && !version_three && !version_two && !text.starts_with(header_v1))
+    if (!version_five && !version_four && !version_three && !version_two && !text.starts_with(header_v1))
     {
       return std::nullopt;
     }
 
     std::size_t offset = std::char_traits<char>::length(
-        version_four ? header_v4 : (version_three ? header_v3 : (version_two ? header_v2 : header_v1)));
+        version_five ? header_v5 : (version_four ? header_v4 : (version_three ? header_v3 : (version_two ? header_v2 : header_v1))));
     const auto count = read_count(text, offset);
 
     if (!count.has_value())
@@ -175,7 +178,7 @@ namespace softadastra
     {
       const auto id = read_string(text, offset);
       std::optional<ProjectIdentity> project_identity;
-      if (version_four)
+      if (version_four || version_five)
       {
         const auto configured = read_count(text, offset);
         if (!configured.has_value() || configured.value() > 1) return std::nullopt;
@@ -188,7 +191,7 @@ namespace softadastra
       }
       const auto executable = read_string(text, offset);
       std::optional<std::string> working_directory;
-      if (version_three || version_four)
+      if (version_three || version_four || version_five)
       {
         const auto configured = read_count(text, offset);
         if (!configured.has_value() || configured.value() > 1)
@@ -202,7 +205,7 @@ namespace softadastra
       }
       std::optional<AccessPoint> access_point;
 
-      if (version_two || version_three || version_four)
+      if (version_two || version_three || version_four || version_five)
       {
         const auto configured = read_count(text, offset);
         if (!configured.has_value() || configured.value() > 1)
@@ -250,12 +253,19 @@ namespace softadastra
 
         arguments.push_back(value.value());
       }
+      std::string declared;
+      if (version_five)
+      {
+        const auto value = read_string(text, offset);
+        if (!value.has_value()) return std::nullopt;
+        declared = value.value();
+      }
 
       entries.emplace_back(
           SoftwareId(id.value()),
           ProcessSpec(executable.value(), std::move(arguments), working_directory),
           std::move(project_identity),
-          access_point);
+          access_point, std::move(declared));
 
       for (std::size_t previous = 0; previous + 1 < entries.size(); ++previous)
       {

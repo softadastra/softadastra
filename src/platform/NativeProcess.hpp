@@ -18,6 +18,9 @@
 #include "platform/Process.hpp"
 
 #include <optional>
+#if defined(__linux__)
+#include <sys/types.h>
+#endif
 #include <vix/process/Child.hpp>
 
 namespace softadastra
@@ -35,6 +38,9 @@ namespace softadastra
      * @brief Creates a native process from a Vix child handle.
      */
     explicit NativeProcess(vix::process::Child child) noexcept;
+#if defined(__linux__)
+    explicit NativeProcess(pid_t pid) noexcept;
+#endif
 
     /**
      * @brief Requests graceful termination of the process.
@@ -55,9 +61,11 @@ namespace softadastra
      * @brief Returns the native process identifier.
      */
     [[nodiscard]] Id id() const noexcept;
+    [[nodiscard]] std::optional<long> pid() const noexcept override;
 
   private:
     vix::process::Child child_;
+    long native_pid_{-1};
     std::optional<int> exit_code_;
   };
 

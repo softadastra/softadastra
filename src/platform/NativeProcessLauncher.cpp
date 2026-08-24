@@ -30,6 +30,11 @@
 
 #include <pthread.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <cerrno>
+#include <cstring>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #endif
 
@@ -97,6 +102,25 @@ namespace softadastra
     {
       return ProcessLaunchError::ExecutableNotFound;
     }
+
+#if defined(__linux__)
+    if (spec.output_file().has_value())
+    {
+      const pid_t pid = ::fork();
+      if (pid < 0) return ProcessLaunchError::LaunchFailed;
+      if (pid == 0)
+      {
+        ::setsid();
+        const int log = ::open(spec.output_file()->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (log < 0) _exit(126);
+        ::dup2(log, STDOUT_FILENO); ::dup2(log, STDERR_FILENO); if (log > STDERR_FILENO) ::close(log);
+        if (spec.working_directory().has_value() && ::chdir(spec.working_directory()->c_str()) != 0) { ::dprintf(STDERR_FILENO, "softadastra: cannot use working directory: %s\n", std::strerror(errno)); _exit(126); }
+        std::vector<char *> args; args.push_back(const_cast<char *>(spec.executable().c_str())); for (const auto &argument : spec.arguments()) args.push_back(const_cast<char *>(argument.c_str())); args.push_back(nullptr);
+        ::execvp(args[0], args.data()); ::dprintf(STDERR_FILENO, "softadastra: cannot start command: %s\n", std::strerror(errno)); _exit(127);
+      }
+      return std::make_unique<NativeProcess>(pid);
+    }
+#endif
 
     vix::process::Command command(spec.executable());
 

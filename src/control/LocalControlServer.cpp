@@ -290,6 +290,8 @@ namespace softadastra
                     " " + LocalControlProtocol::encode(entry.process_spec().executable()) +
                     " " + LocalControlProtocol::encode(entry.process_spec().working_directory().value_or("")) +
                     " " + LocalControlProtocol::encode(entry.project_identity().has_value() ? entry.project_identity()->value() : "") +
+                    " " + LocalControlProtocol::encode(entry.declared_command()) +
+                    " " + std::to_string(entry.pid().value_or(-1)) +
                     " " + (access ? std::string(AccessPoint::name(access->protocol())) : "-") +
                     " " + std::to_string(access ? access->port() : 0);
       }

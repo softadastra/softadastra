@@ -41,6 +41,7 @@
 #if defined(__linux__)
 
 #include <csignal>
+#include <fcntl.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -178,6 +179,14 @@ namespace
     if (child == 0)
     {
       static_cast<void>(::setsid());
+      const int null = ::open("/dev/null", O_RDWR);
+      if (null >= 0)
+      {
+        static_cast<void>(::dup2(null, STDIN_FILENO));
+        static_cast<void>(::dup2(null, STDOUT_FILENO));
+        static_cast<void>(::dup2(null, STDERR_FILENO));
+        if (null > STDERR_FILENO) ::close(null);
+      }
       ::execl(host_executable, host_executable, "host", nullptr);
       ::_exit(127);
     }

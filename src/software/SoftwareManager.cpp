@@ -15,14 +15,23 @@
 #include "software/SoftwareManager.hpp"
 
 #include "software/SoftwareEntry.hpp"
+#include "platform/NativeDataDirectory.hpp"
 
 #include <algorithm>
+#include <filesystem>
+#include <chrono>
+#include <thread>
 #include <utility>
 
 namespace softadastra
 {
   namespace
   {
+    std::string declared_command(const ProcessSpec &spec)
+    {
+      if (spec.executable() == "/bin/sh" && spec.arguments().size() == 2 && spec.arguments()[0] == "-lc") return spec.arguments()[1];
+      std::string command = spec.executable(); for (const auto &argument : spec.arguments()) command += " " + argument; return command;
+    }
     SoftwareOperationError software_error(
         ProcessLaunchError error) noexcept
     {
@@ -56,12 +65,13 @@ namespace softadastra
       std::optional<AccessPoint> access_point,
       std::optional<ProjectIdentity> project_identity)
   {
+    const auto command = declared_command(process_spec);
     return state_.add_software(
         SoftwareEntry(
             std::move(id),
             std::move(process_spec),
             std::move(project_identity),
-            access_point));
+            access_point, command));
   }
 
   std::optional<SoftwareEntry> SoftwareManager::software_by_project_identity(
@@ -92,9 +102,14 @@ namespace softadastra
                          entry->process_spec().arguments() != process_spec.arguments() ||
                          entry->process_spec().working_directory() != process_spec.working_directory() ||
                          access_changed;
-    if (!changed) return false;
+    if (!changed)
+    {
+      if (entry->declared_command().empty()) entry->set_declared_command(declared_command(process_spec));
+      return false;
+    }
     if (entry->state() == SoftwareState::Running) static_cast<void>(stop(id));
     entry->set_process_spec(std::move(process_spec));
+    entry->set_declared_command(declared_command(entry->process_spec()));
     entry->set_access_point(access_point);
     return true;
   }
@@ -142,8 +157,11 @@ namespace softadastra
     entry->set_state(SoftwareState::Starting);
     entry->clear_result();
 
-    ProcessLaunchResult launch =
-        process_launcher_.launch(entry->process_spec());
+    const auto log = NativeDataDirectory::path() / "logs" / (entry->id().value() + ".log");
+    std::error_code log_error;
+    std::filesystem::create_directories(log.parent_path(), log_error);
+    ProcessSpec launch_spec(entry->process_spec().executable(), entry->process_spec().arguments(), entry->process_spec().working_directory(), log.string());
+    ProcessLaunchResult launch = process_launcher_.launch(launch_spec);
 
     if (!launch)
     {
@@ -151,11 +169,14 @@ namespace softadastra
           software_error(launch.error().value()));
 
       entry->set_state(SoftwareState::Failed);
+      entry->set_pid(std::nullopt);
       entry->set_result(result);
       return result;
     }
 
     std::unique_ptr<Process> process = std::move(launch).take_process();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     if (!process->is_running())
     {
@@ -173,6 +194,7 @@ namespace softadastra
           code.has_value() && code.value() == 0
               ? SoftwareState::Stopped
               : SoftwareState::Failed);
+      entry->set_pid(std::nullopt);
       entry->set_result(result);
 
       return result;
@@ -184,6 +206,7 @@ namespace softadastra
             std::move(process)});
 
     entry->set_state(SoftwareState::Running);
+    entry->set_pid(processes_.back().process->pid());
 
     return {};
   }
@@ -224,6 +247,7 @@ namespace softadastra
         processes_.end());
 
     entry->set_state(SoftwareState::Stopped);
+    entry->set_pid(std::nullopt);
     entry->clear_result();
 
     return {};
@@ -262,6 +286,7 @@ namespace softadastra
           processes_.end());
 
       entry->set_state(SoftwareState::Stopped);
+      entry->set_pid(std::nullopt);
       entry->clear_result();
     }
 
@@ -294,6 +319,7 @@ namespace softadastra
       if (entry != nullptr)
       {
         entry->set_state(SoftwareState::Stopped);
+        entry->set_pid(std::nullopt);
         entry->clear_result();
       }
 
@@ -320,6 +346,7 @@ namespace softadastra
 
       if (entry != nullptr)
       {
+        entry->set_pid(std::nullopt);
         const auto code =
             current->process->exit_code();
 

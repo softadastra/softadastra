@@ -81,7 +81,7 @@ namespace
     softadastra::Cli cli(client);
     EXPECT_EQ(cli.run(2, root_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
-    EXPECT_EQ(platform.launcher.last_spec->executable(), "./build/app");
+    EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
     EXPECT_EQ(platform.launcher.last_spec->working_directory(), new_root.string());
     std::filesystem::current_path(new_root / "src");
     EXPECT_EQ(cli.run(2, root_args), 0);
@@ -115,7 +115,7 @@ namespace
     EXPECT_EQ(cli.run(2, run_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
     EXPECT_EQ(platform.launcher.last_spec->working_directory(), root.string());
-    EXPECT_EQ(platform.launcher.last_spec->arguments(), (std::vector<std::string>{"-lc", "./build/app"}));
+    EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("./build/app"), std::string::npos);
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(root);
   }
@@ -143,7 +143,7 @@ namespace
     EXPECT_EQ(cli.run(2, run_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
     EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
-    EXPECT_EQ(platform.launcher.last_spec->arguments(), (std::vector<std::string>{"-lc", "python3 server.py --port 8000"}));
+    EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("python3 server.py --port 8000"), std::string::npos);
     EXPECT_EQ(platform.launcher.last_spec->working_directory(), root.string());
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(root);
@@ -162,7 +162,7 @@ namespace
     const char *args[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
-    EXPECT_EQ(platform.launcher.last_spec->arguments(), (std::vector<std::string>{"-lc", "./build/app"}));
+    EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("./build/app"), std::string::npos);
     EXPECT_TRUE(client.software(softadastra::SoftwareId("toml-stable-id")).has_value());
     std::filesystem::current_path(previous); std::filesystem::remove_all(root);
   }

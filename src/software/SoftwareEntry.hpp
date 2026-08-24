@@ -47,10 +47,11 @@ namespace softadastra
      */
     SoftwareEntry(SoftwareId id, ProcessSpec process_spec,
                   std::optional<ProjectIdentity> project_identity = std::nullopt,
-                  std::optional<AccessPoint> access_point = std::nullopt)
+                  std::optional<AccessPoint> access_point = std::nullopt,
+                  std::string declared_command = {})
         : id_(std::move(id)),
           process_spec_(std::move(process_spec)), project_identity_(std::move(project_identity)),
-          access_point_(access_point)
+          access_point_(access_point), declared_command_(std::move(declared_command))
     {
     }
 
@@ -83,6 +84,10 @@ namespace softadastra
     { project_identity_ = std::move(identity); }
 
     void set_process_spec(ProcessSpec process_spec) { process_spec_ = std::move(process_spec); }
+    [[nodiscard]] const std::string &declared_command() const noexcept { return declared_command_; }
+    void set_declared_command(std::string command) { declared_command_ = std::move(command); }
+    [[nodiscard]] std::optional<long> pid() const noexcept { return pid_; }
+    void set_pid(std::optional<long> pid) noexcept { pid_ = pid; }
     void set_access_point(std::optional<AccessPoint> access_point) { access_point_ = access_point; }
 
     [[nodiscard]] std::optional<AccessPoint> access_point() const noexcept
@@ -137,6 +142,8 @@ namespace softadastra
     ProcessSpec process_spec_;
     std::optional<ProjectIdentity> project_identity_;
     std::optional<AccessPoint> access_point_;
+    std::string declared_command_;
+    std::optional<long> pid_;
     SoftwareState state_{SoftwareState::Stopped};
     std::optional<SoftwareOperationResult> result_;
   };
