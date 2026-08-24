@@ -14,16 +14,20 @@
 
 #include "host/Host.hpp"
 #include "host/HostLoop.hpp"
+#include "host/HostProfile.hpp"
 #include "host/HostStateFile.hpp"
+#include "platform/ManagedNetwork.hpp"
 #include "platform/NativePlatform.hpp"
 #include "platform/Process.hpp"
 #include "platform/ProcessLauncher.hpp"
+#include "platform/Service.hpp"
 
 #include <gtest/gtest.h>
 
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -147,6 +151,70 @@ namespace
     std::vector<std::shared_ptr<ShutdownProcessState>> states_;
   };
 
+  class TestNetwork final : public softadastra::Network
+  {
+  public:
+    [[nodiscard]] bool is_available() const noexcept override { return false; }
+    [[nodiscard]] bool is_connected() const noexcept override { return false; }
+  };
+
+  class TestService final : public softadastra::Service
+  {
+  public:
+    bool start() override { return true; }
+    bool stop() override { return true; }
+    [[nodiscard]] bool is_running() const noexcept override { return true; }
+  };
+
+  class TestManagedNetwork final : public softadastra::ManagedNetwork
+  {
+  public:
+    [[nodiscard]] softadastra::ManagedNetworkStatus status() const override
+    {
+      return current;
+    }
+    [[nodiscard]] softadastra::ManagedNetworkStartResult start() override
+    {
+      ++start_calls;
+      if (start_result == softadastra::ManagedNetworkStartResult::Started)
+      {
+        current.state = softadastra::ManagedNetworkState::Running;
+      }
+      return start_result;
+    }
+    bool stop() override
+    {
+      current.state = softadastra::ManagedNetworkState::Stopped;
+      return true;
+    }
+
+    softadastra::ManagedNetworkStatus current{
+        softadastra::ManagedNetworkCapability::Available,
+        softadastra::ManagedNetworkState::Stopped, "wlan1", "10.42.0.1", "test"};
+    softadastra::ManagedNetworkStartResult start_result{
+        softadastra::ManagedNetworkStartResult::Started};
+    int start_calls{0};
+  };
+
+  class TestPlatform final : public softadastra::Platform
+  {
+  public:
+    [[nodiscard]] softadastra::ProcessLauncher &process_launcher() noexcept override { return launcher_; }
+    [[nodiscard]] const softadastra::ProcessLauncher &process_launcher() const noexcept override { return launcher_; }
+    [[nodiscard]] softadastra::Service &service() noexcept override { return service_; }
+    [[nodiscard]] const softadastra::Service &service() const noexcept override { return service_; }
+    [[nodiscard]] softadastra::Network &network() noexcept override { return network_; }
+    [[nodiscard]] const softadastra::Network &network() const noexcept override { return network_; }
+    [[nodiscard]] softadastra::ManagedNetwork &managed_network() noexcept override { return managed_; }
+    [[nodiscard]] const softadastra::ManagedNetwork &managed_network() const noexcept override { return managed_; }
+
+    std::atomic_size_t refresh_count{0};
+    CountingProcessLauncher launcher_{refresh_count};
+    TestService service_;
+    TestNetwork network_;
+    TestManagedNetwork managed_;
+  };
+
   template <typename Predicate>
   bool wait_until(Predicate predicate)
   {
@@ -161,6 +229,95 @@ namespace
     }
 
     return predicate();
+  }
+
+  void run_until_started(softadastra::HostLoop &loop, std::function<void()> check)
+  {
+    std::atomic_bool completed{false};
+    std::thread thread([&loop, &completed]() { completed = loop.run(); });
+    EXPECT_TRUE(wait_until([&loop]() { return loop.is_running(); }));
+    check();
+    loop.request_stop();
+    thread.join();
+    EXPECT_TRUE(completed);
+  }
+
+  TEST(HostLoopTest, StandardProfileNeverStartsManagedNetwork)
+  {
+    const auto directory = std::filesystem::temp_directory_path() / "softadastra-standard-profile";
+    std::filesystem::remove_all(directory);
+    TestPlatform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::HostStateFile state_file(directory / "host-state");
+    softadastra::HostProfileStore profile(directory / "host-profile");
+    ASSERT_TRUE(profile.load("host"));
+    softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
+    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 0); });
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(HostLoopTest, BoxStartsAvailableStoppedManagedNetwork)
+  {
+    const auto directory = std::filesystem::temp_directory_path() / "softadastra-box-start";
+    std::filesystem::remove_all(directory);
+    TestPlatform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::HostStateFile state_file(directory / "host-state");
+    softadastra::HostProfileStore profile(directory / "host-profile");
+    ASSERT_TRUE(profile.provision_box("host"));
+    softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
+    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 1); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Running); });
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(HostLoopTest, BoxDoesNotStartAnAlreadyRunningManagedNetwork)
+  {
+    const auto directory = std::filesystem::temp_directory_path() / "softadastra-box-running";
+    std::filesystem::remove_all(directory);
+    TestPlatform platform;
+    platform.managed_.current.state = softadastra::ManagedNetworkState::Running;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::HostStateFile state_file(directory / "host-state");
+    softadastra::HostProfileStore profile(directory / "host-profile");
+    ASSERT_TRUE(profile.provision_box("host"));
+    softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
+    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 0); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Running); });
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(HostLoopTest, BoxRemainsRunningWhenManagedNetworkIsUnavailable)
+  {
+    const auto directory = std::filesystem::temp_directory_path() / "softadastra-box-unavailable";
+    std::filesystem::remove_all(directory);
+    TestPlatform platform;
+    platform.managed_.current.capability = softadastra::ManagedNetworkCapability::Unavailable;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::HostStateFile state_file(directory / "host-state");
+    softadastra::HostProfileStore profile(directory / "host-profile");
+    ASSERT_TRUE(profile.provision_box("host"));
+    softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
+    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 0); EXPECT_EQ(platform.managed_.status().capability, softadastra::ManagedNetworkCapability::Unavailable); });
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(HostLoopTest, BoxRemainsRunningWhenManagedNetworkStartFails)
+  {
+    const auto directory = std::filesystem::temp_directory_path() / "softadastra-box-failure";
+    std::filesystem::remove_all(directory);
+    TestPlatform platform;
+    platform.managed_.start_result = softadastra::ManagedNetworkStartResult::Failed;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::HostStateFile state_file(directory / "host-state");
+    softadastra::HostProfileStore profile(directory / "host-profile");
+    ASSERT_TRUE(profile.provision_box("host"));
+    softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
+    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 1); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Stopped); });
+    std::filesystem::remove_all(directory);
   }
 
   TEST(HostLoopTest, RunsUntilAnInternalStopRequest)

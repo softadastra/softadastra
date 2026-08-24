@@ -20,6 +20,7 @@
 #include "control/RemoteControlServer.hpp"
 #include "host/Host.hpp"
 #include "host/HostIdentity.hpp"
+#include "host/HostProfile.hpp"
 #include "host/HostLoop.hpp"
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
@@ -247,6 +248,12 @@ int main(int argc, char *argv[])
       std::cerr << "failed to load Host identity\n";
       return 1;
     }
+    softadastra::HostProfileStore profile_store(data_directory / "host-profile");
+    if (!profile_store.load(identity.id()))
+    {
+      std::cerr << "failed to load Host profile\n";
+      return 1;
+    }
 
     softadastra::NativePlatform platform;
     softadastra::Host host(platform);
@@ -280,7 +287,8 @@ int main(int argc, char *argv[])
         host_service,
         state_file,
         std::chrono::seconds(1),
-        &local_control_server);
+        &local_control_server,
+        &profile_store);
     local_control_server.set_shutdown_handler([&host_loop]() { host_loop.request_stop(); });
     softadastra::MdnsPublisher mdns_publisher(identity.id());
     return run_host(
@@ -293,12 +301,95 @@ int main(int argc, char *argv[])
   softadastra::ControlClient control_client(
       softadastra::NativeDataDirectory::path() / "control.sock");
 
+  if (argc >= 2 && std::string(argv[1]) == "box")
+  {
+    const auto data_directory = softadastra::NativeDataDirectory::path();
+    if (!softadastra::NativeDataDirectory::ensure_exists())
+    {
+      std::cerr << "failed to initialize Host data directory\n";
+      return 1;
+    }
+    softadastra::HostIdentity identity(data_directory / "identity");
+    if (!identity.load_or_create())
+    {
+      std::cerr << "failed to load Host identity\n";
+      return 1;
+    }
+    softadastra::HostProfileStore profile_store(data_directory / "host-profile");
+    if (!profile_store.load(identity.id()))
+    {
+      std::cerr << "failed to load Host profile\n";
+      return 1;
+    }
+    const std::string action = argc >= 3 ? argv[2] : "";
+    if (action == "provision" && argc == 3)
+    {
+      if (!profile_store.provision_box(identity.id()))
+      {
+        std::cerr << "failed to provision Softadastra Box\n";
+        return 1;
+      }
+      std::cout << "Softadastra Box provisioned.\nHost ID: " << identity.id() << '\n';
+      return 0;
+    }
+    if (action == "unprovision" && argc == 3)
+    {
+      if (!profile_store.unprovision())
+      {
+        std::cerr << "failed to unprovision Softadastra Box\n";
+        return 1;
+      }
+      std::cout << "Softadastra Box unprovisioned.\n";
+      return 0;
+    }
+    if (action == "status" && argc == 3)
+    {
+      const bool running = control_client.host_available();
+      const auto network = running
+                               ? control_client.managed_network_status().value_or(softadastra::ManagedNetworkStatus{})
+                               : softadastra::ManagedNetworkStatus{};
+      const auto state = softadastra::box_state(profile_store.profile(), running, network);
+      if (state == softadastra::BoxState::NotProvisioned)
+      {
+        std::cout << "Not provisioned\n";
+        return 0;
+      }
+      std::cout << "Box:              provisioned\nHost:             "
+                << (running ? "running" : "stopped") << '\n';
+      if (state == softadastra::BoxState::Stopped)
+      {
+        std::cout << "State:            stopped\n";
+        return 0;
+      }
+      if (network.capability == softadastra::ManagedNetworkCapability::Unavailable)
+      {
+        std::cout << "Managed network:  unavailable\nState:            degraded\nReason:           managed network unavailable\n";
+        return 0;
+      }
+      if (state == softadastra::BoxState::Ready)
+      {
+        std::cout << "Managed network:  running\nLocal IPv4:       " << network.ipv4 << "\nState:            ready\n";
+        return 0;
+      }
+      std::cout << "Managed network:  "
+                << softadastra::managed_network_state_name(network.state)
+                << "\nState:            degraded\nReason:           "
+                << (network.state == softadastra::ManagedNetworkState::Running
+                        ? "managed network has no local IPv4"
+                        : "managed network is not running")
+                << '\n';
+      return 0;
+    }
+    std::cerr << "Usage:\n  softadastra box provision\n  softadastra box status\n  softadastra box unprovision\n";
+    return 2;
+  }
+
   if (argc >= 3 && std::string(argv[1]) == "host")
   {
     const std::string action(argv[2]);
     if (action == "-h" || action == "--help") { std::cout << "Usage:\n  softadastra host\n  softadastra host start|stop|restart|status|info\n"; return 0; }
     if (action == "status") { const bool responding=control_client.host_available(); const bool held=softadastra::HostInstanceLock::is_held(softadastra::NativeDataDirectory::path()); std::cout << "Host: " << (responding ? "running" : (held ? "stopping" : "stopped")) << '\n'; return 0; }
-    if (action == "info") { if (!control_client.host_available()) { std::cout << "State: stopped\n"; return 0; } const auto access = control_client.local_access(); softadastra::HostIdentity identity(softadastra::NativeDataDirectory::path()/"identity"); static_cast<void>(identity.load_or_create()); softadastra::MdnsPublisher local_name(identity.id()); softadastra::RemoteAccessConfig remote(softadastra::NativeDataDirectory::path()/"remote-access"); softadastra::RemoteAccessSettings remote_settings; static_cast<void>(remote.load(remote_settings)); const auto pid=control_client.request("host-pid"); const auto entries=control_client.software(); std::size_t running=0, stopped=0, failed=0; for(const auto &entry:entries) { if(entry.state()==softadastra::SoftwareState::Running) ++running; else if(entry.state()==softadastra::SoftwareState::Stopped) ++stopped; else if(entry.state()==softadastra::SoftwareState::Failed) ++failed; } std::cout << "State:          running\nHostname:       " << (access ? access->host_name : "-") << "\nHost ID:        " << identity.id() << "\nPID:            " << (pid ? pid->substr(9) : "-") << "\nIPv4:           " << (access && !access->primary_ipv4.empty() ? access->primary_ipv4 : "-") << "\nLocal name:     " << (identity.id().empty() ? "-" : local_name.name()) << "\nConnectivity:   " << (control_client.connectivity_available()?"available":"unavailable") << "\nRemote access:  " << (remote_settings.enabled?"enabled":"disabled") << "\n\nSoftware:\n  total:    " << entries.size() << "\n  running:  " << running << "\n  stopped:  " << stopped << "\n  failed:   " << failed << '\n'; return 0; }
+    if (action == "info") { softadastra::HostIdentity identity(softadastra::NativeDataDirectory::path()/"identity"); static_cast<void>(identity.load_or_create()); softadastra::HostProfileStore profile_store(softadastra::NativeDataDirectory::path()/"host-profile"); static_cast<void>(profile_store.load(identity.id())); if (!control_client.host_available()) { std::cout << "State:          stopped\nProfile:        " << softadastra::host_profile_name(profile_store.profile()) << '\n'; return 0; } const auto access = control_client.local_access(); softadastra::MdnsPublisher local_name(identity.id()); softadastra::RemoteAccessConfig remote(softadastra::NativeDataDirectory::path()/"remote-access"); softadastra::RemoteAccessSettings remote_settings; static_cast<void>(remote.load(remote_settings)); const auto pid=control_client.request("host-pid"); const auto entries=control_client.software(); std::size_t running=0, stopped=0, failed=0; for(const auto &entry:entries) { if(entry.state()==softadastra::SoftwareState::Running) ++running; else if(entry.state()==softadastra::SoftwareState::Stopped) ++stopped; else if(entry.state()==softadastra::SoftwareState::Failed) ++failed; } std::cout << "State:          running\nProfile:        " << softadastra::host_profile_name(profile_store.profile()) << "\nHostname:       " << (access ? access->host_name : "-") << "\nHost ID:        " << identity.id() << "\nPID:            " << (pid ? pid->substr(9) : "-") << "\nIPv4:           " << (access && !access->primary_ipv4.empty() ? access->primary_ipv4 : "-") << "\nLocal name:     " << (identity.id().empty() ? "-" : local_name.name()) << "\nConnectivity:   " << (control_client.connectivity_available()?"available":"unavailable") << "\nRemote access:  " << (remote_settings.enabled?"enabled":"disabled") << "\n\nSoftware:\n  total:    " << entries.size() << "\n  running:  " << running << "\n  stopped:  " << stopped << "\n  failed:   " << failed << '\n'; return 0; }
     if (action == "stop") { if (!control_client.host_available()) { std::cout << "Softadastra Host is not running.\n"; return 0; } if (!control_client.request("shutdown")) { std::cerr << "Failed to stop Softadastra Host.\n"; return 1; } std::cout << "Stopping Softadastra Host...\n"; for (int i=0;i<250 && softadastra::HostInstanceLock::is_held(softadastra::NativeDataDirectory::path());++i) std::this_thread::sleep_for(std::chrono::milliseconds(20)); if (softadastra::HostInstanceLock::is_held(softadastra::NativeDataDirectory::path())) { std::cerr << "Softadastra Host did not stop.\n"; return 1; } std::cout << "Softadastra Host stopped.\n"; return 0; }
     if (action == "start" || action == "restart") { const bool was_running=control_client.host_available(); if (action == "restart" && was_running) { static_cast<void>(control_client.request("shutdown")); for (int i=0;i<100 && control_client.host_available();++i) std::this_thread::sleep_for(std::chrono::milliseconds(20)); } if (!control_client.host_available()) { if (!start_host_automatically(argv[0])) return 1; for (int i=0;i<100 && !control_client.host_available();++i) std::this_thread::sleep_for(std::chrono::milliseconds(20)); } std::cout << (action == "restart" ? "Softadastra Host restarted.\n" : (was_running ? "Softadastra Host is already running.\n" : "Softadastra Host started.\n")); return 0; }
     std::cerr << "Unknown host action: " << action << "\n\nUsage:\n  softadastra host\n  softadastra host start\n  softadastra host stop\n  softadastra host restart\n  softadastra host status\n  softadastra host info\n";
@@ -315,6 +406,7 @@ int main(int argc, char *argv[])
   const bool needs_host = cli_command != "" && cli_command != "host" &&
                           cli_command != "help" && cli_command != "-h" &&
                           cli_command != "--help" &&
+                          cli_command != "box" &&
                           cli_command != "network" &&
                           (cli_command != "init" || legacy_migration) &&
                           !command_help;

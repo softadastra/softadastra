@@ -35,6 +35,7 @@ add_library(
   src/control/RemoteControlServer.cpp
   src/host/Host.cpp
   src/host/HostIdentity.cpp
+  src/host/HostProfile.cpp
   src/host/HostPeerIdentity.cpp
   src/host/HostPeerClient.cpp
   src/host/HostPeerServer.cpp
@@ -204,6 +205,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_host_state_file_test
     tests/host/host_state_file_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_profile_test
+    tests/host/host_profile_test.cpp
   )
 
   softadastra_add_test(
