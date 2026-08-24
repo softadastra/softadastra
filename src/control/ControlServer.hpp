@@ -41,7 +41,17 @@ namespace softadastra
     bool register_software(
         SoftwareId id,
         ProcessSpec process_spec,
-        std::optional<AccessPoint> access_point = std::nullopt);
+        std::optional<AccessPoint> access_point = std::nullopt,
+        std::optional<ProjectIdentity> project_identity = std::nullopt);
+
+    [[nodiscard]] std::optional<SoftwareEntry> software_by_project_identity(
+        const ProjectIdentity &identity) const noexcept;
+    bool update_project_root(const ProjectIdentity &identity, std::string root);
+    [[nodiscard]] std::optional<ProjectIdentity> project_identity(const SoftwareId &id) const noexcept;
+    [[nodiscard]] std::optional<SoftwareEntry> software(const SoftwareId &id) const noexcept;
+    [[nodiscard]] std::vector<SoftwareEntry> software() const;
+    bool link_project(const SoftwareId &id, ProjectIdentity identity, std::string root);
+    [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point);
 
     [[nodiscard]] std::optional<AccessPoint> access_point(const SoftwareId &id) const noexcept;
 

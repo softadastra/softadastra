@@ -53,19 +53,61 @@ namespace softadastra
   bool SoftwareManager::register_software(
       SoftwareId id,
       ProcessSpec process_spec,
-      std::optional<AccessPoint> access_point)
+      std::optional<AccessPoint> access_point,
+      std::optional<ProjectIdentity> project_identity)
   {
     return state_.add_software(
         SoftwareEntry(
             std::move(id),
             std::move(process_spec),
+            std::move(project_identity),
             access_point));
+  }
+
+  std::optional<SoftwareEntry> SoftwareManager::software_by_project_identity(
+      const ProjectIdentity &identity) const noexcept
+  {
+    const auto *entry = state_.find_software(identity);
+    return entry == nullptr ? std::nullopt : std::optional<SoftwareEntry>(*entry);
+  }
+
+  bool SoftwareManager::update_project_root(const ProjectIdentity &identity, std::string root)
+  {
+    auto *entry = state_.find_software(identity);
+    if (entry == nullptr)
+      return false;
+    entry->set_working_directory(std::move(root));
+    return true;
+  }
+
+  bool SoftwareManager::synchronize(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
+  {
+    auto *entry = state_.find_software(id);
+    if (entry == nullptr) return false;
+    const auto existing_access = entry->access_point();
+    const bool access_changed = existing_access.has_value() != access_point.has_value() ||
+        (existing_access.has_value() && access_point.has_value() &&
+         (existing_access->protocol() != access_point->protocol() || existing_access->port() != access_point->port()));
+    const bool changed = entry->process_spec().executable() != process_spec.executable() ||
+                         entry->process_spec().arguments() != process_spec.arguments() ||
+                         entry->process_spec().working_directory() != process_spec.working_directory() ||
+                         access_changed;
+    if (!changed) return false;
+    if (entry->state() == SoftwareState::Running) static_cast<void>(stop(id));
+    entry->set_process_spec(std::move(process_spec));
+    entry->set_access_point(access_point);
+    return true;
   }
 
   std::optional<AccessPoint> SoftwareManager::access_point(const SoftwareId &id) const noexcept
   {
     const SoftwareEntry *entry = state_.find_software(id);
     return entry == nullptr ? std::nullopt : entry->access_point();
+  }
+
+  std::vector<SoftwareEntry> SoftwareManager::software() const
+  {
+    return state_.software();
   }
 
   SoftwareOperationResult SoftwareManager::start(const SoftwareId &id)

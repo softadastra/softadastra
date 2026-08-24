@@ -79,7 +79,7 @@ namespace
   {
   public:
     [[nodiscard]] softadastra::ProcessLaunchResult launch(
-        const softadastra::ProcessSpec &) override
+        const softadastra::ProcessSpec &spec) override
     {
       if (launch_fails_)
       {
@@ -88,6 +88,7 @@ namespace
 
       last_process_ =
           std::make_shared<TestProcessState>();
+      last_spec_ = spec;
 
       last_process_->running = process_running_;
       last_process_->stop_succeeds = stop_succeeds_;
@@ -127,12 +128,16 @@ namespace
       return last_process_;
     }
 
+    [[nodiscard]] const std::optional<softadastra::ProcessSpec> &last_spec() const noexcept
+    { return last_spec_; }
+
   private:
     bool launch_fails_{false};
     bool process_running_{true};
     bool stop_succeeds_{true};
     int launch_exit_code_{0};
     std::shared_ptr<TestProcessState> last_process_;
+    std::optional<softadastra::ProcessSpec> last_spec_;
   };
 
   class TestService final : public softadastra::Service
@@ -252,6 +257,66 @@ namespace
         client.register_software(
             softadastra::SoftwareId("example"),
             softadastra::ProcessSpec("/usr/bin/example")));
+  }
+
+  TEST(ControlClientTest, LooksUpSoftwareByPersistentProjectIdentityAndUpdatesRoot)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    const softadastra::ProjectIdentity identity("opaque-project-id");
+
+    ASSERT_TRUE(client.register_software(
+        softadastra::SoftwareId("project-app"),
+        softadastra::ProcessSpec("./build/app", {}, "/old/project"),
+        std::nullopt, identity));
+    const auto entry = client.software_by_project_identity(identity);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->id().value(), "project-app");
+    EXPECT_TRUE(client.update_project_root(identity, "/new/project"));
+    ASSERT_TRUE(client.start_software(entry->id()));
+    ASSERT_TRUE(launcher.last_spec().has_value());
+    EXPECT_EQ(launcher.last_spec()->executable(), "./build/app");
+    EXPECT_EQ(launcher.last_spec()->working_directory(), "/new/project");
+  }
+
+  TEST(ControlClientTest, DoesNotReplaceAnExistingProjectIdentityWhenLinking)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    const softadastra::SoftwareId id("legacy");
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("app")));
+    EXPECT_TRUE(client.link_project(id, softadastra::ProjectIdentity("first"), "/project"));
+    EXPECT_FALSE(client.link_project(id, softadastra::ProjectIdentity("second"), "/other"));
+    ASSERT_TRUE(client.project_identity(id).has_value());
+    EXPECT_EQ(client.project_identity(id)->value(), "first");
+  }
+
+  TEST(ControlClientTest, ReturnsStructuredSoftwareInventory)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(
+        softadastra::SoftwareId("api"),
+        softadastra::ProcessSpec("./serve", {}, "/project/api"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8000)));
+    const auto inventory = client.software();
+    ASSERT_EQ(inventory.size(), 1U);
+    EXPECT_EQ(inventory.front().id().value(), "api");
+    EXPECT_EQ(inventory.front().process_spec().working_directory(), "/project/api");
+    ASSERT_TRUE(inventory.front().access_point().has_value());
+    EXPECT_EQ(inventory.front().access_point()->port(), 8000);
   }
 
   TEST(ControlClientTest, ReturnsLocalHostAccessInformation)

@@ -53,6 +53,8 @@ add_library(
   src/platform/NativeProcessLauncher.cpp
   src/platform/NativeService.cpp
   src/software/SoftwareManager.cpp
+  src/software/ProjectIdentity.cpp
+  src/software/ProjectConfig.cpp
   src/software/SoftwareRegistrationFormat.cpp
 )
 
@@ -232,6 +234,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
+    softadastra_project_identity_test
+    tests/software/project_identity_test.cpp
+  )
+
+  softadastra_add_test(
     softadastra_software_manager_test
     tests/software/software_manager_test.cpp
   )
@@ -264,6 +271,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_access_url_test
     tests/cli/access_url_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_cli_test
+    tests/cli/cli_test.cpp
   )
 
   softadastra_add_test(

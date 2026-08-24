@@ -44,14 +44,17 @@ namespace softadastra
      * Supported commands:
      *
      * @code
-     * softadastra register <software-id> <executable> [arguments...]
-     * softadastra start <software-id>
-     * softadastra stop <software-id>
-     * softadastra restart <software-id>
-     * softadastra status <software-id>
-     * softadastra status
+     * softadastra init [name] [--command <command>] [--access http:port]
+     * softadastra run [name]
+     * softadastra start [name]
+     * softadastra stop [name]
+     * softadastra restart [name]
+     * softadastra status [name]
+     * softadastra info [name]
+     * softadastra access [name]
+     * softadastra list [--running|--stopped]
+     * softadastra register <name> [--access http:port] -- <command> [arguments...]
      * softadastra connectivity
-     * softadastra access [port]
      * softadastra help
      * @endcode
      *

@@ -22,6 +22,8 @@ namespace softadastra
   {
     constexpr const char *header_v1 = "softadastra-registrations 1\n";
     constexpr const char *header_v2 = "softadastra-registrations 2\n";
+    constexpr const char *header_v3 = "softadastra-registrations 3\n";
+    constexpr const char *header_v4 = "softadastra-registrations 4\n";
 
     void append_string(std::string &output, const std::string &value)
     {
@@ -107,14 +109,20 @@ namespace softadastra
   std::string SoftwareRegistrationFormat::serialize(
       const std::vector<SoftwareEntry> &entries)
   {
-    std::string output(header_v2);
+    std::string output(header_v4);
     output += std::to_string(entries.size());
     output += '\n';
 
     for (const auto &entry : entries)
     {
       append_string(output, entry.id().value());
+      output += entry.project_identity().has_value() ? "1\n" : "0\n";
+      if (entry.project_identity().has_value())
+        append_string(output, entry.project_identity()->value());
       append_string(output, entry.process_spec().executable());
+      output += entry.process_spec().working_directory().has_value() ? "1\n" : "0\n";
+      if (entry.process_spec().working_directory().has_value())
+        append_string(output, entry.process_spec().working_directory().value());
       const auto access_point = entry.access_point();
       output += access_point.has_value() ? "1\n" : "0\n";
       if (access_point.has_value())
@@ -138,13 +146,16 @@ namespace softadastra
   std::optional<std::vector<SoftwareEntry>>
   SoftwareRegistrationFormat::deserialize(const std::string &text)
   {
+    const bool version_four = text.starts_with(header_v4);
+    const bool version_three = text.starts_with(header_v3);
     const bool version_two = text.starts_with(header_v2);
-    if (!version_two && !text.starts_with(header_v1))
+    if (!version_four && !version_three && !version_two && !text.starts_with(header_v1))
     {
       return std::nullopt;
     }
 
-    std::size_t offset = std::char_traits<char>::length(version_two ? header_v2 : header_v1);
+    std::size_t offset = std::char_traits<char>::length(
+        version_four ? header_v4 : (version_three ? header_v3 : (version_two ? header_v2 : header_v1)));
     const auto count = read_count(text, offset);
 
     if (!count.has_value())
@@ -163,10 +174,35 @@ namespace softadastra
     for (std::size_t index = 0; index < count.value(); ++index)
     {
       const auto id = read_string(text, offset);
+      std::optional<ProjectIdentity> project_identity;
+      if (version_four)
+      {
+        const auto configured = read_count(text, offset);
+        if (!configured.has_value() || configured.value() > 1) return std::nullopt;
+        if (configured.value() == 1)
+        {
+          const auto value = read_string(text, offset);
+          if (!value.has_value() || value->empty()) return std::nullopt;
+          project_identity.emplace(value.value());
+        }
+      }
       const auto executable = read_string(text, offset);
+      std::optional<std::string> working_directory;
+      if (version_three || version_four)
+      {
+        const auto configured = read_count(text, offset);
+        if (!configured.has_value() || configured.value() > 1)
+          return std::nullopt;
+        if (configured.value() == 1)
+        {
+          working_directory = read_string(text, offset);
+          if (!working_directory.has_value())
+            return std::nullopt;
+        }
+      }
       std::optional<AccessPoint> access_point;
 
-      if (version_two)
+      if (version_two || version_three || version_four)
       {
         const auto configured = read_count(text, offset);
         if (!configured.has_value() || configured.value() > 1)
@@ -217,7 +253,8 @@ namespace softadastra
 
       entries.emplace_back(
           SoftwareId(id.value()),
-          ProcessSpec(executable.value(), std::move(arguments)),
+          ProcessSpec(executable.value(), std::move(arguments), working_directory),
+          std::move(project_identity),
           access_point);
 
       for (std::size_t previous = 0; previous + 1 < entries.size(); ++previous)

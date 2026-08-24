@@ -54,7 +54,8 @@ namespace
 
   CommandResult invoke_cli(
       const std::filesystem::path &state_home,
-      const std::vector<std::string> &arguments)
+      const std::vector<std::string> &arguments,
+      const std::filesystem::path &working_directory = {})
   {
     int output_pipe[2]{};
     EXPECT_EQ(::pipe(output_pipe), 0);
@@ -63,6 +64,8 @@ namespace
     if (child == 0)
     {
       ::setenv("XDG_STATE_HOME", state_home.c_str(), 1);
+      if (!working_directory.empty())
+        static_cast<void>(::chdir(working_directory.c_str()));
       ::dup2(output_pipe[1], STDOUT_FILENO);
       ::dup2(output_pipe[1], STDERR_FILENO);
       ::close(output_pipe[0]);
@@ -185,11 +188,11 @@ namespace
                                     .time_since_epoch()
                                     .count()));
     const auto socket = state_home / "softadastra" / "control.sock";
+    const auto project = state_home / "project";
+    const auto source = project / "src";
     std::filesystem::remove_all(state_home);
-
-    const auto absent = invoke_cli(state_home, {"status", "demo"});
-    EXPECT_EQ(absent.exit_code, 1);
-    EXPECT_NE(absent.output.find("Host is not running"), std::string::npos);
+    std::filesystem::create_directories(project);
+    std::filesystem::create_directories(source);
 
     HostProcess host(state_home);
     ASSERT_TRUE(host.valid());
@@ -207,16 +210,12 @@ namespace
     EXPECT_NE(started.find("remote access: disabled"), std::string::npos);
     EXPECT_NE(started.find("Press Ctrl+C to stop."), std::string::npos);
 
-    const auto access = invoke_cli(state_home, {"access"});
-    EXPECT_EQ(access.exit_code, 0);
-    EXPECT_NE(access.output.find("hosted software endpoints"), std::string::npos);
-
-    const auto host_status = invoke_cli(state_home, {"status"});
-    EXPECT_EQ(host_status.exit_code, 0);
-    EXPECT_NE(host_status.output.find("Host: running"), std::string::npos);
-
-    EXPECT_EQ(invoke_cli(state_home, {"register", "demo", "sleep", "30"}).exit_code, 0);
-    EXPECT_EQ(invoke_cli(state_home, {"start", "demo"}).exit_code, 0);
+    EXPECT_EQ(invoke_cli(state_home, {"register", "demo", "--access", "http:8080", "--", "sleep", "30"}, project).exit_code, 0);
+    const auto run_from_root = invoke_cli(state_home, {"run", "demo"}, project);
+    EXPECT_NE(run_from_root.output.find("running: demo"), std::string::npos);
+    const auto run_from_subdirectory = invoke_cli(state_home, {"run", "demo"}, source);
+    EXPECT_EQ(run_from_subdirectory.exit_code, 0);
+    EXPECT_NE(run_from_subdirectory.output.find("already running: demo"), std::string::npos);
     const auto running = invoke_cli(state_home, {"status", "demo"});
     EXPECT_EQ(running.exit_code, 0);
     EXPECT_NE(running.output.find("demo: running"), std::string::npos);

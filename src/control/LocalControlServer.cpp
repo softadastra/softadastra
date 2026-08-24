@@ -242,19 +242,96 @@ namespace softadastra
              " " + std::to_string(access_point->port());
     }
 
-    if (fields[0] == "register" && fields.size() >= 6)
+    if (fields[0] == "project" && fields.size() == 2)
+    {
+      const auto identity = LocalControlProtocol::decode(fields[1]);
+      if (!identity.has_value()) return "error";
+      const auto entry = server.software_by_project_identity(ProjectIdentity(identity.value()));
+      return entry.has_value() ? "project 1 " + LocalControlProtocol::encode(entry->id().value()) +
+                                     " " + LocalControlProtocol::encode(entry->process_spec().executable())
+                               : "project 0 -";
+    }
+
+    if (fields[0] == "project-root" && fields.size() == 3)
+    {
+      const auto identity = LocalControlProtocol::decode(fields[1]);
+      const auto root = LocalControlProtocol::decode(fields[2]);
+      if (!identity.has_value() || !root.has_value()) return "error";
+      return std::string("project-root ") + (server.update_project_root(ProjectIdentity(identity.value()), root.value()) ? "1" : "0");
+    }
+
+    if (fields[0] == "software-project" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      if (!id.has_value()) return "error";
+      const auto state = server.software_state(SoftwareId(id.value()));
+      if (!state.has_value()) return "software-project 0 -";
+      const auto identity = server.project_identity(SoftwareId(id.value()));
+      return "software-project 1 " + LocalControlProtocol::encode(identity.has_value() ? identity->value() : "");
+    }
+
+    if (fields[0] == "software" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      if (!id.has_value()) return "error";
+      const auto entry = server.software(SoftwareId(id.value()));
+      return entry.has_value() ? "software 1 " + LocalControlProtocol::encode(entry->process_spec().executable()) : "software 0 -";
+    }
+
+    if (fields[0] == "software-list" && fields.size() == 1)
+    {
+      const auto entries = server.software();
+      std::string response = "software-list " + std::to_string(entries.size());
+      for (const auto &entry : entries)
+      {
+        const auto access = entry.access_point();
+        response += " " + LocalControlProtocol::encode(entry.id().value()) +
+                    " " + std::to_string(static_cast<int>(entry.state())) +
+                    " " + LocalControlProtocol::encode(entry.process_spec().executable()) +
+                    " " + LocalControlProtocol::encode(entry.process_spec().working_directory().value_or("")) +
+                    " " + LocalControlProtocol::encode(entry.project_identity().has_value() ? entry.project_identity()->value() : "") +
+                    " " + (access ? std::string(AccessPoint::name(access->protocol())) : "-") +
+                    " " + std::to_string(access ? access->port() : 0);
+      }
+      return response;
+    }
+
+    if (fields[0] == "link-project" && fields.size() == 4)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      const auto identity = LocalControlProtocol::decode(fields[2]);
+      const auto root = LocalControlProtocol::decode(fields[3]);
+      if (!id.has_value() || !identity.has_value() || !root.has_value() || identity->empty()) return "error";
+      return std::string("link-project ") + (server.link_project(SoftwareId(id.value()), ProjectIdentity(identity.value()), root.value()) ? "1" : "0");
+    }
+
+    if (fields[0] == "sync" && fields.size() >= 7)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]); const auto executable = LocalControlProtocol::decode(fields[2]); const auto root = LocalControlProtocol::decode(fields[3]);
+      const auto protocol = fields[4] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[4]);
+      const auto port = LocalControlProtocol::integer(fields[5]); const auto count = LocalControlProtocol::integer(fields[6]);
+      if (!id || !executable || !root || !port || !count || count.value() < 0 || fields.size() != static_cast<std::size_t>(count.value()) + 7 || (fields[4] == "-" && port.value() != 0) || (fields[4] != "-" && (!protocol || port.value() < 1 || port.value() > 65535))) return "error";
+      std::vector<std::string> arguments;
+      for (std::size_t index = 7; index < fields.size(); ++index) { const auto argument = LocalControlProtocol::decode(fields[index]); if (!argument) return "error"; arguments.push_back(argument.value()); }
+      const auto access = protocol ? AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value())) : std::nullopt;
+      return std::string("sync ") + (server.synchronize_software(SoftwareId(id.value()), ProcessSpec(executable.value(), std::move(arguments), root->empty() ? std::nullopt : std::optional<std::string>(root.value())), access) ? "1" : "0");
+    }
+
+    if (fields[0] == "register" && fields.size() >= 8)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);
       const auto executable = LocalControlProtocol::decode(fields[2]);
-      const auto protocol = fields[3] == "-" ? std::optional<AccessProtocol>{}
-                                               : AccessPoint::protocol(fields[3]);
-      const auto port = LocalControlProtocol::integer(fields[4]);
-      const auto count = LocalControlProtocol::integer(fields[5]);
+      const auto project_identity = LocalControlProtocol::decode(fields[3]);
+      const auto working_directory = LocalControlProtocol::decode(fields[4]);
+      const auto protocol = fields[5] == "-" ? std::optional<AccessProtocol>{}
+                                               : AccessPoint::protocol(fields[5]);
+      const auto port = LocalControlProtocol::integer(fields[6]);
+      const auto count = LocalControlProtocol::integer(fields[7]);
 
-      if (!id.has_value() || !executable.has_value() || !count.has_value() || !port.has_value() ||
-          count.value() < 0 || fields.size() != static_cast<std::size_t>(count.value()) + 6 ||
-          (fields[3] == "-" && port.value() != 0) ||
-          (fields[3] != "-" && (!protocol.has_value() || port.value() < 1 || port.value() > 65535)))
+      if (!id.has_value() || !executable.has_value() || !project_identity.has_value() || !working_directory.has_value() || !count.has_value() || !port.has_value() ||
+          count.value() < 0 || fields.size() != static_cast<std::size_t>(count.value()) + 8 ||
+          (fields[5] == "-" && port.value() != 0) ||
+          (fields[5] != "-" && (!protocol.has_value() || port.value() < 1 || port.value() > 65535)))
       {
         return "error";
       }
@@ -262,7 +339,7 @@ namespace softadastra
       std::vector<std::string> arguments;
       arguments.reserve(static_cast<std::size_t>(count.value()));
 
-      for (std::size_t index = 6; index < fields.size(); ++index)
+      for (std::size_t index = 8; index < fields.size(); ++index)
       {
         const auto argument = LocalControlProtocol::decode(fields[index]);
 
@@ -277,10 +354,11 @@ namespace softadastra
       return std::string("register ") +
              (server.register_software(
                   SoftwareId(id.value()),
-                  ProcessSpec(executable.value(), std::move(arguments)),
+                  ProcessSpec(executable.value(), std::move(arguments), working_directory.value().empty() ? std::nullopt : std::optional<std::string>(working_directory.value())),
                   protocol.has_value()
                       ? AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value()))
-                      : std::nullopt)
+                      : std::nullopt,
+                  project_identity.value().empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(project_identity.value())))
                   ? "1"
                   : "0");
     }

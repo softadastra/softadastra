@@ -63,7 +63,7 @@ namespace
 
     std::filesystem::current_path(previous);
     ASSERT_TRUE(normalized.has_value());
-    EXPECT_EQ(normalized.value(), executable.string());
+    EXPECT_EQ(normalized.value(), "./program");
     std::filesystem::remove_all(directory);
   }
 

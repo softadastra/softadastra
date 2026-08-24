@@ -18,6 +18,7 @@
 #include "platform/ProcessSpec.hpp"
 #include "software/AccessPoint.hpp"
 #include "software/SoftwareId.hpp"
+#include "software/ProjectIdentity.hpp"
 #include "software/SoftwareOperation.hpp"
 #include "software/SoftwareState.hpp"
 
@@ -45,12 +46,16 @@ namespace softadastra
      * @param process_spec Information required to launch the software process.
      */
     SoftwareEntry(SoftwareId id, ProcessSpec process_spec,
+                  std::optional<ProjectIdentity> project_identity = std::nullopt,
                   std::optional<AccessPoint> access_point = std::nullopt)
         : id_(std::move(id)),
-          process_spec_(std::move(process_spec)),
+          process_spec_(std::move(process_spec)), project_identity_(std::move(project_identity)),
           access_point_(access_point)
     {
     }
+
+    SoftwareEntry(SoftwareId id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
+        : SoftwareEntry(std::move(id), std::move(process_spec), std::nullopt, access_point) {}
 
     /**
      * @brief Returns the software identifier.
@@ -67,6 +72,18 @@ namespace softadastra
     {
       return process_spec_;
     }
+
+    [[nodiscard]] const std::optional<ProjectIdentity> &project_identity() const noexcept
+    { return project_identity_; }
+
+    void set_working_directory(std::string working_directory)
+    { process_spec_ = ProcessSpec(process_spec_.executable(), process_spec_.arguments(), std::move(working_directory)); }
+
+    void set_project_identity(ProjectIdentity identity)
+    { project_identity_ = std::move(identity); }
+
+    void set_process_spec(ProcessSpec process_spec) { process_spec_ = std::move(process_spec); }
+    void set_access_point(std::optional<AccessPoint> access_point) { access_point_ = access_point; }
 
     [[nodiscard]] std::optional<AccessPoint> access_point() const noexcept
     {
@@ -118,6 +135,7 @@ namespace softadastra
   private:
     SoftwareId id_;
     ProcessSpec process_spec_;
+    std::optional<ProjectIdentity> project_identity_;
     std::optional<AccessPoint> access_point_;
     SoftwareState state_{SoftwareState::Stopped};
     std::optional<SoftwareOperationResult> result_;

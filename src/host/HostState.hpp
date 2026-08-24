@@ -17,6 +17,7 @@
 
 #include "software/SoftwareEntry.hpp"
 #include "software/SoftwareId.hpp"
+#include "software/ProjectIdentity.hpp"
 
 #include <cstddef>
 #include <vector>
@@ -70,6 +71,9 @@ namespace softadastra
      */
     [[nodiscard]] const SoftwareEntry *find_software(
         const SoftwareId &id) const noexcept;
+
+    [[nodiscard]] SoftwareEntry *find_software(const ProjectIdentity &identity) noexcept;
+    [[nodiscard]] const SoftwareEntry *find_software(const ProjectIdentity &identity) const noexcept;
 
     /**
      * @brief Returns the number of software entries known to the Host.

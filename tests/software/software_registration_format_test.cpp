@@ -62,6 +62,24 @@ namespace
     EXPECT_EQ(restored->front().access_point()->protocol(), softadastra::AccessProtocol::Http);
   }
 
+  TEST(SoftwareRegistrationFormatTest, PreservesProjectIdentityAndWorkingDirectory)
+  {
+    const std::vector<softadastra::SoftwareEntry> entries{
+        softadastra::SoftwareEntry(
+            softadastra::SoftwareId("moved-project"),
+            softadastra::ProcessSpec("./build/app", {}, "/old/project"),
+            softadastra::ProjectIdentity("opaque-project-id"))};
+
+    const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(
+        softadastra::SoftwareRegistrationFormat::serialize(entries));
+
+    ASSERT_TRUE(restored.has_value());
+    ASSERT_EQ(restored->size(), 1U);
+    ASSERT_TRUE(restored->front().project_identity().has_value());
+    EXPECT_EQ(restored->front().project_identity()->value(), "opaque-project-id");
+    EXPECT_EQ(restored->front().process_spec().working_directory(), "/old/project");
+  }
+
   TEST(SoftwareRegistrationFormatTest, RejectsInvalidInput)
   {
     EXPECT_FALSE(softadastra::SoftwareRegistrationFormat::deserialize("invalid").has_value());

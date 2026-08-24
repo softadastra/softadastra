@@ -27,9 +27,12 @@
 #include "platform/HostInstanceLock.hpp"
 #include "platform/MdnsPublisher.hpp"
 #include "platform/NativePlatform.hpp"
+#include "software/ProjectIdentity.hpp"
+#include "software/ProjectConfig.hpp"
 
 #include <chrono>
 #include <atomic>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -39,6 +42,8 @@
 
 #include <csignal>
 #include <pthread.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #endif
 
@@ -161,6 +166,27 @@ namespace
 
 #endif
   }
+  bool start_host_automatically(const char *executable)
+  {
+#if defined(__linux__)
+    char path[4096]{};
+    const ssize_t length = ::readlink("/proc/self/exe", path, sizeof(path) - 1);
+    const char *host_executable = length > 0 ? path : executable;
+    const pid_t child = ::fork();
+    if (child < 0)
+      return false;
+    if (child == 0)
+    {
+      static_cast<void>(::setsid());
+      ::execl(host_executable, host_executable, "host", nullptr);
+      ::_exit(127);
+    }
+    return true;
+#else
+    static_cast<void>(executable);
+    return false;
+#endif
+  }
 } // namespace
 
 int main(int argc, char *argv[])
@@ -249,6 +275,40 @@ int main(int argc, char *argv[])
 
   softadastra::ControlClient control_client(
       softadastra::NativeDataDirectory::path() / "control.sock");
+
+  const std::string cli_command = argc > 1 ? argv[1] : "";
+  const bool command_help = argc == 3 &&
+                            (std::string(argv[2]) == "-h" ||
+                             std::string(argv[2]) == "--help");
+  const bool legacy_migration = cli_command == "init" &&
+                                softadastra::ProjectIdentity::find(
+                                    std::filesystem::current_path()).has_value();
+  const bool needs_host = cli_command != "" && cli_command != "host" &&
+                          cli_command != "help" && cli_command != "-h" &&
+                          cli_command != "--help" &&
+                          (cli_command != "init" || legacy_migration) &&
+                          !command_help;
+  if (needs_host && !control_client.host_available())
+  {
+    if (!start_host_automatically(argv[0]))
+    {
+      std::cerr << "failed to start Softadastra Host\n";
+      return 1;
+    }
+
+    for (int attempt = 0; attempt < 100; ++attempt)
+    {
+      if (control_client.host_available())
+        break;
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+
+    if (!control_client.host_available())
+    {
+      std::cerr << "Softadastra Host did not become available\n";
+      return 1;
+    }
+  }
 
   softadastra::Cli cli(control_client);
 

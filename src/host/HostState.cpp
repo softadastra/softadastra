@@ -56,6 +56,22 @@ namespace softadastra
     return nullptr;
   }
 
+  SoftwareEntry *HostState::find_software(const ProjectIdentity &identity) noexcept
+  {
+    for (auto &entry : software_)
+      if (entry.project_identity().has_value() && entry.project_identity().value() == identity)
+        return &entry;
+    return nullptr;
+  }
+
+  const SoftwareEntry *HostState::find_software(const ProjectIdentity &identity) const noexcept
+  {
+    for (const auto &entry : software_)
+      if (entry.project_identity().has_value() && entry.project_identity().value() == identity)
+        return &entry;
+    return nullptr;
+  }
+
   std::size_t HostState::software_count() const noexcept
   {
     return software_.size();

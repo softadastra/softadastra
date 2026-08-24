@@ -48,13 +48,14 @@ namespace softadastra
   bool ControlClient::register_software(
       SoftwareId id,
       ProcessSpec process_spec,
-      std::optional<AccessPoint> access_point)
+      std::optional<AccessPoint> access_point,
+      std::optional<ProjectIdentity> project_identity)
   {
     if (server_ != nullptr)
     {
       return server_->register_software(
           std::move(id),
-          std::move(process_spec), access_point);
+          std::move(process_spec), access_point, std::move(project_identity));
     }
 
     const std::string protocol = access_point.has_value()
@@ -65,6 +66,8 @@ namespace softadastra
                                  : "0";
     std::string message = "register " + LocalControlProtocol::encode(id.value()) +
                           " " + LocalControlProtocol::encode(process_spec.executable()) +
+                          " " + LocalControlProtocol::encode(project_identity.has_value() ? project_identity->value() : "") +
+                          " " + LocalControlProtocol::encode(process_spec.working_directory().value_or("")) +
                           " " + protocol + " " + port + " " +
                           std::to_string(process_spec.arguments().size());
 
@@ -76,6 +79,92 @@ namespace softadastra
     const auto response = request(message);
 
     return response.has_value() && response.value() == "register 1";
+  }
+
+  std::optional<SoftwareEntry> ControlClient::software_by_project_identity(
+      const ProjectIdentity &identity) const noexcept
+  {
+    if (server_ != nullptr)
+      return server_->software_by_project_identity(identity);
+    const auto response = request("project " + LocalControlProtocol::encode(identity.value()));
+    const auto fields = response.has_value() ? LocalControlProtocol::fields(response.value()) : std::vector<std::string>{};
+    if (fields.size() != 4 || fields[0] != "project" || fields[1] != "1")
+      return std::nullopt;
+    const auto id = LocalControlProtocol::decode(fields[2]);
+    const auto executable = LocalControlProtocol::decode(fields[3]);
+    if (!id.has_value() || !executable.has_value()) return std::nullopt;
+    return SoftwareEntry(SoftwareId(id.value()), ProcessSpec(executable.value()), identity);
+  }
+
+  bool ControlClient::update_project_root(const ProjectIdentity &identity, std::string root)
+  {
+    if (server_ != nullptr)
+      return server_->update_project_root(identity, std::move(root));
+    const auto response = request("project-root " + LocalControlProtocol::encode(identity.value()) + " " + LocalControlProtocol::encode(root));
+    return response.has_value() && response.value() == "project-root 1";
+  }
+
+  std::optional<ProjectIdentity> ControlClient::project_identity(const SoftwareId &id) const noexcept
+  {
+    if (server_ != nullptr) return server_->project_identity(id);
+    const auto response = request("software-project " + LocalControlProtocol::encode(id.value()));
+    const auto fields = response.has_value() ? LocalControlProtocol::fields(response.value()) : std::vector<std::string>{};
+    if (fields.size() != 3 || fields[0] != "software-project" || fields[1] != "1") return std::nullopt;
+    const auto value = LocalControlProtocol::decode(fields[2]);
+    return value.has_value() && !value->empty() ? std::optional<ProjectIdentity>(ProjectIdentity(value.value())) : std::nullopt;
+  }
+
+  std::optional<SoftwareEntry> ControlClient::software(const SoftwareId &id) const noexcept
+  {
+    if (server_ != nullptr) return server_->software(id);
+    const auto entries = software();
+    for (const auto &entry : entries)
+      if (entry.id() == id) return entry;
+    return std::nullopt;
+  }
+
+  std::vector<SoftwareEntry> ControlClient::software() const noexcept
+  {
+    if (server_ != nullptr) return server_->software();
+    const auto response = request("software-list");
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    if (fields.size() < 2 || fields[0] != "software-list") return {};
+    const auto count = LocalControlProtocol::integer(fields[1]);
+    if (!count || count.value() < 0 || fields.size() != 2 + static_cast<std::size_t>(count.value()) * 7) return {};
+    std::vector<SoftwareEntry> entries;
+    for (std::size_t index = 0; index < static_cast<std::size_t>(count.value()); ++index)
+    {
+      const auto base = 2 + index * 7;
+      const auto id = LocalControlProtocol::decode(fields[base]);
+      const auto executable = LocalControlProtocol::decode(fields[base + 2]);
+      const auto root = LocalControlProtocol::decode(fields[base + 3]);
+      const auto identity = LocalControlProtocol::decode(fields[base + 4]);
+      const auto protocol = fields[base + 5] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[base + 5]);
+      const auto port = LocalControlProtocol::integer(fields[base + 6]);
+      if (!id || !executable || !root || !identity || !port || port.value() < 0 || port.value() > 65535 || (fields[base + 5] != "-" && !protocol)) return {};
+      const auto access = protocol ? AccessPoint::create(*protocol, static_cast<std::uint16_t>(*port)) : std::nullopt;
+      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, {}, root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), access);
+      entries.back().set_state(static_cast<SoftwareState>(std::stoi(fields[base + 1])));
+    }
+    return entries;
+  }
+
+  bool ControlClient::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
+  {
+    if (server_ != nullptr) return server_->link_project(id, std::move(identity), std::move(root));
+    const auto response = request("link-project " + LocalControlProtocol::encode(id.value()) + " " + LocalControlProtocol::encode(identity.value()) + " " + LocalControlProtocol::encode(root));
+    return response.has_value() && response.value() == "link-project 1";
+  }
+
+  bool ControlClient::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
+  {
+    if (server_ != nullptr) return server_->synchronize_software(id, std::move(process_spec), access_point);
+    const std::string protocol = access_point.has_value() ? std::string(AccessPoint::name(access_point->protocol())) : "-";
+    const std::string port = access_point.has_value() ? std::to_string(access_point->port()) : "0";
+    std::string message = "sync " + LocalControlProtocol::encode(id.value()) + " " + LocalControlProtocol::encode(process_spec.executable()) + " " + LocalControlProtocol::encode(process_spec.working_directory().value_or("")) + " " + protocol + " " + port + " " + std::to_string(process_spec.arguments().size());
+    for (const auto &argument : process_spec.arguments()) message += " " + LocalControlProtocol::encode(argument);
+    const auto response = request(message);
+    return response.has_value() && response.value() == "sync 1";
   }
 
   std::optional<AccessPoint> ControlClient::access_point(const SoftwareId &id) const noexcept

@@ -101,6 +101,8 @@ namespace softadastra
     vix::process::Command command(spec.executable());
 
     command.args(spec.arguments());
+    if (spec.working_directory().has_value())
+      command.cwd(spec.working_directory().value());
     command.search_in_path(true);
     command.detach(true);
 

@@ -41,10 +41,17 @@ namespace softadastra
      */
     explicit ProcessSpec(
         std::string executable,
-        std::vector<std::string> arguments = {})
+        std::vector<std::string> arguments = {},
+        std::optional<std::string> working_directory = std::nullopt)
         : executable_(std::move(executable)),
-          arguments_(std::move(arguments))
+          arguments_(std::move(arguments)),
+          working_directory_(std::move(working_directory))
     {
+    }
+
+    [[nodiscard]] const std::optional<std::string> &working_directory() const noexcept
+    {
+      return working_directory_;
     }
 
     /**
@@ -91,12 +98,13 @@ namespace softadastra
         return std::nullopt;
       }
 
-      return normalized.string();
+      return executable;
     }
 
   private:
     std::string executable_;
     std::vector<std::string> arguments_;
+    std::optional<std::string> working_directory_;
   };
 
 } // namespace softadastra
