@@ -119,5 +119,8 @@ namespace softadastra
   {
     return host_service_.network_capability();
   }
+  ManagedNetworkStatus ControlServer::managed_network_status() const { return host_service_.managed_network_status(); }
+  ManagedNetworkStartResult ControlServer::start_managed_network() { return host_service_.start_managed_network(); }
+  bool ControlServer::stop_managed_network() { return host_service_.stop_managed_network(); }
 
 } // namespace softadastra

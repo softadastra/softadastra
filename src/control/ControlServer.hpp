@@ -107,6 +107,9 @@ namespace softadastra
         const SoftwareId &id) const noexcept;
 
     [[nodiscard]] NetworkCapability network_capability() const;
+    [[nodiscard]] ManagedNetworkStatus managed_network_status() const;
+    [[nodiscard]] ManagedNetworkStartResult start_managed_network();
+    bool stop_managed_network();
 
   private:
     HostService &host_service_;

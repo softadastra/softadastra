@@ -102,8 +102,11 @@ namespace softadastra
   bool HostService::shutdown()
   {
     const bool stopped = software_manager_.stop_all();
+    const auto network = managed_network_status();
+    const bool network_stopped = network.state != ManagedNetworkState::Running ||
+                                 stop_managed_network();
     software_manager_.refresh();
-    return stopped;
+    return stopped && network_stopped;
   }
 
   void HostService::refresh()
@@ -166,6 +169,9 @@ namespace softadastra
   {
     return host_.platform().network().network_capability();
   }
+  ManagedNetworkStatus HostService::managed_network_status() const { return host_.platform().managed_network().status(); }
+  ManagedNetworkStartResult HostService::start_managed_network() { return host_.platform().managed_network().start(); }
+  bool HostService::stop_managed_network() { return host_.platform().managed_network().stop(); }
 
   std::string HostService::primary_ipv4() const
   {

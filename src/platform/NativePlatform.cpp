@@ -45,5 +45,7 @@ namespace softadastra
   {
     return network_;
   }
+  ManagedNetwork &NativePlatform::managed_network() noexcept { return managed_network_; }
+  const ManagedNetwork &NativePlatform::managed_network() const noexcept { return managed_network_; }
 
 } // namespace softadastra

@@ -508,6 +508,31 @@ namespace softadastra
         static_cast<ManagedNetworkCapability>(managed_network.value())};
   }
 
+  std::optional<ManagedNetworkStatus> ControlClient::managed_network_status() const noexcept
+  {
+    if (server_ != nullptr) return server_->managed_network_status();
+    const auto response=request("managed-network-status"); const auto fields=response?LocalControlProtocol::fields(*response):std::vector<std::string>{};
+    if(fields.size()!=6||fields[0]!="managed-network-status") return std::nullopt;
+    const auto capability=LocalControlProtocol::integer(fields[1]); const auto state=LocalControlProtocol::integer(fields[2]); const auto interface_name=LocalControlProtocol::decode(fields[3]); const auto ipv4=LocalControlProtocol::decode(fields[4]); const auto ssid=LocalControlProtocol::decode(fields[5]);
+    if(!capability||!state||!interface_name||!ipv4||!ssid||*capability<0||*capability>1||*state<0||*state>1) return std::nullopt;
+    return ManagedNetworkStatus{static_cast<ManagedNetworkCapability>(*capability),static_cast<ManagedNetworkState>(*state),*interface_name,*ipv4,*ssid};
+  }
+  std::optional<ManagedNetworkStartResult> ControlClient::start_managed_network() const noexcept
+  {
+    if (server_ != nullptr)
+      return server_->start_managed_network();
+    const auto response = request("managed-network-start");
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    const auto result = fields.size() == 2 ? LocalControlProtocol::integer(fields[1]) : std::nullopt;
+    if (!result || fields[0] != "managed-network-start" || *result < 0 || *result > 4)
+      return std::nullopt;
+    return static_cast<ManagedNetworkStartResult>(*result);
+  }
+  std::optional<bool> ControlClient::stop_managed_network() const noexcept
+  {
+    if(server_!=nullptr) { const auto state=server_->managed_network_status(); if(state.state!=ManagedNetworkState::Running) return false; return server_->stop_managed_network(); } const auto response=request("managed-network-stop"); const auto fields=response?LocalControlProtocol::fields(*response):std::vector<std::string>{}; if(fields.size()!=2||fields[0]!="managed-network-stop") return std::nullopt; const auto stopped=LocalControlProtocol::integer(fields[1]); if(!stopped||(*stopped!=0&&*stopped!=1)) return std::nullopt; return *stopped==1;
+  }
+
   std::optional<std::string> ControlClient::request(
       const std::string &message) const noexcept
   {

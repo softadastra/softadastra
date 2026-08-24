@@ -45,6 +45,8 @@ add_library(
   src/host/HostState.cpp
   src/host/HostStateFile.cpp
   src/platform/NativeNetwork.cpp
+  src/platform/ManagedNetwork.cpp
+  src/platform/NativeManagedNetwork.cpp
   src/platform/NativeDataDirectory.cpp
   src/platform/HostInstanceLock.cpp
   src/platform/MdnsPublisher.cpp
@@ -217,6 +219,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_native_data_directory_test
     tests/platform/native_data_directory_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_managed_network_test
+    tests/platform/native_managed_network_test.cpp
   )
 
   softadastra_add_test(

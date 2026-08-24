@@ -16,6 +16,7 @@
 #define SOFTADASTRA_PLATFORM_NATIVE_PLATFORM_HPP
 
 #include "platform/NativeNetwork.hpp"
+#include "platform/NativeManagedNetwork.hpp"
 #include "platform/NativeProcessLauncher.hpp"
 #include "platform/NativeService.hpp"
 #include "platform/Platform.hpp"
@@ -93,11 +94,14 @@ namespace softadastra
      * @brief Returns the native network capability.
      */
     [[nodiscard]] const Network &network() const noexcept override;
+    [[nodiscard]] ManagedNetwork &managed_network() noexcept override;
+    [[nodiscard]] const ManagedNetwork &managed_network() const noexcept override;
 
   private:
     NativeProcessLauncher process_launcher_;
     NativeService service_;
     NativeNetwork network_;
+    NativeManagedNetwork managed_network_;
   };
 
 } // namespace softadastra

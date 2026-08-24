@@ -28,6 +28,7 @@
 #include "platform/MdnsPublisher.hpp"
 #include "platform/NativePlatform.hpp"
 #include "platform/NativeNetwork.hpp"
+#include "platform/NativeManagedNetwork.hpp"
 #include "software/ProjectIdentity.hpp"
 #include "software/ProjectConfig.hpp"
 
@@ -340,7 +341,8 @@ int main(int argc, char *argv[])
   }
 
   softadastra::NativeNetwork network;
-  softadastra::Cli cli(control_client, network);
+  softadastra::NativeManagedNetwork managed_network;
+  softadastra::Cli cli(control_client, network, managed_network);
 
   std::vector<const char *> arguments;
   arguments.reserve(static_cast<std::size_t>(argc));

@@ -198,6 +198,16 @@ namespace
     std::string primary_ipv4_;
   };
 
+  class TestManagedNetwork final : public softadastra::ManagedNetwork
+  {
+  public:
+    [[nodiscard]] softadastra::ManagedNetworkStatus status() const override { return {softadastra::ManagedNetworkCapability::Available,state,{},{},{}}; }
+    [[nodiscard]] softadastra::ManagedNetworkStartResult start() override { return softadastra::ManagedNetworkStartResult::Failed; }
+    bool stop() override { ++stop_calls; state=softadastra::ManagedNetworkState::Stopped; return true; }
+    softadastra::ManagedNetworkState state{softadastra::ManagedNetworkState::Stopped};
+    int stop_calls{0};
+  };
+
   class TestPlatform final : public softadastra::Platform
   {
   public:
@@ -236,6 +246,8 @@ namespace
     {
       return network_;
     }
+    [[nodiscard]] softadastra::ManagedNetwork &managed_network() noexcept override { return managed_network_; }
+    [[nodiscard]] const softadastra::ManagedNetwork &managed_network() const noexcept override { return managed_network_; }
 
     TestNetwork &test_network() noexcept
     {
@@ -246,6 +258,7 @@ namespace
     TestProcessLauncher process_launcher_;
     TestService service_;
     TestNetwork network_;
+    TestManagedNetwork managed_network_;
   };
 
   TEST(HostServiceTest, RegistersSoftware)
@@ -511,6 +524,20 @@ namespace
     const softadastra::HostService service(host, launcher);
 
     EXPECT_EQ(service.local_access().primary_ipv4, "192.168.1.6");
+  }
+
+  TEST(HostServiceTest, StopsRunningManagedNetworkDuringShutdown)
+  {
+    TestPlatform platform; platform.managed_network().start();
+    auto &managed=static_cast<TestManagedNetwork &>(platform.managed_network()); managed.state=softadastra::ManagedNetworkState::Running;
+    TestProcessLauncher launcher; softadastra::Host host(platform); softadastra::HostService service(host,launcher);
+    EXPECT_TRUE(service.shutdown()); EXPECT_EQ(managed.stop_calls,1);
+  }
+
+  TEST(HostServiceTest, DoesNotStopManagedNetworkWhenAlreadyStopped)
+  {
+    TestPlatform platform; TestProcessLauncher launcher; softadastra::Host host(platform); softadastra::HostService service(host,launcher);
+    EXPECT_TRUE(service.shutdown()); EXPECT_EQ(static_cast<TestManagedNetwork &>(platform.managed_network()).stop_calls,0);
   }
 
 } // namespace

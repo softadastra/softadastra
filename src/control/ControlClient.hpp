@@ -123,6 +123,9 @@ namespace softadastra
      * @brief Returns detailed Host network capability when the endpoint responds.
      */
     [[nodiscard]] std::optional<NetworkCapability> network_capability() const noexcept;
+    [[nodiscard]] std::optional<ManagedNetworkStatus> managed_network_status() const noexcept;
+    [[nodiscard]] std::optional<ManagedNetworkStartResult> start_managed_network() const noexcept;
+    [[nodiscard]] std::optional<bool> stop_managed_network() const noexcept;
 
   public:
     [[nodiscard]] std::optional<std::string> request(

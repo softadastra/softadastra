@@ -17,6 +17,7 @@
 
 #include "control/ControlClient.hpp"
 #include "platform/Network.hpp"
+#include "platform/ManagedNetwork.hpp"
 
 namespace softadastra
 {
@@ -45,6 +46,7 @@ namespace softadastra
      * This lets `network info` observe the machine without starting the Host.
      */
     Cli(ControlClient &client, const Network &network) noexcept;
+    Cli(ControlClient &client, const Network &network, ManagedNetwork &managed_network) noexcept;
 
     /**
      * @brief Executes a command-line operation.
@@ -77,6 +79,7 @@ namespace softadastra
   private:
     ControlClient &client_;
     const Network *network_{nullptr};
+    ManagedNetwork *managed_network_{nullptr};
   };
 
 } // namespace softadastra

@@ -255,6 +255,9 @@ namespace softadastra
              std::to_string(static_cast<int>(capability.local_network_state)) + " " +
              std::to_string(static_cast<int>(capability.managed_network_capability));
     }
+    if (fields[0] == "managed-network-status" && fields.size() == 1) { const auto status=server.managed_network_status(); return "managed-network-status "+std::to_string(static_cast<int>(status.capability))+" "+std::to_string(static_cast<int>(status.state))+" "+LocalControlProtocol::encode(status.interface_name)+" "+LocalControlProtocol::encode(status.ipv4)+" "+LocalControlProtocol::encode(status.ssid); }
+    if (fields[0] == "managed-network-start" && fields.size() == 1) return "managed-network-start "+std::to_string(static_cast<int>(server.start_managed_network()));
+    if (fields[0] == "managed-network-stop" && fields.size() == 1) { const auto status=server.managed_network_status(); return "managed-network-stop "+std::to_string(status.state==ManagedNetworkState::Running&&server.stop_managed_network()?1:0); }
 
     if (fields[0] == "local-access" && fields.size() == 2)
     {

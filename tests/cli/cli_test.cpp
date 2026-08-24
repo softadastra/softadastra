@@ -221,10 +221,25 @@ namespace
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_NE(output.find("State:            available"), std::string::npos);
     EXPECT_NE(output.find("Interface:        wlp108s0"), std::string::npos);
-    EXPECT_NE(output.find("Managed network:  available"), std::string::npos);
+    EXPECT_NE(output.find("Managed network:  unavailable"), std::string::npos);
     EXPECT_EQ(cli.run(3, short_help), 0);
     EXPECT_EQ(cli.run(3, long_help), 0);
     EXPECT_EQ(cli.run(3, help), 0);
+  }
+
+  TEST(CliTest, ReportsUnavailableManagedNetworkWithoutChangingState)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    const char *start[] = {"softadastra", "network", "start"};
+    const char *status[] = {"softadastra", "network", "status"};
+    const char *stop[] = {"softadastra", "network", "stop"};
+    testing::internal::CaptureStderr(); EXPECT_EQ(cli.run(3, start), 1);
+    EXPECT_NE(testing::internal::GetCapturedStderr().find("Managed network is unavailable"), std::string::npos);
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, status), 0);
+    EXPECT_NE(testing::internal::GetCapturedStdout().find("Managed network: stopped"), std::string::npos);
+    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, stop), 0);
+    EXPECT_NE(testing::internal::GetCapturedStdout().find("is not running"), std::string::npos);
   }
 
   TEST(CliTest, ResolvesLocalAccessFromCurrentNetworkAndSoftwareState)

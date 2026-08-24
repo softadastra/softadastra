@@ -19,6 +19,7 @@
 #include "host/Host.hpp"
 #include "host/LocalAccess.hpp"
 #include "platform/Network.hpp"
+#include "platform/ManagedNetwork.hpp"
 #include "platform/ProcessLauncher.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
@@ -152,6 +153,9 @@ namespace softadastra
      * @brief Returns the Host's detailed, read-only network capability.
      */
     [[nodiscard]] NetworkCapability network_capability() const;
+    [[nodiscard]] ManagedNetworkStatus managed_network_status() const;
+    [[nodiscard]] ManagedNetworkStartResult start_managed_network();
+    bool stop_managed_network();
 
     /**
      * @brief Returns the current primary local IPv4 address when available.

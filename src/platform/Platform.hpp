@@ -16,6 +16,7 @@
 #define SOFTADASTRA_PLATFORM_PLATFORM_HPP
 
 #include "platform/Network.hpp"
+#include "platform/ManagedNetwork.hpp"
 #include "platform/ProcessLauncher.hpp"
 #include "platform/Service.hpp"
 
@@ -63,6 +64,11 @@ namespace softadastra
      * @brief Returns the network capability.
      */
     [[nodiscard]] virtual const Network &network() const noexcept = 0;
+
+    [[nodiscard]] virtual ManagedNetwork &managed_network() noexcept
+    { static UnavailableManagedNetwork network; return network; }
+    [[nodiscard]] virtual const ManagedNetwork &managed_network() const noexcept
+    { static UnavailableManagedNetwork network; return network; }
   };
 
 } // namespace softadastra
