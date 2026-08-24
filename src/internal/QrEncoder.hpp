@@ -1194,7 +1194,11 @@ namespace softadastra
     }
   };
 
-  // ASCII Renderer
+  /**
+   * @brief Renders compact terminal QR matrices.
+   *
+   * Two matrix rows are packed into each text line with Unicode half blocks.
+   */
   class ASCIIRenderer
   {
   public:
@@ -1202,9 +1206,11 @@ namespace softadastra
     {
       const int sz = m.size();
       const int qs = opts.quiet_zone;
-      std::string result;
       const int total = sz + 2 * qs;
-      result.reserve(static_cast<std::size_t>(total * ((total + 1) / 2) * 12));
+
+      std::string result;
+      result.reserve(static_cast<std::size_t>(total) *
+                     static_cast<std::size_t>((total + 1) / 2) * 20U);
 
       for (int row = 0; row < total; row += 2)
       {
@@ -1214,11 +1220,11 @@ namespace softadastra
           const bool bottom = module(m, row + 1 - qs, col - qs);
           append_cell(result, top, bottom, opts.use_ansi);
         }
+
+        if (opts.use_ansi)
+          result += "\x1b[0m";
         result += '\n';
       }
-
-      if (opts.use_ansi)
-        result += "\x1b[0m";
 
       return result;
     }
@@ -1234,16 +1240,18 @@ namespace softadastra
     {
       if (use_ansi)
       {
-        result += top ? "\x1b[30" : "\x1b[37";
-        result += bottom ? ";40m" : ";47m";
+        result += bottom ? "\x1b[30" : "\x1b[37";
+        result += top ? ";40m" : ";47m";
+        result += "\u2584";
+        return;
       }
 
       if (top && bottom)
-        result += "█";
+        result += "\u2588";
       else if (top)
-        result += "▀";
+        result += "\u2580";
       else if (bottom)
-        result += "▄";
+        result += "\u2584";
       else
         result += ' ';
     }

@@ -151,7 +151,16 @@ TEST(AccessUrlTest, UsesCompactAnsiTerminalRendererWithQuietZone)
   const std::string terminal = encoded.to_ascii({.use_ansi = true});
 
   EXPECT_EQ(std::count(terminal.begin(), terminal.end(), '\n'), 17);
+
+  EXPECT_NE(terminal.find("\u2584"), std::string::npos);
+  EXPECT_EQ(terminal.find("\u2580"), std::string::npos);
+  EXPECT_EQ(terminal.find("\u2588"), std::string::npos);
+
   EXPECT_NE(terminal.find("\x1b[30;40m"), std::string::npos);
   EXPECT_NE(terminal.find("\x1b[37;47m"), std::string::npos);
-  EXPECT_EQ(terminal.rfind("\x1b[0m"), terminal.size() - 4U);
+  EXPECT_NE(terminal.find("\x1b[37;40m"), std::string::npos);
+  EXPECT_NE(terminal.find("\x1b[0m\n"), std::string::npos);
+
+  const std::string tail = "\x1b[0m\n";
+  EXPECT_EQ(terminal.compare(terminal.size() - tail.size(), tail.size(), tail), 0);
 }
