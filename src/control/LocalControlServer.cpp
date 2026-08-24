@@ -256,6 +256,26 @@ namespace softadastra
              std::to_string(static_cast<int>(capability.managed_network_capability));
     }
 
+    if (fields[0] == "local-access" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      const auto access = id.has_value()
+                              ? server.local_access(SoftwareId(id.value()))
+                              : std::nullopt;
+      if (!access.has_value())
+      {
+        return "error";
+      }
+
+      return "local-access " + std::to_string(static_cast<int>(access->state)) +
+             " " + std::to_string(static_cast<int>(access->protocol)) +
+             " " + std::to_string(access->port) + " " +
+             LocalControlProtocol::encode(access->ipv4) + " " +
+             LocalControlProtocol::encode(access->url) + " " +
+             std::to_string(static_cast<int>(access->local_network_state)) + " " +
+             std::to_string(static_cast<int>(access->managed_network_capability));
+    }
+
     if (fields[0] == "access-point" && fields.size() == 2)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);

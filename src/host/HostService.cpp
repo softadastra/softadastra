@@ -147,6 +147,21 @@ namespace softadastra
         network.local_addresses()};
   }
 
+  std::optional<LocalAccess> HostService::local_access(
+      const SoftwareId &id) const noexcept
+  {
+    const auto entry = software(id);
+    if (!entry.has_value() || !entry->access_point().has_value())
+    {
+      return std::nullopt;
+    }
+
+    return resolve_local_access(
+        entry->access_point().value(),
+        network_capability(),
+        entry->state() == SoftwareState::Running);
+  }
+
   NetworkCapability HostService::network_capability() const
   {
     return host_.platform().network().network_capability();

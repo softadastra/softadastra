@@ -420,6 +420,51 @@ namespace softadastra
     return access;
   }
 
+  std::optional<LocalAccess> ControlClient::local_access(
+      const SoftwareId &id) const noexcept
+  {
+    if (server_ != nullptr)
+    {
+      return server_->local_access(id);
+    }
+
+    const auto response = request("local-access " + LocalControlProtocol::encode(id.value()));
+    const auto fields = response.has_value()
+                            ? LocalControlProtocol::fields(response.value())
+                            : std::vector<std::string>{};
+    if (fields.size() != 8 || fields[0] != "local-access")
+    {
+      return std::nullopt;
+    }
+
+    const auto state = LocalControlProtocol::integer(fields[1]);
+    const auto protocol = LocalControlProtocol::integer(fields[2]);
+    const auto port = LocalControlProtocol::integer(fields[3]);
+    const auto ipv4 = LocalControlProtocol::decode(fields[4]);
+    const auto url = LocalControlProtocol::decode(fields[5]);
+    const auto local_network = LocalControlProtocol::integer(fields[6]);
+    const auto managed_network = LocalControlProtocol::integer(fields[7]);
+    if (!state.has_value() || !protocol.has_value() || !port.has_value() ||
+        !ipv4.has_value() || !url.has_value() || !local_network.has_value() ||
+        !managed_network.has_value() || state.value() < 0 || state.value() > 1 ||
+        protocol.value() < 0 || protocol.value() > 1 || port.value() < 1 ||
+        port.value() > 65535 || local_network.value() < 0 ||
+        local_network.value() > 1 || managed_network.value() < 0 ||
+        managed_network.value() > 1)
+    {
+      return std::nullopt;
+    }
+
+    return LocalAccess{
+        static_cast<LocalAccessState>(state.value()),
+        static_cast<AccessProtocol>(protocol.value()),
+        static_cast<std::uint16_t>(port.value()),
+        ipv4.value(),
+        url.value(),
+        static_cast<LocalNetworkState>(local_network.value()),
+        static_cast<ManagedNetworkCapability>(managed_network.value())};
+  }
+
   std::optional<NetworkCapability> ControlClient::network_capability() const noexcept
   {
     if (server_ != nullptr)

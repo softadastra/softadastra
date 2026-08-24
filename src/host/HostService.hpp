@@ -17,6 +17,7 @@
 
 #include "connectivity/ConnectivityManager.hpp"
 #include "host/Host.hpp"
+#include "host/LocalAccess.hpp"
 #include "platform/Network.hpp"
 #include "platform/ProcessLauncher.hpp"
 #include "platform/ProcessSpec.hpp"
@@ -138,6 +139,14 @@ namespace softadastra
      * @brief Returns infrastructure information for reaching the Host locally.
      */
     [[nodiscard]] LocalHostAccess local_access() const;
+
+    /**
+     * @brief Resolves the current local access for a registered Software.
+     *
+     * @return No value when the Software has no AccessPoint or is unknown.
+     */
+    [[nodiscard]] std::optional<LocalAccess> local_access(
+        const SoftwareId &id) const noexcept;
 
     /**
      * @brief Returns the Host's detailed, read-only network capability.

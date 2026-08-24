@@ -21,6 +21,7 @@ namespace
   class Process final : public softadastra::Process
   {
   public:
+    explicit Process(bool running = true) : running_(running) {}
     bool stop() override { running_ = false; return true; }
     [[nodiscard]] bool is_running() const noexcept override { return running_; }
     [[nodiscard]] std::optional<int> exit_code() noexcept override { return std::nullopt; }
@@ -31,8 +32,9 @@ namespace
   {
   public:
     [[nodiscard]] softadastra::ProcessLaunchResult launch(const softadastra::ProcessSpec &spec) override
-    { last_spec = spec; return std::make_unique<Process>(); }
+    { last_spec = spec; return std::make_unique<Process>(process_running); }
     std::optional<softadastra::ProcessSpec> last_spec;
+    bool process_running{true};
   };
 
   class Service final : public softadastra::Service
@@ -47,11 +49,13 @@ namespace
     [[nodiscard]] std::vector<softadastra::LocalNetworkAddress> local_addresses() const override { return {{softadastra::LocalAddressFamily::IPv4, "test", "127.0.0.1"}}; }
     [[nodiscard]] softadastra::NetworkCapability network_capability() const override
     {
-      return {softadastra::NetworkState::Available, "10.56.116.55", "wlp108s0",
-              softadastra::NetworkInterfaceType::Wifi,
-              softadastra::LocalNetworkState::Existing,
-              softadastra::ManagedNetworkCapability::Available};
+      return capability;
     }
+    softadastra::NetworkCapability capability{
+        softadastra::NetworkState::Available, "10.56.116.55", "wlp108s0",
+        softadastra::NetworkInterfaceType::Wifi,
+        softadastra::LocalNetworkState::Existing,
+        softadastra::ManagedNetworkCapability::Available};
   };
 
   class Platform final : public softadastra::Platform
@@ -221,6 +225,84 @@ namespace
     EXPECT_EQ(cli.run(3, short_help), 0);
     EXPECT_EQ(cli.run(3, long_help), 0);
     EXPECT_EQ(cli.run(3, help), 0);
+  }
+
+  TEST(CliTest, ResolvesLocalAccessFromCurrentNetworkAndSoftwareState)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("api"), softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
+    ASSERT_TRUE(client.start_software(softadastra::SoftwareId("api")));
+    const char *access_api[] = {"softadastra", "access", "api"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 0);
+    auto output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("State:         running"), std::string::npos);
+    EXPECT_NE(output.find("Network:       existing"), std::string::npos);
+    EXPECT_NE(output.find("Local URL:     http://10.56.116.55:8080"), std::string::npos);
+    EXPECT_NE(output.find("Scan with your phone."), std::string::npos);
+
+    platform.network_.capability.primary_ipv4 = "192.168.1.6";
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 0);
+    output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("http://192.168.1.6:8080"), std::string::npos);
+
+    ASSERT_TRUE(client.stop_software(softadastra::SoftwareId("api")));
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 1);
+    output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("State:         stopped"), std::string::npos);
+    EXPECT_NE(output.find("Local access:  unavailable"), std::string::npos);
+    EXPECT_NE(output.find("softadastra run api"), std::string::npos);
+    EXPECT_EQ(output.find("Scan with your phone."), std::string::npos);
+
+    platform.launcher.process_running = false;
+    EXPECT_FALSE(client.start_software(softadastra::SoftwareId("api")));
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 1);
+    output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("State:         failed"), std::string::npos);
+    EXPECT_NE(output.find("softadastra logs api"), std::string::npos);
+    EXPECT_EQ(output.find("Scan with your phone."), std::string::npos);
+  }
+
+  TEST(CliTest, ExplainsUnavailableNetworkAndSupportsHttpsAccess)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("secure"), softadastra::ProcessSpec("secure"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Https, 8443)));
+    ASSERT_TRUE(client.start_software(softadastra::SoftwareId("secure")));
+    const char *access_secure[] = {"softadastra", "access", "secure"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_secure), 0);
+    auto output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("Access:        https:8443"), std::string::npos);
+    EXPECT_NE(output.find("https://10.56.116.55:8443"), std::string::npos);
+
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
+                                    softadastra::NetworkInterfaceType::Unknown,
+                                    softadastra::LocalNetworkState::Unavailable,
+                                    softadastra::ManagedNetworkCapability::Available};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_secure), 1);
+    output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("No active local network is available on this Host."), std::string::npos);
+    EXPECT_NE(output.find("Managed network capability: available"), std::string::npos);
+    EXPECT_EQ(output.find("Scan with your phone."), std::string::npos);
+  }
+
+  TEST(CliTest, ExplainsMissingAccessPoint)
+  {
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("worker"), softadastra::ProcessSpec("worker")));
+    const char *access_worker[] = {"softadastra", "access", "worker"};
+    testing::internal::CaptureStderr();
+    EXPECT_EQ(cli.run(3, access_worker), 1);
+    const auto output = testing::internal::GetCapturedStderr();
+    EXPECT_NE(output.find("No access configured for: worker"), std::string::npos);
+    EXPECT_NE(output.find("global Software has no AccessPoint"), std::string::npos);
   }
 
   TEST(CliTest, ResolvesProjectAndNamedTargetsUniformly)
