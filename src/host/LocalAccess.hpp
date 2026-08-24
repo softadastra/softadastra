@@ -9,6 +9,7 @@
 #define SOFTADASTRA_HOST_LOCAL_ACCESS_HPP
 
 #include "platform/Network.hpp"
+#include "platform/ManagedNetwork.hpp"
 #include "software/AccessPoint.hpp"
 
 #include <cstdint>
@@ -20,6 +21,13 @@ namespace softadastra
   {
     Available,
     Unavailable
+  };
+
+  enum class LocalAccessNetwork
+  {
+    Unavailable,
+    Existing,
+    Managed
   };
 
   /**
@@ -35,6 +43,7 @@ namespace softadastra
     std::uint16_t port{0};
     std::string ipv4;
     std::string url;
+    LocalAccessNetwork network{LocalAccessNetwork::Unavailable};
     LocalNetworkState local_network_state{LocalNetworkState::Unavailable};
     ManagedNetworkCapability managed_network_capability{
         ManagedNetworkCapability::Unavailable};
@@ -43,10 +52,13 @@ namespace softadastra
   [[nodiscard]] LocalAccess resolve_local_access(
       AccessPoint access_point,
       NetworkCapability network_capability,
+      ManagedNetworkStatus managed_network_status,
       bool software_running);
 
   [[nodiscard]] const char *local_access_state_name(
       LocalAccessState state) noexcept;
+  [[nodiscard]] const char *local_access_network_name(
+      LocalAccessNetwork network) noexcept;
 }
 
 #endif // SOFTADASTRA_HOST_LOCAL_ACCESS_HPP

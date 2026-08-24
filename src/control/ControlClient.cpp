@@ -432,7 +432,7 @@ namespace softadastra
     const auto fields = response.has_value()
                             ? LocalControlProtocol::fields(response.value())
                             : std::vector<std::string>{};
-    if (fields.size() != 8 || fields[0] != "local-access")
+    if (fields.size() != 9 || fields[0] != "local-access")
     {
       return std::nullopt;
     }
@@ -442,13 +442,14 @@ namespace softadastra
     const auto port = LocalControlProtocol::integer(fields[3]);
     const auto ipv4 = LocalControlProtocol::decode(fields[4]);
     const auto url = LocalControlProtocol::decode(fields[5]);
-    const auto local_network = LocalControlProtocol::integer(fields[6]);
-    const auto managed_network = LocalControlProtocol::integer(fields[7]);
+    const auto network = LocalControlProtocol::integer(fields[6]);
+    const auto local_network = LocalControlProtocol::integer(fields[7]);
+    const auto managed_network = LocalControlProtocol::integer(fields[8]);
     if (!state.has_value() || !protocol.has_value() || !port.has_value() ||
-        !ipv4.has_value() || !url.has_value() || !local_network.has_value() ||
+        !ipv4.has_value() || !url.has_value() || !network.has_value() || !local_network.has_value() ||
         !managed_network.has_value() || state.value() < 0 || state.value() > 1 ||
         protocol.value() < 0 || protocol.value() > 1 || port.value() < 1 ||
-        port.value() > 65535 || local_network.value() < 0 ||
+        port.value() > 65535 || network.value() < 0 || network.value() > 2 || local_network.value() < 0 ||
         local_network.value() > 1 || managed_network.value() < 0 ||
         managed_network.value() > 1)
     {
@@ -461,6 +462,7 @@ namespace softadastra
         static_cast<std::uint16_t>(port.value()),
         ipv4.value(),
         url.value(),
+        static_cast<LocalAccessNetwork>(network.value()),
         static_cast<LocalNetworkState>(local_network.value()),
         static_cast<ManagedNetworkCapability>(managed_network.value())};
   }

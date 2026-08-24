@@ -58,6 +58,26 @@ namespace
         softadastra::ManagedNetworkCapability::Available};
   };
 
+  class ManagedNetwork final : public softadastra::ManagedNetwork
+  {
+  public:
+    [[nodiscard]] softadastra::ManagedNetworkStatus status() const override
+    {
+      return current;
+    }
+    [[nodiscard]] softadastra::ManagedNetworkStartResult start() override
+    {
+      return current.capability == softadastra::ManagedNetworkCapability::Available
+                 ? softadastra::ManagedNetworkStartResult::Failed
+                 : softadastra::ManagedNetworkStartResult::Unavailable;
+    }
+    bool stop() override { return false; }
+
+    softadastra::ManagedNetworkStatus current{
+        softadastra::ManagedNetworkCapability::Unavailable,
+        softadastra::ManagedNetworkState::Stopped, {}, {}, {}};
+  };
+
   class Platform final : public softadastra::Platform
   {
   public:
@@ -67,7 +87,9 @@ namespace
     [[nodiscard]] const softadastra::Service &service() const noexcept override { return service_; }
     [[nodiscard]] softadastra::Network &network() noexcept override { return network_; }
     [[nodiscard]] const softadastra::Network &network() const noexcept override { return network_; }
-    Launcher launcher; Service service_; Network network_;
+    [[nodiscard]] softadastra::ManagedNetwork &managed_network() noexcept override { return managed_network_; }
+    [[nodiscard]] const softadastra::ManagedNetwork &managed_network() const noexcept override { return managed_network_; }
+    Launcher launcher; Service service_; Network network_; ManagedNetwork managed_network_;
   };
 
   TEST(CliTest, RunsMovedProjectFromRootAndSubdirectoryUsingCurrentRoot)
@@ -257,7 +279,18 @@ namespace
     EXPECT_NE(output.find("Local URL:     http://10.56.116.55:8080"), std::string::npos);
     EXPECT_NE(output.find("Scan with your phone."), std::string::npos);
 
+    platform.managed_network_.current = {
+        softadastra::ManagedNetworkCapability::Available,
+        softadastra::ManagedNetworkState::Running, "wlan1", "10.42.0.1",
+        "Softadastra-test"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 0);
+    output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("Network:       managed"), std::string::npos);
+    EXPECT_NE(output.find("Local URL:     http://10.42.0.1:8080"), std::string::npos);
+
     platform.network_.capability.primary_ipv4 = "192.168.1.6";
+    platform.managed_network_.current.state = softadastra::ManagedNetworkState::Stopped;
     testing::internal::CaptureStdout();
     EXPECT_EQ(cli.run(3, access_api), 0);
     output = testing::internal::GetCapturedStdout();

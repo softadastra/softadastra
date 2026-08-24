@@ -162,6 +162,7 @@ namespace softadastra
     return resolve_local_access(
         entry->access_point().value(),
         network_capability(),
+        managed_network_status(),
         entry->state() == SoftwareState::Running);
   }
 

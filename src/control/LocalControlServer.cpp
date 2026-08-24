@@ -275,6 +275,7 @@ namespace softadastra
              " " + std::to_string(access->port) + " " +
              LocalControlProtocol::encode(access->ipv4) + " " +
              LocalControlProtocol::encode(access->url) + " " +
+             std::to_string(static_cast<int>(access->network)) + " " +
              std::to_string(static_cast<int>(access->local_network_state)) + " " +
              std::to_string(static_cast<int>(access->managed_network_capability));
     }

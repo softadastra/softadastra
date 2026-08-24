@@ -55,7 +55,7 @@ bool print_access(ControlClient &client,const Target &t) {
   const auto access=client.local_access(t.id); if(!access) { std::cerr<<"Local access information is unavailable\n"; return false; }
   const auto entry=client.software(t.id); if(!entry) { unknown_software(t.name); return false; }
   std::cout<<"Software:      "<<t.name<<"\nState:         "<<state_name(entry->state())<<"\nAccess:        "<<access_name(configured)<<'\n';
-  if(access->state==LocalAccessState::Available) { std::cout<<"Network:       "<<local_network_state_name(access->local_network_state)<<"\nLocal URL:     "<<access->url<<"\n\n"; if(!QrCode::print(access->url)) std::cout<<"QR generation is unavailable.\n"; std::cout<<"\nScan with your phone.\n"; return true; }
+  if(access->state==LocalAccessState::Available) { std::cout<<"Network:       "<<local_access_network_name(access->network)<<"\nLocal URL:     "<<access->url<<"\n\n"; if(!QrCode::print(access->url)) std::cout<<"QR generation is unavailable.\n"; std::cout<<"\nScan with your phone.\n"; return true; }
   std::cout<<"Local access:  unavailable\n";
   if(entry->state()==SoftwareState::Stopped) std::cout<<"\nStart it with:\n\n  softadastra run"<<(t.root?"":" "+t.name)<<"\n";
   else if(entry->state()==SoftwareState::Failed) std::cout<<"\nInspect logs with:\n\n  softadastra logs"<<(t.root?"":" "+t.name)<<"\n";
