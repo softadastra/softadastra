@@ -49,6 +49,7 @@ namespace softadastra
 
   std::vector<SoftwareEntry> ControlServer::software() const
   { return host_service_.software(); }
+  bool ControlServer::remove_software(const SoftwareId &id) { return host_service_.remove_software(id); }
 
   bool ControlServer::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
   { return host_service_.link_project(id, std::move(identity), std::move(root)); }

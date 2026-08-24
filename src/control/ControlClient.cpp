@@ -152,6 +152,13 @@ namespace softadastra
     return entries;
   }
 
+  bool ControlClient::remove_software(const SoftwareId &id)
+  {
+    if (server_ != nullptr) return server_->remove_software(id);
+    const auto response = request("remove " + LocalControlProtocol::encode(id.value()));
+    return response.has_value() && response.value() == "remove 1";
+  }
+
   bool ControlClient::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
   {
     if (server_ != nullptr) return server_->link_project(id, std::move(identity), std::move(root));

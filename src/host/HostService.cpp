@@ -69,6 +69,7 @@ namespace softadastra
 
   std::vector<SoftwareEntry> HostService::software() const
   { return software_manager_.software(); }
+  bool HostService::remove_software(const SoftwareId &id) { return software_manager_.remove(id); }
 
   bool HostService::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
   {

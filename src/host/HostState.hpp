@@ -50,6 +50,7 @@ namespace softadastra
      *         same identifier already exists.
      */
     bool add_software(SoftwareEntry entry);
+    bool remove_software(const SoftwareId &id);
 
     /**
      * @brief Finds a software entry by identifier.

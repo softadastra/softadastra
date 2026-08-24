@@ -298,6 +298,12 @@ namespace softadastra
       return response;
     }
 
+    if (fields[0] == "remove" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      return id ? std::string("remove ") + (server.remove_software(SoftwareId(*id)) ? "1" : "0") : "error";
+    }
+
     if (fields[0] == "link-project" && fields.size() == 4)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);

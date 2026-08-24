@@ -65,6 +65,7 @@ namespace softadastra
 
     [[nodiscard]] std::optional<AccessPoint> access_point(const SoftwareId &id) const noexcept;
     [[nodiscard]] std::vector<SoftwareEntry> software() const;
+    [[nodiscard]] bool remove(const SoftwareId &id);
 
     /**
      * @brief Starts registered software.

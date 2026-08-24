@@ -13,6 +13,7 @@
  */
 
 #include "host/HostState.hpp"
+#include <algorithm>
 #include <utility>
 
 namespace softadastra
@@ -26,6 +27,13 @@ namespace softadastra
 
     software_.push_back(std::move(entry));
     return true;
+  }
+
+  bool HostState::remove_software(const SoftwareId &id)
+  {
+    const auto previous = software_.size();
+    software_.erase(std::remove_if(software_.begin(), software_.end(), [&id](const SoftwareEntry &entry) { return entry.id() == id; }), software_.end());
+    return software_.size() != previous;
   }
 
   SoftwareEntry *HostState::find_software(

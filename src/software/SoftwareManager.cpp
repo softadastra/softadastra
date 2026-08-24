@@ -125,6 +125,13 @@ namespace softadastra
     return state_.software();
   }
 
+  bool SoftwareManager::remove(const SoftwareId &id)
+  {
+    const auto *entry = state_.find_software(id);
+    if (entry == nullptr || entry->state() == SoftwareState::Running) return false;
+    return state_.remove_software(id);
+  }
+
   SoftwareOperationResult SoftwareManager::start(const SoftwareId &id)
   {
     SoftwareEntry *entry = state_.find_software(id);
