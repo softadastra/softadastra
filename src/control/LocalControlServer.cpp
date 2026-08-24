@@ -163,6 +163,11 @@ namespace softadastra
           }
           else response = "error";
         }
+        else if (fields.size() == 1 && fields[0] == "shutdown" && shutdown_handler_)
+        {
+          response = "shutdown 1";
+          shutdown_handler_();
+        }
         else response = handle(server_, request);
         static_cast<void>(::send(client, response.data(), response.size(), MSG_NOSIGNAL));
       }

@@ -34,6 +34,7 @@ namespace softadastra
      * @brief Acquires the non-stale exclusive lock for a data directory.
      */
     [[nodiscard]] bool acquire(const std::filesystem::path &directory) noexcept;
+    [[nodiscard]] static bool is_held(const std::filesystem::path &directory) noexcept;
 
   private:
     int descriptor_{-1};

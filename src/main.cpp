@@ -141,9 +141,14 @@ namespace
     }
 
     int signal = 0;
-    const int result = sigwait(&signals, &signal);
+    while (!completed)
+    {
+      const timespec timeout{0, 100000000};
+      const int received = sigtimedwait(&signals, nullptr, &timeout);
+      if (received == SIGINT || received == SIGTERM) { signal = received; break; }
+    }
 
-    if (result == 0)
+    if (signal != 0)
     {
       std::cout << "Stopping Softadastra Host...\n" << std::flush;
     }
@@ -152,7 +157,7 @@ namespace
     thread.join();
     mdns_publisher.stop();
 
-    if (result == 0 && completed)
+    if (completed)
     {
       std::cout << "Softadastra Host stopped.\n" << std::flush;
       return 0;
@@ -274,6 +279,7 @@ int main(int argc, char *argv[])
         state_file,
         std::chrono::seconds(1),
         &local_control_server);
+    local_control_server.set_shutdown_handler([&host_loop]() { host_loop.request_stop(); });
     softadastra::MdnsPublisher mdns_publisher(identity.id());
     return run_host(
         host_loop,
@@ -284,6 +290,16 @@ int main(int argc, char *argv[])
 
   softadastra::ControlClient control_client(
       softadastra::NativeDataDirectory::path() / "control.sock");
+
+  if (argc >= 3 && std::string(argv[1]) == "host")
+  {
+    const std::string action(argv[2]);
+    if (action == "-h" || action == "--help") { std::cout << "Usage:\n  softadastra host\n  softadastra host start|stop|restart|status|info\n"; return 0; }
+    if (action == "status") { const bool responding=control_client.host_available(); const bool held=softadastra::HostInstanceLock::is_held(softadastra::NativeDataDirectory::path()); std::cout << "Host: " << (responding ? "running" : (held ? "stopping" : "stopped")) << '\n'; return 0; }
+    if (action == "info") { if (!control_client.host_available()) { std::cout << "State: stopped\n"; return 0; } const auto access = control_client.local_access(); std::cout << "State:          running\nHostname:       " << (access ? access->host_name : "-") << "\nIPv4:           " << (access ? access->primary_ipv4 : "-") << '\n'; return 0; }
+    if (action == "stop") { if (!control_client.host_available()) { std::cout << "Softadastra Host is not running.\n"; return 0; } if (!control_client.request("shutdown")) { std::cerr << "Failed to stop Softadastra Host.\n"; return 1; } std::cout << "Stopping Softadastra Host...\n"; for (int i=0;i<250 && softadastra::HostInstanceLock::is_held(softadastra::NativeDataDirectory::path());++i) std::this_thread::sleep_for(std::chrono::milliseconds(20)); if (softadastra::HostInstanceLock::is_held(softadastra::NativeDataDirectory::path())) { std::cerr << "Softadastra Host did not stop.\n"; return 1; } std::cout << "Softadastra Host stopped.\n"; return 0; }
+    if (action == "start" || action == "restart") { const bool was_running=control_client.host_available(); if (action == "restart" && was_running) { static_cast<void>(control_client.request("shutdown")); for (int i=0;i<100 && control_client.host_available();++i) std::this_thread::sleep_for(std::chrono::milliseconds(20)); } if (!control_client.host_available()) { if (!start_host_automatically(argv[0])) return 1; for (int i=0;i<100 && !control_client.host_available();++i) std::this_thread::sleep_for(std::chrono::milliseconds(20)); } std::cout << (action == "restart" ? "Softadastra Host restarted.\n" : (was_running ? "Softadastra Host is already running.\n" : "Softadastra Host started.\n")); return 0; }
+  }
 
   const std::string cli_command = argc > 1 ? argv[1] : "";
   const bool command_help = argc == 3 &&

@@ -66,4 +66,10 @@ namespace softadastra
 #endif
   }
 
+  bool HostInstanceLock::is_held(const std::filesystem::path &directory) noexcept
+  {
+    HostInstanceLock probe;
+    return !probe.acquire(directory);
+  }
+
 } // namespace softadastra

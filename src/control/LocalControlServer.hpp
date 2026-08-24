@@ -18,6 +18,7 @@
 #include "control/ControlServer.hpp"
 
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -59,6 +60,7 @@ namespace softadastra
      * @brief Closes the local control endpoint.
      */
     void stop() noexcept;
+    void set_shutdown_handler(std::function<void()> handler) { shutdown_handler_ = std::move(handler); }
 
     /** Executes the shared Host control protocol. */
     [[nodiscard]] static std::string handle(ControlServer &server, std::string_view request);
@@ -69,6 +71,7 @@ namespace softadastra
     int descriptor_{-1};
     RemoteAccessConfig *remote_config_;
     RemoteControlServer *remote_server_;
+    std::function<void()> shutdown_handler_;
   };
 
 } // namespace softadastra
