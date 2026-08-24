@@ -253,6 +253,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
+    softadastra_local_name_test
+    tests/software/local_name_test.cpp
+  )
+
+  softadastra_add_test(
     softadastra_project_identity_test
     tests/software/project_identity_test.cpp
   )
