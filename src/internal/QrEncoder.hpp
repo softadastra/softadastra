@@ -53,10 +53,8 @@ namespace softadastra
 
   struct ASCIIOptions
   {
-    int quiet_zone = 2;
-    bool invert = false;
-    std::string dark_char = "██";
-    std::string light_char = "  ";
+    int quiet_zone = 4;
+    bool use_ansi = false;
   };
 
   // Number of data codewords per (version-1, ec_level)
@@ -385,7 +383,7 @@ namespace softadastra
         result.push_back(0);
         for (int i = 0; i < num_ec_; ++i)
         {
-          result[i] ^= gf_mul(generator_[i], factor);
+          result[i] ^= gf_mul(generator_[i + 1], factor);
         }
       }
       return result;
@@ -927,7 +925,8 @@ namespace softadastra
       const auto &positions = ALIGNMENT_POSITIONS[static_cast<std::size_t>(m.version() - 1)];
       for (int r : positions)
         for (int c : positions)
-          place_alignment_pattern(m, r, c);
+          if (r != 0 && c != 0 && !m.is_function(r, c))
+            place_alignment_pattern(m, r, c);
     }
 
     // Timing Patterns
@@ -963,7 +962,7 @@ namespace softadastra
       for (int i = 0; i < 8; ++i)
         m.set(8, sz - 1 - i, false, true);
       // Bottom-left
-      for (int i = 0; i < 8; ++i)
+      for (int i = 0; i < 7; ++i)
         m.set(sz - 1 - i, 8, false, true);
     }
 
@@ -1204,40 +1203,49 @@ namespace softadastra
       const int sz = m.size();
       const int qs = opts.quiet_zone;
       std::string result;
-      result.reserve(static_cast<std::size_t>((sz + 2 * qs) * (sz + 2 * qs) * 3));
+      const int total = sz + 2 * qs;
+      result.reserve(static_cast<std::size_t>(total * ((total + 1) / 2) * 12));
 
-      auto empty_row = [&]()
+      for (int row = 0; row < total; row += 2)
       {
-        for (int c = 0; c < sz + 2 * qs; ++c)
-          result += opts.invert ? opts.dark_char : opts.light_char;
-        result += '\n';
-      };
-
-      for (int q = 0; q < qs; ++q)
-        empty_row();
-
-      for (int r = 0; r < sz; ++r)
-      {
-        // left quiet zone
-        for (int q = 0; q < qs; ++q)
-          result += opts.invert ? opts.dark_char : opts.light_char;
-        // data row
-        for (int c = 0; c < sz; ++c)
+        for (int col = 0; col < total; ++col)
         {
-          bool dark = m.get(r, c);
-          if (opts.invert)
-            dark = !dark;
-          result += dark ? opts.dark_char : opts.light_char;
+          const bool top = module(m, row - qs, col - qs);
+          const bool bottom = module(m, row + 1 - qs, col - qs);
+          append_cell(result, top, bottom, opts.use_ansi);
         }
-        // right quiet zone
-        for (int q = 0; q < qs; ++q)
-          result += opts.invert ? opts.dark_char : opts.light_char;
         result += '\n';
       }
 
-      for (int q = 0; q < qs; ++q)
-        empty_row();
+      if (opts.use_ansi)
+        result += "\x1b[0m";
+
       return result;
+    }
+
+  private:
+    [[nodiscard]] static bool module(const QRMatrix &matrix, int row, int col)
+    {
+      return row >= 0 && row < matrix.size() && col >= 0 && col < matrix.size() &&
+             matrix.get(row, col);
+    }
+
+    static void append_cell(std::string &result, bool top, bool bottom, bool use_ansi)
+    {
+      if (use_ansi)
+      {
+        result += top ? "\x1b[30" : "\x1b[37";
+        result += bottom ? ";40m" : ";47m";
+      }
+
+      if (top && bottom)
+        result += "█";
+      else if (top)
+        result += "▀";
+      else if (bottom)
+        result += "▄";
+      else
+        result += ' ';
     }
   };
 
@@ -1258,6 +1266,21 @@ namespace softadastra
     [[nodiscard]] std::string_view original_data() const noexcept
     {
       return data_;
+    }
+
+    [[nodiscard]] int size() const noexcept
+    {
+      return matrix_.size();
+    }
+
+    [[nodiscard]] bool module(int row, int col) const noexcept
+    {
+      return matrix_.get(row, col);
+    }
+
+    [[nodiscard]] bool is_function_module(int row, int col) const noexcept
+    {
+      return matrix_.is_function(row, col);
     }
 
   private:
