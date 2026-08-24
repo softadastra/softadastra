@@ -230,14 +230,31 @@ namespace softadastra
       return response;
     }
 
-    if (fields[0] == "register" && fields.size() >= 4)
+    if (fields[0] == "access-point" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      if (!id.has_value())
+        return "error";
+      const auto access_point = server.access_point(SoftwareId(id.value()));
+      if (!access_point.has_value())
+        return "access-point 0 - 0";
+      return "access-point 1 " + std::string(AccessPoint::name(access_point->protocol())) +
+             " " + std::to_string(access_point->port());
+    }
+
+    if (fields[0] == "register" && fields.size() >= 6)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);
       const auto executable = LocalControlProtocol::decode(fields[2]);
-      const auto count = LocalControlProtocol::integer(fields[3]);
+      const auto protocol = fields[3] == "-" ? std::optional<AccessProtocol>{}
+                                               : AccessPoint::protocol(fields[3]);
+      const auto port = LocalControlProtocol::integer(fields[4]);
+      const auto count = LocalControlProtocol::integer(fields[5]);
 
-      if (!id.has_value() || !executable.has_value() || !count.has_value() ||
-          count.value() < 0 || fields.size() != static_cast<std::size_t>(count.value()) + 4)
+      if (!id.has_value() || !executable.has_value() || !count.has_value() || !port.has_value() ||
+          count.value() < 0 || fields.size() != static_cast<std::size_t>(count.value()) + 6 ||
+          (fields[3] == "-" && port.value() != 0) ||
+          (fields[3] != "-" && (!protocol.has_value() || port.value() < 1 || port.value() > 65535)))
       {
         return "error";
       }
@@ -245,7 +262,7 @@ namespace softadastra
       std::vector<std::string> arguments;
       arguments.reserve(static_cast<std::size_t>(count.value()));
 
-      for (std::size_t index = 4; index < fields.size(); ++index)
+      for (std::size_t index = 6; index < fields.size(); ++index)
       {
         const auto argument = LocalControlProtocol::decode(fields[index]);
 
@@ -260,7 +277,10 @@ namespace softadastra
       return std::string("register ") +
              (server.register_software(
                   SoftwareId(id.value()),
-                  ProcessSpec(executable.value(), std::move(arguments)))
+                  ProcessSpec(executable.value(), std::move(arguments)),
+                  protocol.has_value()
+                      ? AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value()))
+                      : std::nullopt)
                   ? "1"
                   : "0");
     }

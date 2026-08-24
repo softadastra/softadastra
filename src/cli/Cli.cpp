@@ -18,6 +18,7 @@
 #include "platform/QrCode.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "software/SoftwareId.hpp"
+#include "software/AccessPoint.hpp"
 #include "software/SoftwareState.hpp"
 
 #include <iostream>
@@ -101,14 +102,14 @@ namespace
   {
     std::cout
         << "Usage:\n"
-        << "  softadastra register <software-id> <executable> [arguments...]\n"
+        << "  softadastra register <software-id> [--access http:port] -- <executable> [arguments...]\n"
         << "  softadastra start <software-id>\n"
         << "  softadastra stop <software-id>\n"
         << "  softadastra restart <software-id>\n"
         << "  softadastra status <software-id>\n"
         << "  softadastra status\n"
         << "  softadastra connectivity\n"
-        << "  softadastra access [port]\n"
+        << "  softadastra access <port|software-id>\n"
         << "  softadastra remote enable <ipv4-address> <port>\n"
         << "  softadastra remote disable\n"
         << "  softadastra help\n";
@@ -192,24 +193,13 @@ namespace softadastra
 
     if (command == "access")
     {
-      if (argc != 2 && argc != 3)
+      if (argc != 3)
       {
-        std::cerr << "access accepts an optional port from 1 to 65535\n";
+        std::cerr << "access requires a port or software identifier\n";
         return 2;
       }
 
-      std::optional<std::uint16_t> port;
-
-      if (argc == 3)
-      {
-        port = AccessUrl::port(argv[2]);
-
-        if (!port.has_value())
-        {
-          std::cerr << "port must be between 1 and 65535\n";
-          return 2;
-        }
-      }
+      const auto port = AccessUrl::port(argv[2]);
 
       const auto access = client_.local_access();
 
@@ -245,26 +235,32 @@ namespace softadastra
         return 0;
       }
 
-      if (!access->host_name.empty())
+      const SoftwareId id(argv[2]);
+      if (!client_.software_state(id).has_value())
       {
-        std::cout << "hostname: " << access->host_name << '\n';
+        std::cerr << "Software not found: " << id.value() << '\n';
+        return 1;
       }
-
-      for (const auto &address : access->addresses)
+      const auto access_point = client_.access_point(id);
+      if (!access_point.has_value())
       {
-        std::cout << (address.family == LocalAddressFamily::IPv4
-                          ? "ipv4"
-                          : "ipv6")
-                  << " " << address.interface_name
-                  << ": " << address.value << '\n';
+        std::cerr << "No access point configured for software: " << id.value() << '\n';
+        return 1;
       }
-
-      if (access->host_name.empty() && access->addresses.empty())
+      if (access->primary_ipv4.empty())
       {
-        std::cout << "no active non-loopback address\n";
+        std::cerr << "current IPv4 address is unavailable\n";
+        return 1;
       }
-
-      std::cout << "hosted software endpoints are managed by the software\n";
+      const std::string url = access_point->protocol() == AccessProtocol::Http
+                                  ? AccessUrl::http(access->primary_ipv4, access_point->port())
+                                  : AccessUrl::https(access->primary_ipv4, access_point->port());
+      std::cout << id.value() << "\nhostname: "
+                << (access->host_name.empty() ? "unavailable" : access->host_name)
+                << "\nipv4: " << access->primary_ipv4 << "\nurl: " << url << "\n\n";
+      if (!QrCode::print(url))
+        std::cout << "QR generation is unavailable.\n";
+      std::cout << "\nScan with your phone.\n";
       return 0;
     }
 
@@ -283,20 +279,40 @@ namespace softadastra
         return 2;
       }
 
-      std::vector<std::string> arguments;
-      arguments.reserve(static_cast<std::size_t>(argc - 4));
-
-      for (int index = 4; index < argc; ++index)
+      int executable_index = 3;
+      std::optional<AccessPoint> access_point;
+      if (std::string(argv[3]) == "--access")
       {
-        arguments.emplace_back(argv[index]);
+        if (argc < 7 || std::string(argv[5]) != "--")
+        {
+          std::cerr << "register --access requires http:port followed by -- and a command\n";
+          return 2;
+        }
+        const std::string value(argv[4]);
+        const auto separator = value.find(':');
+        const auto protocol = separator == std::string::npos ? std::nullopt
+                                                               : AccessPoint::protocol(value.substr(0, separator));
+        const auto port = separator == std::string::npos ? std::nullopt
+                                                           : AccessUrl::port(value.substr(separator + 1));
+        if (!protocol.has_value() || !port.has_value())
+        {
+          std::cerr << "access point must use http:port or https:port with port 1 to 65535\n";
+          return 2;
+        }
+        access_point = AccessPoint::create(protocol.value(), port.value());
+        executable_index = 6;
       }
+
+      std::vector<std::string> arguments;
+      for (int index = executable_index + 1; index < argc; ++index)
+        arguments.emplace_back(argv[index]);
 
       const SoftwareId id(argv[2]);
       const ProcessSpec process_spec(
-          argv[3],
+          argv[executable_index],
           std::move(arguments));
 
-      if (!client_.register_software(id, process_spec))
+      if (!client_.register_software(id, process_spec, access_point))
       {
         std::cerr
             << "failed to register software: "

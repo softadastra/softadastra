@@ -78,8 +78,8 @@ namespace
         std::istreambuf_iterator<char>());
 
     EXPECT_EQ(content,
-              "softadastra-registrations 1\n1\n7\nexample\n16\n/usr/bin/example\n"
-              "2\n6\n--port\n4\n8080\n");
+              "softadastra-registrations 2\n1\n7\nexample\n16\n/usr/bin/example\n"
+              "0\n2\n6\n--port\n4\n8080\n");
     EXPECT_EQ(content.find(database.string()), std::string::npos);
     EXPECT_EQ(content.find("business-data-must-not-be-persisted"), std::string::npos);
     EXPECT_EQ(content.find(output.string()), std::string::npos);
@@ -154,7 +154,6 @@ namespace
     const std::vector<std::string> invalid_content{
         "",
         "softadastra-registrations 1\n1\n1\na\n",
-        "softadastra-registrations 2\n0\n",
         "softadastra-registrations 1\n1\n1\na\n0\n",
         "softadastra-registrations 1\n1\n0\n\n1\na\n0\n"};
 

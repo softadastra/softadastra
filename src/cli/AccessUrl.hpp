@@ -40,6 +40,10 @@ namespace softadastra
     [[nodiscard]] static std::string http(
         std::string_view ipv4,
         std::uint16_t port);
+
+    [[nodiscard]] static std::string https(
+        std::string_view ipv4,
+        std::uint16_t port);
   };
 
 } // namespace softadastra

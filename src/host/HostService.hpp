@@ -68,7 +68,8 @@ namespace softadastra
      */
     bool register_software(
         SoftwareId id,
-        ProcessSpec process_spec);
+        ProcessSpec process_spec,
+        std::optional<AccessPoint> access_point = std::nullopt);
 
     /**
      * @brief Starts registered software.
@@ -107,6 +108,9 @@ namespace softadastra
      * @brief Returns the last terminal lifecycle result for registered software.
      */
     [[nodiscard]] std::optional<SoftwareOperationResult> software_result(
+        const SoftwareId &id) const noexcept;
+
+    [[nodiscard]] std::optional<AccessPoint> access_point(
         const SoftwareId &id) const noexcept;
 
     /**

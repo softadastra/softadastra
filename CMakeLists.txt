@@ -227,6 +227,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
+    softadastra_access_point_test
+    tests/software/access_point_test.cpp
+  )
+
+  softadastra_add_test(
     softadastra_software_manager_test
     tests/software/software_manager_test.cpp
   )

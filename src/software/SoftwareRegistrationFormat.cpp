@@ -20,7 +20,8 @@ namespace softadastra
 {
   namespace
   {
-    constexpr const char *header = "softadastra-registrations 1\n";
+    constexpr const char *header_v1 = "softadastra-registrations 1\n";
+    constexpr const char *header_v2 = "softadastra-registrations 2\n";
 
     void append_string(std::string &output, const std::string &value)
     {
@@ -106,7 +107,7 @@ namespace softadastra
   std::string SoftwareRegistrationFormat::serialize(
       const std::vector<SoftwareEntry> &entries)
   {
-    std::string output(header);
+    std::string output(header_v2);
     output += std::to_string(entries.size());
     output += '\n';
 
@@ -114,6 +115,14 @@ namespace softadastra
     {
       append_string(output, entry.id().value());
       append_string(output, entry.process_spec().executable());
+      const auto access_point = entry.access_point();
+      output += access_point.has_value() ? "1\n" : "0\n";
+      if (access_point.has_value())
+      {
+        append_string(output, std::string(AccessPoint::name(access_point->protocol())));
+        output += std::to_string(access_point->port());
+        output += '\n';
+      }
       output += std::to_string(entry.process_spec().arguments().size());
       output += '\n';
 
@@ -129,12 +138,13 @@ namespace softadastra
   std::optional<std::vector<SoftwareEntry>>
   SoftwareRegistrationFormat::deserialize(const std::string &text)
   {
-    if (!text.starts_with(header))
+    const bool version_two = text.starts_with(header_v2);
+    if (!version_two && !text.starts_with(header_v1))
     {
       return std::nullopt;
     }
 
-    std::size_t offset = std::char_traits<char>::length(header);
+    std::size_t offset = std::char_traits<char>::length(version_two ? header_v2 : header_v1);
     const auto count = read_count(text, offset);
 
     if (!count.has_value())
@@ -154,6 +164,27 @@ namespace softadastra
     {
       const auto id = read_string(text, offset);
       const auto executable = read_string(text, offset);
+      std::optional<AccessPoint> access_point;
+
+      if (version_two)
+      {
+        const auto configured = read_count(text, offset);
+        if (!configured.has_value() || configured.value() > 1)
+          return std::nullopt;
+        if (configured.value() == 1)
+        {
+          const auto protocol_name = read_string(text, offset);
+          const auto port = read_count(text, offset);
+          if (!protocol_name.has_value() || !port.has_value() || port.value() > 65535)
+            return std::nullopt;
+          const auto protocol = AccessPoint::protocol(protocol_name.value());
+          if (!protocol.has_value())
+            return std::nullopt;
+          access_point = AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value()));
+          if (!access_point.has_value())
+            return std::nullopt;
+        }
+      }
       const auto argument_count = read_count(text, offset);
 
       if (!id.has_value() || !executable.has_value() ||
@@ -186,7 +217,8 @@ namespace softadastra
 
       entries.emplace_back(
           SoftwareId(id.value()),
-          ProcessSpec(executable.value(), std::move(arguments)));
+          ProcessSpec(executable.value(), std::move(arguments)),
+          access_point);
 
       for (std::size_t previous = 0; previous + 1 < entries.size(); ++previous)
       {

@@ -41,4 +41,9 @@ namespace softadastra
     return "http://" + std::string(ipv4) + ":" + std::to_string(port);
   }
 
+  std::string AccessUrl::https(std::string_view ipv4, std::uint16_t port)
+  {
+    return "https://" + std::string(ipv4) + ":" + std::to_string(port);
+  }
+
 } // namespace softadastra

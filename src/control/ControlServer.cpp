@@ -25,11 +25,17 @@ namespace softadastra
 
   bool ControlServer::register_software(
       SoftwareId id,
-      ProcessSpec process_spec)
+      ProcessSpec process_spec,
+      std::optional<AccessPoint> access_point)
   {
     return host_service_.register_software(
         std::move(id),
-        std::move(process_spec));
+        std::move(process_spec), access_point);
+  }
+
+  std::optional<AccessPoint> ControlServer::access_point(const SoftwareId &id) const noexcept
+  {
+    return host_service_.access_point(id);
   }
 
   SoftwareOperationResult ControlServer::start_software(const SoftwareId &id)

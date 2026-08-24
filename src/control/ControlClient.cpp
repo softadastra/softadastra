@@ -47,18 +47,26 @@ namespace softadastra
 
   bool ControlClient::register_software(
       SoftwareId id,
-      ProcessSpec process_spec)
+      ProcessSpec process_spec,
+      std::optional<AccessPoint> access_point)
   {
     if (server_ != nullptr)
     {
       return server_->register_software(
           std::move(id),
-          std::move(process_spec));
+          std::move(process_spec), access_point);
     }
 
+    const std::string protocol = access_point.has_value()
+                                     ? std::string(AccessPoint::name(access_point->protocol()))
+                                     : "-";
+    const std::string port = access_point.has_value()
+                                 ? std::to_string(access_point->port())
+                                 : "0";
     std::string message = "register " + LocalControlProtocol::encode(id.value()) +
                           " " + LocalControlProtocol::encode(process_spec.executable()) +
-                          " " + std::to_string(process_spec.arguments().size());
+                          " " + protocol + " " + port + " " +
+                          std::to_string(process_spec.arguments().size());
 
     for (const auto &argument : process_spec.arguments())
     {
@@ -68,6 +76,23 @@ namespace softadastra
     const auto response = request(message);
 
     return response.has_value() && response.value() == "register 1";
+  }
+
+  std::optional<AccessPoint> ControlClient::access_point(const SoftwareId &id) const noexcept
+  {
+    if (server_ != nullptr)
+      return server_->access_point(id);
+
+    const auto response = request("access-point " + LocalControlProtocol::encode(id.value()));
+    const auto fields = response.has_value() ? LocalControlProtocol::fields(response.value())
+                                              : std::vector<std::string>{};
+    if (fields.size() != 4 || fields[0] != "access-point" || fields[1] != "1")
+      return std::nullopt;
+    const auto protocol = AccessPoint::protocol(fields[2]);
+    const auto port = LocalControlProtocol::integer(fields[3]);
+    if (!protocol.has_value() || !port.has_value() || port.value() < 1 || port.value() > 65535)
+      return std::nullopt;
+    return AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value()));
   }
 
   SoftwareOperationResult ControlClient::start_software(const SoftwareId &id)

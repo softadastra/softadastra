@@ -13,6 +13,7 @@
  */
 
 #include "software/SoftwareRegistrationFormat.hpp"
+#include "software/AccessPoint.hpp"
 
 #include <gtest/gtest.h>
 
@@ -37,6 +38,28 @@ namespace
     EXPECT_EQ(parsed->at(0).process_spec().executable(), "/usr/bin/first app");
     EXPECT_EQ(parsed->at(0).process_spec().arguments().at(0), "");
     EXPECT_EQ(parsed->at(0).process_spec().arguments().at(1), "two words");
+  }
+
+  TEST(SoftwareRegistrationFormatTest, PreservesAccessPoint)
+  {
+    const auto protocol = softadastra::AccessPoint::protocol("http");
+    ASSERT_TRUE(protocol.has_value());
+    const auto access_point = softadastra::AccessPoint::create(protocol.value(), 8080);
+    ASSERT_TRUE(access_point.has_value());
+
+    const std::vector<softadastra::SoftwareEntry> entries{
+        softadastra::SoftwareEntry(
+            softadastra::SoftwareId("phone-test"),
+            softadastra::ProcessSpec("python3", {}),
+            access_point)};
+    const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(
+        softadastra::SoftwareRegistrationFormat::serialize(entries));
+
+    ASSERT_TRUE(restored.has_value());
+    ASSERT_EQ(restored->size(), 1U);
+    ASSERT_TRUE(restored->front().access_point().has_value());
+    EXPECT_EQ(restored->front().access_point()->port(), 8080);
+    EXPECT_EQ(restored->front().access_point()->protocol(), softadastra::AccessProtocol::Http);
   }
 
   TEST(SoftwareRegistrationFormatTest, RejectsInvalidInput)

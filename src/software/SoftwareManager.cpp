@@ -52,12 +52,20 @@ namespace softadastra
 
   bool SoftwareManager::register_software(
       SoftwareId id,
-      ProcessSpec process_spec)
+      ProcessSpec process_spec,
+      std::optional<AccessPoint> access_point)
   {
     return state_.add_software(
         SoftwareEntry(
             std::move(id),
-            std::move(process_spec)));
+            std::move(process_spec),
+            access_point));
+  }
+
+  std::optional<AccessPoint> SoftwareManager::access_point(const SoftwareId &id) const noexcept
+  {
+    const SoftwareEntry *entry = state_.find_software(id);
+    return entry == nullptr ? std::nullopt : entry->access_point();
   }
 
   SoftwareOperationResult SoftwareManager::start(const SoftwareId &id)

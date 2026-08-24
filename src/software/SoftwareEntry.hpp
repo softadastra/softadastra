@@ -16,6 +16,7 @@
 #define SOFTADASTRA_SOFTWARE_SOFTWARE_ENTRY_HPP
 
 #include "platform/ProcessSpec.hpp"
+#include "software/AccessPoint.hpp"
 #include "software/SoftwareId.hpp"
 #include "software/SoftwareOperation.hpp"
 #include "software/SoftwareState.hpp"
@@ -43,9 +44,11 @@ namespace softadastra
      * @param id Stable identifier used by the Host.
      * @param process_spec Information required to launch the software process.
      */
-    SoftwareEntry(SoftwareId id, ProcessSpec process_spec)
+    SoftwareEntry(SoftwareId id, ProcessSpec process_spec,
+                  std::optional<AccessPoint> access_point = std::nullopt)
         : id_(std::move(id)),
-          process_spec_(std::move(process_spec))
+          process_spec_(std::move(process_spec)),
+          access_point_(access_point)
     {
     }
 
@@ -63,6 +66,11 @@ namespace softadastra
     [[nodiscard]] const ProcessSpec &process_spec() const noexcept
     {
       return process_spec_;
+    }
+
+    [[nodiscard]] std::optional<AccessPoint> access_point() const noexcept
+    {
+      return access_point_;
     }
 
     /**
@@ -110,6 +118,7 @@ namespace softadastra
   private:
     SoftwareId id_;
     ProcessSpec process_spec_;
+    std::optional<AccessPoint> access_point_;
     SoftwareState state_{SoftwareState::Stopped};
     std::optional<SoftwareOperationResult> result_;
   };

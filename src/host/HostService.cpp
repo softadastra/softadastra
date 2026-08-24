@@ -39,11 +39,12 @@ namespace softadastra
 
   bool HostService::register_software(
       SoftwareId id,
-      ProcessSpec process_spec)
+      ProcessSpec process_spec,
+      std::optional<AccessPoint> access_point)
   {
     return software_manager_.register_software(
         std::move(id),
-        std::move(process_spec));
+        std::move(process_spec), access_point);
   }
 
   SoftwareOperationResult HostService::start_software(const SoftwareId &id)
@@ -83,6 +84,11 @@ namespace softadastra
       const SoftwareId &id) const noexcept
   {
     return software_manager_.result(id);
+  }
+
+  std::optional<AccessPoint> HostService::access_point(const SoftwareId &id) const noexcept
+  {
+    return software_manager_.access_point(id);
   }
 
   bool HostService::connectivity_available() const noexcept
