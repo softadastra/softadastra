@@ -21,6 +21,7 @@ find_package(Vix CONFIG QUIET)
 if(NOT Vix_FOUND)
   include(FetchContent)
   set(VIX_SDK_PROFILE default CACHE STRING "" FORCE)
+  set(VIX_ENABLE_NOTE OFF CACHE BOOL "" FORCE)
   FetchContent_Declare(
     vix
     GIT_REPOSITORY https://github.com/vixcpp/vix.git
