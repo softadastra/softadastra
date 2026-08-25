@@ -23,7 +23,7 @@ jobs:
       - name: Install C++ dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes libspdlog-dev
+          sudo apt-get install --yes libspdlog-dev nlohmann-json3-dev
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
@@ -60,7 +60,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
       - name: Install C++ dependencies
         shell: pwsh
-        run: vcpkg install spdlog:x64-windows
+        run: vcpkg install spdlog:x64-windows nlohmann-json:x64-windows
       - name: Configure
         shell: pwsh
         run: cmake -S . -B build-ci -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
