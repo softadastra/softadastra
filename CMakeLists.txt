@@ -42,6 +42,7 @@ add_library(
   src/host/HostPeerTrust.cpp
   src/host/HostLoop.cpp
   src/host/LocalAccess.cpp
+  src/host/LocalDns.cpp
   src/host/LocalGateway.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
@@ -221,6 +222,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_gateway_test
     tests/host/local_gateway_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_local_dns_test
+    tests/host/local_dns_test.cpp
   )
 
   softadastra_add_test(
