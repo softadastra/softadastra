@@ -14,6 +14,10 @@
 
 #include "control/ControlServer.hpp"
 
+#include "platform/NativeDataDirectory.hpp"
+
+#include <fstream>
+
 #include <utility>
 
 namespace softadastra
@@ -50,6 +54,23 @@ namespace softadastra
   std::vector<SoftwareEntry> ControlServer::software() const
   { return host_service_.software(); }
   bool ControlServer::remove_software(const SoftwareId &id) { return host_service_.remove_software(id); }
+  std::optional<std::string> ControlServer::logs(const SoftwareId &id) const noexcept
+  {
+    if (!host_service_.software(id)) return std::nullopt;
+    std::ifstream input(NativeDataDirectory::path() / "logs" / (id.value() + ".log"), std::ios::binary);
+    if (!input) return std::string{};
+    input.seekg(0, std::ios::end);
+    const auto size = input.tellg();
+    constexpr std::streamoff maximum = 4096;
+    input.seekg(size > maximum ? size - maximum : std::streampos(0));
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  }
+  bool ControlServer::clear_logs(const SoftwareId &id) const noexcept
+  {
+    if (!host_service_.software(id)) return false;
+    std::ofstream output(NativeDataDirectory::path() / "logs" / (id.value() + ".log"), std::ios::trunc);
+    return static_cast<bool>(output);
+  }
 
   bool ControlServer::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
   { return host_service_.link_project(id, std::move(identity), std::move(root)); }

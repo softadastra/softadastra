@@ -33,6 +33,7 @@ add_library(
   src/control/RemoteAccessConfig.cpp
   src/control/RemoteControlClient.cpp
   src/control/RemoteControlServer.cpp
+  src/webui/WebUiServer.cpp
   src/gateway/ControlLocalGatewayTargetResolver.cpp
   src/host/Host.cpp
   src/host/HostIdentity.cpp
@@ -246,6 +247,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_gateway_test
     tests/host/local_gateway_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_web_ui_server_test
+    tests/webui/web_ui_server_test.cpp
   )
 
   softadastra_add_test(
