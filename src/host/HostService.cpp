@@ -133,6 +133,21 @@ namespace softadastra
     return software_manager_.access_point(id);
   }
 
+  LocalGatewayTarget HostService::local_gateway_target(std::string_view host) const
+  {
+    constexpr std::string_view suffix = ".softadastra.home.arpa";
+    std::string label(host);
+    if (label.ends_with(suffix)) label.resize(label.size() - suffix.size());
+    const auto local_name = LocalName::from_software_name(label);
+    if (!local_name || (host != local_name->short_name() && host != local_name->canonical_name())) return {};
+    const auto entry = software_manager_.find_by_name(label);
+    if (!entry) return {};
+    if (entry->state() != SoftwareState::Running) return {LocalGatewayLookup::Unavailable, 0};
+    const auto access = entry->access_point();
+    if (!access || access->protocol() != AccessProtocol::Http) return {};
+    return {LocalGatewayLookup::Http, access->port()};
+  }
+
   bool HostService::connectivity_available() const noexcept
   {
     return connectivity_manager_.is_available();

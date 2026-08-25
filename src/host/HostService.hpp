@@ -28,6 +28,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace softadastra
@@ -41,6 +42,9 @@ namespace softadastra
     std::string primary_ipv4;
     std::vector<LocalNetworkAddress> addresses;
   };
+
+  enum class LocalGatewayLookup { NotFound, Unavailable, Http };
+  struct LocalGatewayTarget { LocalGatewayLookup result{LocalGatewayLookup::NotFound}; std::uint16_t port{}; };
 
   /**
    * @brief Coordinates Host infrastructure capabilities.
@@ -126,6 +130,7 @@ namespace softadastra
 
     [[nodiscard]] std::optional<AccessPoint> access_point(
         const SoftwareId &id) const noexcept;
+    [[nodiscard]] LocalGatewayTarget local_gateway_target(std::string_view host) const;
 
     /**
      * @brief Returns whether network connectivity is available.
