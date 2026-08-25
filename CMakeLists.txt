@@ -45,8 +45,10 @@ add_library(
   src/host/LocalAccess.cpp
   src/host/LocalDns.cpp
   src/host/LocalGateway.cpp
+  src/host/HttpProxy.cpp
   src/host/LocalGatewayProcessEndpoint.cpp
   src/host/LocalReachability.cpp
+  src/host/RemoteReachability.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
   src/host/HostStateFile.cpp
@@ -266,6 +268,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_reachability_test
     tests/host/local_reachability_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_remote_reachability_test
+    tests/host/remote_reachability_test.cpp
   )
 
   softadastra_add_test(

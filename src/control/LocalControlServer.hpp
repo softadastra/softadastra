@@ -25,7 +25,7 @@
 namespace softadastra
 {
   class RemoteAccessConfig;
-  class RemoteControlServer;
+  class RemoteReachability;
   /**
    * @brief Serves Host control operations through a local platform channel.
    */
@@ -39,7 +39,7 @@ namespace softadastra
         ControlServer &server,
         std::filesystem::path path,
         RemoteAccessConfig *remote_config = nullptr,
-        RemoteControlServer *remote_server = nullptr) noexcept;
+        RemoteReachability *remote_reachability = nullptr) noexcept;
 
     ~LocalControlServer();
 
@@ -70,7 +70,7 @@ namespace softadastra
     std::filesystem::path path_;
     int descriptor_{-1};
     RemoteAccessConfig *remote_config_;
-    RemoteControlServer *remote_server_;
+    RemoteReachability *remote_reachability_;
     std::function<void()> shutdown_handler_;
   };
 
