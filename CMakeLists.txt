@@ -53,6 +53,7 @@ add_library(
   src/platform/NativeManagedNetwork.cpp
   src/platform/LocalDnsDelegation.cpp
   src/platform/NativeLocalDnsDelegation.cpp
+  src/platform/NativeLocalGatewaySocketProvider.cpp
   src/platform/NativeDataDirectory.cpp
   src/platform/HostInstanceLock.cpp
   src/platform/MdnsPublisher.cpp
@@ -240,6 +241,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_reachability_test
     tests/host/local_reachability_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_local_gateway_socket_provider_test
+    tests/platform/local_gateway_socket_provider_test.cpp
   )
 
   softadastra_add_test(
