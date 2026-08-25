@@ -27,11 +27,11 @@ namespace softadastra
       SoftwareId id,
       ProcessSpec process_spec,
       std::optional<AccessPoint> access_point,
-      std::optional<ProjectIdentity> project_identity)
+      std::optional<ProjectIdentity> project_identity, std::string name)
   {
     return host_service_.register_software(
         std::move(id),
-        std::move(process_spec), access_point, std::move(project_identity));
+        std::move(process_spec), access_point, std::move(project_identity), std::move(name));
   }
 
   std::optional<SoftwareEntry> ControlServer::software_by_project_identity(
@@ -54,8 +54,8 @@ namespace softadastra
   bool ControlServer::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
   { return host_service_.link_project(id, std::move(identity), std::move(root)); }
 
-  bool ControlServer::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
-  { return host_service_.synchronize_software(id, std::move(process_spec), access_point); }
+  bool ControlServer::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
+  { return host_service_.synchronize_software(id, std::move(process_spec), access_point, std::move(name)); }
 
   std::optional<AccessPoint> ControlServer::access_point(const SoftwareId &id) const noexcept
   {

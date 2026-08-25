@@ -23,6 +23,7 @@
 #include "software/SoftwareState.hpp"
 
 #include <optional>
+#include <string>
 #include <utility>
 
 namespace softadastra
@@ -48,8 +49,9 @@ namespace softadastra
     SoftwareEntry(SoftwareId id, ProcessSpec process_spec,
                   std::optional<ProjectIdentity> project_identity = std::nullopt,
                   std::optional<AccessPoint> access_point = std::nullopt,
-                  std::string declared_command = {})
+                  std::string declared_command = {}, std::string name = {})
         : id_(std::move(id)),
+          name_(std::move(name)),
           process_spec_(std::move(process_spec)), project_identity_(std::move(project_identity)),
           access_point_(access_point), declared_command_(std::move(declared_command))
     {
@@ -65,6 +67,9 @@ namespace softadastra
     {
       return id_;
     }
+
+    [[nodiscard]] const std::string &name() const noexcept { return name_; }
+    void set_name(std::string name) { name_ = std::move(name); }
 
     /**
      * @brief Returns the process launch specification.
@@ -139,6 +144,7 @@ namespace softadastra
 
   private:
     SoftwareId id_;
+    std::string name_;
     ProcessSpec process_spec_;
     std::optional<ProjectIdentity> project_identity_;
     std::optional<AccessPoint> access_point_;

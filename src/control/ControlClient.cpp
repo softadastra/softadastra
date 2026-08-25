@@ -49,13 +49,13 @@ namespace softadastra
       SoftwareId id,
       ProcessSpec process_spec,
       std::optional<AccessPoint> access_point,
-      std::optional<ProjectIdentity> project_identity)
+      std::optional<ProjectIdentity> project_identity, std::string name)
   {
     if (server_ != nullptr)
     {
       return server_->register_software(
           std::move(id),
-          std::move(process_spec), access_point, std::move(project_identity));
+          std::move(process_spec), access_point, std::move(project_identity), std::move(name));
     }
 
     const std::string protocol = access_point.has_value()
@@ -65,6 +65,7 @@ namespace softadastra
                                  ? std::to_string(access_point->port())
                                  : "0";
     std::string message = "register " + LocalControlProtocol::encode(id.value()) +
+                          " " + LocalControlProtocol::encode(name) +
                           " " + LocalControlProtocol::encode(process_spec.executable()) +
                           " " + LocalControlProtocol::encode(project_identity.has_value() ? project_identity->value() : "") +
                           " " + LocalControlProtocol::encode(process_spec.working_directory().value_or("")) +
@@ -130,24 +131,25 @@ namespace softadastra
     const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
     if (fields.size() < 2 || fields[0] != "software-list") return {};
     const auto count = LocalControlProtocol::integer(fields[1]);
-    if (!count || count.value() < 0 || fields.size() != 2 + static_cast<std::size_t>(count.value()) * 9) return {};
+    if (!count || count.value() < 0 || fields.size() != 2 + static_cast<std::size_t>(count.value()) * 10) return {};
     std::vector<SoftwareEntry> entries;
     for (std::size_t index = 0; index < static_cast<std::size_t>(count.value()); ++index)
     {
-      const auto base = 2 + index * 9;
+      const auto base = 2 + index * 10;
       const auto id = LocalControlProtocol::decode(fields[base]);
-      const auto executable = LocalControlProtocol::decode(fields[base + 2]);
-      const auto root = LocalControlProtocol::decode(fields[base + 3]);
-      const auto identity = LocalControlProtocol::decode(fields[base + 4]);
-      const auto declared = LocalControlProtocol::decode(fields[base + 5]);
-      const auto pid = LocalControlProtocol::integer(fields[base + 6]);
-      const auto protocol = fields[base + 7] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[base + 7]);
-      const auto port = LocalControlProtocol::integer(fields[base + 8]);
-      if (!id || !executable || !root || !identity || !declared || !pid || !port || port.value() < 0 || port.value() > 65535 || (fields[base + 7] != "-" && !protocol)) return {};
+      const auto name = LocalControlProtocol::decode(fields[base + 1]);
+      const auto executable = LocalControlProtocol::decode(fields[base + 3]);
+      const auto root = LocalControlProtocol::decode(fields[base + 4]);
+      const auto identity = LocalControlProtocol::decode(fields[base + 5]);
+      const auto declared = LocalControlProtocol::decode(fields[base + 6]);
+      const auto pid = LocalControlProtocol::integer(fields[base + 7]);
+      const auto protocol = fields[base + 8] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[base + 8]);
+      const auto port = LocalControlProtocol::integer(fields[base + 9]);
+      if (!id || !name || !executable || !root || !identity || !declared || !pid || !port || port.value() < 0 || port.value() > 65535 || (fields[base + 8] != "-" && !protocol)) return {};
       const auto access = protocol ? AccessPoint::create(*protocol, static_cast<std::uint16_t>(*port)) : std::nullopt;
-      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, {}, root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), access, *declared);
+      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, {}, root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), access, *declared, *name);
       if (*pid >= 0) entries.back().set_pid(*pid);
-      entries.back().set_state(static_cast<SoftwareState>(std::stoi(fields[base + 1])));
+      entries.back().set_state(static_cast<SoftwareState>(std::stoi(fields[base + 2])));
     }
     return entries;
   }
@@ -166,12 +168,12 @@ namespace softadastra
     return response.has_value() && response.value() == "link-project 1";
   }
 
-  bool ControlClient::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
+  bool ControlClient::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
   {
-    if (server_ != nullptr) return server_->synchronize_software(id, std::move(process_spec), access_point);
+    if (server_ != nullptr) return server_->synchronize_software(id, std::move(process_spec), access_point, std::move(name));
     const std::string protocol = access_point.has_value() ? std::string(AccessPoint::name(access_point->protocol())) : "-";
     const std::string port = access_point.has_value() ? std::to_string(access_point->port()) : "0";
-    std::string message = "sync " + LocalControlProtocol::encode(id.value()) + " " + LocalControlProtocol::encode(process_spec.executable()) + " " + LocalControlProtocol::encode(process_spec.working_directory().value_or("")) + " " + protocol + " " + port + " " + std::to_string(process_spec.arguments().size());
+    std::string message = "sync " + LocalControlProtocol::encode(id.value()) + " " + LocalControlProtocol::encode(name) + " " + LocalControlProtocol::encode(process_spec.executable()) + " " + LocalControlProtocol::encode(process_spec.working_directory().value_or("")) + " " + protocol + " " + port + " " + std::to_string(process_spec.arguments().size());
     for (const auto &argument : process_spec.arguments()) message += " " + LocalControlProtocol::encode(argument);
     const auto response = request(message);
     return response.has_value() && response.value() == "sync 1";

@@ -259,6 +259,19 @@ namespace
             softadastra::ProcessSpec("/usr/bin/example")));
   }
 
+  TEST(ControlClientTest, SynchronizesRenamedSoftwareName)
+  {
+    TestPlatform platform; TestProcessLauncher launcher; softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher); softadastra::ControlServer server(host_service); softadastra::ControlClient client(server);
+    const softadastra::SoftwareId id("stable-id");
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("app"), std::nullopt, std::nullopt, "phone-test"));
+    ASSERT_TRUE(client.synchronize_software(id, softadastra::ProcessSpec("app"), std::nullopt, "phone-api"));
+    const auto entry = client.software(id);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->id(), id);
+    EXPECT_EQ(entry->name(), "phone-api");
+  }
+
   TEST(ControlClientTest, LooksUpSoftwareByPersistentProjectIdentityAndUpdatesRoot)
   {
     TestPlatform platform;

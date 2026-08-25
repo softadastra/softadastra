@@ -135,6 +135,24 @@ namespace
     std::filesystem::remove_all(base);
   }
 
+  TEST(CliTest, RunsTomlProjectWithConfiguredIdAndName)
+  {
+    const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-name-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt}));
+    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher); softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    const char *arguments[] = {"softadastra", "run"};
+    EXPECT_EQ(cli.run(2, arguments), 0);
+    std::filesystem::current_path(previous);
+    const auto entry = client.software(softadastra::SoftwareId("stable-id"));
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->id().value(), "stable-id");
+    EXPECT_EQ(entry->name(), "phone-test");
+    EXPECT_EQ(service.find_by_name("phone-test")->id().value(), "stable-id");
+    std::filesystem::remove_all(root);
+  }
+
   TEST(CliTest, MigratesLegacyProjectWithInitThenRunsTomlCommand)
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-link-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));

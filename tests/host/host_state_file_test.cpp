@@ -50,6 +50,21 @@ namespace
     std::filesystem::remove_all(directory);
   }
 
+  TEST(HostStateFileTest, RoundTripsModernNameInVersionSix)
+  {
+    const auto path = std::filesystem::temp_directory_path() / ("softadastra-name-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())) / "host-state";
+    softadastra::HostState source;
+    ASSERT_TRUE(source.add_software(softadastra::SoftwareEntry(softadastra::SoftwareId("stable-id"), softadastra::ProcessSpec("app"), std::nullopt, std::nullopt, {}, "phone-test")));
+    ASSERT_TRUE(softadastra::HostStateFile(path).save(source));
+    softadastra::HostState restored;
+    ASSERT_TRUE(softadastra::HostStateFile(path).load(restored));
+    const auto *entry = restored.find_software(softadastra::SoftwareId("stable-id"));
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->name(), "phone-test");
+    EXPECT_EQ(restored.find_software_by_name("phone-test"), entry);
+    std::filesystem::remove_all(path.parent_path());
+  }
+
   TEST(HostStateFileTest, PersistsOnlyRegistrationMetadata)
   {
     const auto directory = std::filesystem::temp_directory_path() /
@@ -78,7 +93,7 @@ namespace
         std::istreambuf_iterator<char>());
 
     EXPECT_EQ(content,
-        "softadastra-registrations 5\n1\n7\nexample\n0\n16\n/usr/bin/example\n"
+        "softadastra-registrations 6\n1\n7\nexample\n0\n\n0\n16\n/usr/bin/example\n"
         "0\n0\n2\n6\n--port\n4\n8080\n0\n\n");
     EXPECT_EQ(content.find(database.string()), std::string::npos);
     EXPECT_EQ(content.find("business-data-must-not-be-persisted"), std::string::npos);

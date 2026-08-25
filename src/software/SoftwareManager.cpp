@@ -63,7 +63,7 @@ namespace softadastra
       SoftwareId id,
       ProcessSpec process_spec,
       std::optional<AccessPoint> access_point,
-      std::optional<ProjectIdentity> project_identity)
+      std::optional<ProjectIdentity> project_identity, std::string name)
   {
     const auto command = declared_command(process_spec);
     return state_.add_software(
@@ -71,7 +71,7 @@ namespace softadastra
             std::move(id),
             std::move(process_spec),
             std::move(project_identity),
-            access_point, command));
+            access_point, command, std::move(name)));
   }
 
   std::optional<SoftwareEntry> SoftwareManager::software_by_project_identity(
@@ -90,7 +90,7 @@ namespace softadastra
     return true;
   }
 
-  bool SoftwareManager::synchronize(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
+  bool SoftwareManager::synchronize(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
   {
     auto *entry = state_.find_software(id);
     if (entry == nullptr) return false;
@@ -98,7 +98,8 @@ namespace softadastra
     const bool access_changed = existing_access.has_value() != access_point.has_value() ||
         (existing_access.has_value() && access_point.has_value() &&
          (existing_access->protocol() != access_point->protocol() || existing_access->port() != access_point->port()));
-    const bool changed = entry->process_spec().executable() != process_spec.executable() ||
+    if (!name.empty()) { const auto *other=state_.find_software_by_name(name); if(other!=nullptr && other->id()!=id) return false; }
+    const bool changed = entry->name()!=name || entry->process_spec().executable() != process_spec.executable() ||
                          entry->process_spec().arguments() != process_spec.arguments() ||
                          entry->process_spec().working_directory() != process_spec.working_directory() ||
                          access_changed;
@@ -107,12 +108,14 @@ namespace softadastra
       if (entry->declared_command().empty()) entry->set_declared_command(declared_command(process_spec));
       return false;
     }
+    entry->set_name(std::move(name));
     if (entry->state() == SoftwareState::Running) static_cast<void>(stop(id));
     entry->set_process_spec(std::move(process_spec));
     entry->set_declared_command(declared_command(entry->process_spec()));
     entry->set_access_point(access_point);
     return true;
   }
+  std::optional<SoftwareEntry> SoftwareManager::find_by_name(const std::string &name) const noexcept { if(name.empty()) return std::nullopt; const auto *entry=state_.find_software_by_name(name); return entry?std::optional<SoftwareEntry>(*entry):std::nullopt; }
 
   std::optional<AccessPoint> SoftwareManager::access_point(const SoftwareId &id) const noexcept
   {

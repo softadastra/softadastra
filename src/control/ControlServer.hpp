@@ -42,7 +42,7 @@ namespace softadastra
         SoftwareId id,
         ProcessSpec process_spec,
         std::optional<AccessPoint> access_point = std::nullopt,
-        std::optional<ProjectIdentity> project_identity = std::nullopt);
+        std::optional<ProjectIdentity> project_identity = std::nullopt, std::string name = {});
 
     [[nodiscard]] std::optional<SoftwareEntry> software_by_project_identity(
         const ProjectIdentity &identity) const noexcept;
@@ -52,7 +52,7 @@ namespace softadastra
     [[nodiscard]] std::vector<SoftwareEntry> software() const;
     [[nodiscard]] bool remove_software(const SoftwareId &id);
     bool link_project(const SoftwareId &id, ProjectIdentity identity, std::string root);
-    [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point);
+    [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name = {});
 
     [[nodiscard]] std::optional<AccessPoint> access_point(const SoftwareId &id) const noexcept;
 

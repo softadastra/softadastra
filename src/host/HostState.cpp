@@ -20,7 +20,7 @@ namespace softadastra
 {
   bool HostState::add_software(SoftwareEntry entry)
   {
-    if (find_software(entry.id()) != nullptr)
+    if (find_software(entry.id()) != nullptr || (!entry.name().empty() && find_software_by_name(entry.name()) != nullptr))
     {
       return false;
     }
@@ -63,6 +63,8 @@ namespace softadastra
 
     return nullptr;
   }
+  SoftwareEntry *HostState::find_software_by_name(const std::string &name) noexcept { for(auto &entry:software_) if(entry.name()==name) return &entry; return nullptr; }
+  const SoftwareEntry *HostState::find_software_by_name(const std::string &name) const noexcept { for(const auto &entry:software_) if(entry.name()==name) return &entry; return nullptr; }
 
   SoftwareEntry *HostState::find_software(const ProjectIdentity &identity) noexcept
   {

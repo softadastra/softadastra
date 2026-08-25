@@ -72,6 +72,8 @@ namespace softadastra
      */
     [[nodiscard]] const SoftwareEntry *find_software(
         const SoftwareId &id) const noexcept;
+    [[nodiscard]] SoftwareEntry *find_software_by_name(const std::string &name) noexcept;
+    [[nodiscard]] const SoftwareEntry *find_software_by_name(const std::string &name) const noexcept;
 
     [[nodiscard]] SoftwareEntry *find_software(const ProjectIdentity &identity) noexcept;
     [[nodiscard]] const SoftwareEntry *find_software(const ProjectIdentity &identity) const noexcept;

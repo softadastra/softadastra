@@ -13,6 +13,7 @@
  */
 
 #include "host/HostService.hpp"
+#include "software/LocalName.hpp"
 
 #include <utility>
 
@@ -41,11 +42,11 @@ namespace softadastra
       SoftwareId id,
       ProcessSpec process_spec,
       std::optional<AccessPoint> access_point,
-      std::optional<ProjectIdentity> project_identity)
+      std::optional<ProjectIdentity> project_identity, std::string name)
   {
     return software_manager_.register_software(
         std::move(id),
-        std::move(process_spec), access_point, std::move(project_identity));
+        std::move(process_spec), access_point, std::move(project_identity), std::move(name));
   }
 
   std::optional<SoftwareEntry> HostService::software_by_project_identity(
@@ -66,6 +67,7 @@ namespace softadastra
     const auto *entry = host_.state().find_software(id);
     return entry == nullptr ? std::nullopt : std::optional<SoftwareEntry>(*entry);
   }
+  std::optional<SoftwareEntry> HostService::find_by_name(const std::string &name) const noexcept { return software_manager_.find_by_name(name); }
 
   std::vector<SoftwareEntry> HostService::software() const
   { return software_manager_.software(); }
@@ -81,8 +83,8 @@ namespace softadastra
     return true;
   }
 
-  bool HostService::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
-  { return software_manager_.synchronize(id, std::move(process_spec), access_point); }
+  bool HostService::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
+  { return software_manager_.synchronize(id, std::move(process_spec), access_point, std::move(name)); }
 
   SoftwareOperationResult HostService::start_software(const SoftwareId &id)
   {
