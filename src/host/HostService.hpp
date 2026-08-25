@@ -18,6 +18,7 @@
 #include "connectivity/ConnectivityManager.hpp"
 #include "host/Host.hpp"
 #include "host/LocalAccess.hpp"
+#include "host/LocalGatewayTargetResolver.hpp"
 #include "platform/Network.hpp"
 #include "platform/ManagedNetwork.hpp"
 #include "platform/ProcessLauncher.hpp"
@@ -43,13 +44,10 @@ namespace softadastra
     std::vector<LocalNetworkAddress> addresses;
   };
 
-  enum class LocalGatewayLookup { NotFound, Unavailable, Http };
-  struct LocalGatewayTarget { LocalGatewayLookup result{LocalGatewayLookup::NotFound}; std::uint16_t port{}; };
-
   /**
    * @brief Coordinates Host infrastructure capabilities.
    */
-  class HostService
+  class HostService : public LocalGatewayTargetResolver
   {
   public:
     /**
@@ -130,7 +128,7 @@ namespace softadastra
 
     [[nodiscard]] std::optional<AccessPoint> access_point(
         const SoftwareId &id) const noexcept;
-    [[nodiscard]] LocalGatewayTarget local_gateway_target(std::string_view host) const;
+    [[nodiscard]] LocalGatewayTarget resolve(std::string_view host) const override;
 
     /**
      * @brief Returns whether network connectivity is available.

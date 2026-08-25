@@ -565,4 +565,35 @@ namespace
     EXPECT_FALSE(client.connectivity_available());
   }
 
+  TEST(ControlClientTest, ResolvesLocalGatewayTargetsWithoutCaching)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
+    const softadastra::SoftwareId id("stable-id");
+
+    ASSERT_TRUE(client.register_software(
+        id, softadastra::ProcessSpec("app"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080),
+        std::nullopt, "phone-test"));
+    ASSERT_TRUE(client.start_software(id));
+    EXPECT_EQ(client.local_gateway_target("phone-test").result, softadastra::LocalGatewayLookup::Http);
+    EXPECT_EQ(client.local_gateway_target("phone-test.softadastra.home.arpa").port, 8080);
+
+    ASSERT_TRUE(client.synchronize_software(
+        id, softadastra::ProcessSpec("app"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 9000), "phone-api"));
+    EXPECT_EQ(client.local_gateway_target("phone-test").result, softadastra::LocalGatewayLookup::NotFound);
+    EXPECT_EQ(client.local_gateway_target("phone-api").result, softadastra::LocalGatewayLookup::Unavailable);
+    ASSERT_TRUE(client.start_software(id));
+    EXPECT_EQ(client.local_gateway_target("phone-api").port, 9000);
+    ASSERT_TRUE(client.stop_software(id));
+    EXPECT_EQ(client.local_gateway_target("phone-api").result, softadastra::LocalGatewayLookup::Unavailable);
+    ASSERT_TRUE(client.remove_software(id));
+    EXPECT_EQ(client.local_gateway_target("phone-api").result, softadastra::LocalGatewayLookup::NotFound);
+  }
+
 } // namespace

@@ -62,6 +62,9 @@ namespace softadastra
     return host_service_.access_point(id);
   }
 
+  LocalGatewayTarget ControlServer::local_gateway_target(std::string_view host) const
+  { return host_service_.resolve(host); }
+
   SoftwareOperationResult ControlServer::start_software(const SoftwareId &id)
   {
     return host_service_.start_software(id);

@@ -293,6 +293,16 @@ namespace softadastra
              " " + std::to_string(access_point->port());
     }
 
+    if (fields[0] == "local-gateway-target" && fields.size() == 2)
+    {
+      const auto host = LocalControlProtocol::decode(fields[1]);
+      if (!host) return "error";
+      const auto target = server.local_gateway_target(*host);
+      if (target.result == LocalGatewayLookup::NotFound) return "not-found";
+      if (target.result == LocalGatewayLookup::Unavailable) return "unavailable";
+      return "http " + std::to_string(target.port);
+    }
+
     if (fields[0] == "project" && fields.size() == 2)
     {
       const auto identity = LocalControlProtocol::decode(fields[1]);

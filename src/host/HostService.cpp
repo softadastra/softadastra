@@ -133,7 +133,7 @@ namespace softadastra
     return software_manager_.access_point(id);
   }
 
-  LocalGatewayTarget HostService::local_gateway_target(std::string_view host) const
+  LocalGatewayTarget HostService::resolve(std::string_view host) const
   {
     constexpr std::string_view suffix = ".softadastra.home.arpa";
     std::string label(host);

@@ -196,6 +196,18 @@ namespace softadastra
     return AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value()));
   }
 
+  LocalGatewayTarget ControlClient::local_gateway_target(std::string_view host) const noexcept
+  {
+    if (server_ != nullptr) return server_->local_gateway_target(host);
+    const auto response = request("local-gateway-target " + LocalControlProtocol::encode(host));
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    if (fields.size() == 1 && fields[0] == "not-found") return {};
+    if (fields.size() == 1 && fields[0] == "unavailable") return {LocalGatewayLookup::Unavailable, 0};
+    const auto port = fields.size() == 2 && fields[0] == "http" ? LocalControlProtocol::integer(fields[1]) : std::nullopt;
+    if (!port || *port < 1 || *port > 65535) return {};
+    return {LocalGatewayLookup::Http, static_cast<std::uint16_t>(*port)};
+  }
+
   SoftwareOperationResult ControlClient::start_software(const SoftwareId &id)
   {
     if (server_ != nullptr)

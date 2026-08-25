@@ -540,4 +540,43 @@ namespace
     EXPECT_TRUE(service.shutdown()); EXPECT_EQ(static_cast<TestManagedNetwork &>(platform.managed_network()).stop_calls,0);
   }
 
+  TEST(HostServiceTest, ResolvesLocalGatewayTargetsDynamically)
+  {
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    const softadastra::SoftwareId id("stable-id");
+
+    ASSERT_TRUE(service.register_software(
+        id, softadastra::ProcessSpec("app"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080),
+        std::nullopt, "phone-test"));
+    ASSERT_TRUE(service.start_software(id));
+    EXPECT_EQ(service.resolve("phone-test").result, softadastra::LocalGatewayLookup::Http);
+    EXPECT_EQ(service.resolve("phone-test").port, 8080);
+    EXPECT_EQ(service.resolve("phone-test.softadastra.home.arpa").result, softadastra::LocalGatewayLookup::Http);
+    EXPECT_EQ(service.resolve("example.com").result, softadastra::LocalGatewayLookup::NotFound);
+
+    ASSERT_TRUE(service.synchronize_software(
+        id, softadastra::ProcessSpec("app"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 9000), "phone-api"));
+    EXPECT_EQ(service.resolve("phone-test").result, softadastra::LocalGatewayLookup::NotFound);
+    EXPECT_EQ(service.resolve("phone-api").result, softadastra::LocalGatewayLookup::Unavailable);
+    ASSERT_TRUE(service.start_software(id));
+    EXPECT_EQ(service.resolve("phone-api").port, 9000);
+
+    ASSERT_TRUE(service.stop_software(id));
+    EXPECT_EQ(service.resolve("phone-api").result, softadastra::LocalGatewayLookup::Unavailable);
+    host.state().find_software(id)->set_state(softadastra::SoftwareState::Failed);
+    EXPECT_EQ(service.resolve("phone-api").result, softadastra::LocalGatewayLookup::Unavailable);
+
+    const softadastra::SoftwareId no_access("no-access");
+    ASSERT_TRUE(service.register_software(no_access, softadastra::ProcessSpec("app"), std::nullopt, std::nullopt, "no-access"));
+    ASSERT_TRUE(service.start_software(no_access));
+    EXPECT_EQ(service.resolve("no-access").result, softadastra::LocalGatewayLookup::NotFound);
+    ASSERT_TRUE(service.remove_software(id));
+    EXPECT_EQ(service.resolve("phone-api").result, softadastra::LocalGatewayLookup::NotFound);
+  }
+
 } // namespace

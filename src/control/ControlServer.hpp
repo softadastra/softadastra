@@ -55,6 +55,7 @@ namespace softadastra
     [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name = {});
 
     [[nodiscard]] std::optional<AccessPoint> access_point(const SoftwareId &id) const noexcept;
+    [[nodiscard]] LocalGatewayTarget local_gateway_target(std::string_view host) const;
 
     /**
      * @brief Starts registered software.

@@ -216,6 +216,10 @@ namespace
     EXPECT_EQ(invoke_cli(state_home, {"register", "demo", "--access", "http:8080", "--", "sleep", "30"}, project).exit_code, 0);
     const auto run_from_root = invoke_cli(state_home, {"run", "demo"}, project);
     EXPECT_NE(run_from_root.output.find("running: demo"), std::string::npos);
+    softadastra::ControlClient local_client(socket);
+    const auto target = local_client.local_gateway_target("demo.softadastra.home.arpa");
+    EXPECT_EQ(target.result, softadastra::LocalGatewayLookup::Http);
+    EXPECT_EQ(target.port, 8080);
     const auto run_from_subdirectory = invoke_cli(state_home, {"run", "demo"}, source);
     EXPECT_EQ(run_from_subdirectory.exit_code, 0);
     EXPECT_NE(run_from_subdirectory.output.find("already running: demo"), std::string::npos);
