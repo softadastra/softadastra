@@ -13,6 +13,8 @@ public:
   explicit LocalGateway(HostService &host_service) noexcept;
   ~LocalGateway();
   bool start(std::string address, std::uint16_t port);
+  // On success this object takes ownership of fd; on failure fd remains owned by the caller.
+  bool start_from_socket(int fd);
   void stop() noexcept;
   [[nodiscard]] LocalGatewayStatus status() const;
 private:
