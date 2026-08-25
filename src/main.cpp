@@ -36,6 +36,7 @@
 #include "platform/NativeLocalDnsDelegation.hpp"
 #include "software/ProjectIdentity.hpp"
 #include "software/ProjectConfig.hpp"
+#include "webui/WebUiServer.hpp"
 
 #include <chrono>
 #include <atomic>
@@ -312,6 +313,55 @@ int main(int argc, char *argv[])
 
   softadastra::ControlClient control_client(
       softadastra::NativeDataDirectory::path() / "control.sock");
+
+  if (argc >= 2 && std::string(argv[1]) == "ui")
+  {
+    std::uint16_t port = 0;
+    if (argc == 4 && std::string(argv[2]) == "--port")
+    {
+      try
+      {
+        const unsigned long parsed = std::stoul(argv[3]);
+        if (parsed == 0 || parsed > 65535) throw std::out_of_range("port");
+        port = static_cast<std::uint16_t>(parsed);
+      }
+      catch (const std::exception &)
+      {
+        std::cerr << "invalid UI port\n";
+        return 2;
+      }
+    }
+    else if (argc != 2)
+    {
+      std::cerr << "Usage:\n  softadastra ui [--port <port>]\n";
+      return 2;
+    }
+
+    if (!control_client.host_available())
+    {
+      if (!start_host_automatically(argv[0]))
+      {
+        std::cerr << "failed to start Softadastra Host\n";
+        return 1;
+      }
+      for (int attempt = 0; attempt < 100 && !control_client.host_available(); ++attempt)
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    if (!control_client.host_available())
+    {
+      std::cerr << "Softadastra Host did not become available\n";
+      return 1;
+    }
+
+    softadastra::WebUiServer ui(control_client);
+    if (!ui.start(port))
+    {
+      std::cerr << "failed to start Softadastra UI on 127.0.0.1\n";
+      return 1;
+    }
+    std::cout << "Softadastra UI:\nhttp://127.0.0.1:" << ui.port() << '\n';
+    for (;;) std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
 
   if (argc >= 2 && std::string(argv[1]) == "box")
   {

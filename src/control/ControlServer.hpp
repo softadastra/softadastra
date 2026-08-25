@@ -51,6 +51,8 @@ namespace softadastra
     [[nodiscard]] std::optional<SoftwareEntry> software(const SoftwareId &id) const noexcept;
     [[nodiscard]] std::vector<SoftwareEntry> software() const;
     [[nodiscard]] bool remove_software(const SoftwareId &id);
+    [[nodiscard]] std::optional<std::string> logs(const SoftwareId &id) const noexcept;
+    [[nodiscard]] bool clear_logs(const SoftwareId &id) const noexcept;
     bool link_project(const SoftwareId &id, ProjectIdentity identity, std::string root);
     [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name = {});
 

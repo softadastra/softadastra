@@ -161,6 +161,22 @@ namespace softadastra
     return response.has_value() && response.value() == "remove 1";
   }
 
+  std::optional<std::string> ControlClient::logs(const SoftwareId &id) const noexcept
+  {
+    if (server_ != nullptr) return server_->logs(id);
+    const auto response = request("logs " + LocalControlProtocol::encode(id.value()));
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    if (fields.size() != 2 || fields[0] != "logs") return std::nullopt;
+    return LocalControlProtocol::decode(fields[1]);
+  }
+
+  bool ControlClient::clear_logs(const SoftwareId &id) const noexcept
+  {
+    if (server_ != nullptr) return server_->clear_logs(id);
+    const auto response = request("logs-clear " + LocalControlProtocol::encode(id.value()));
+    return response && *response == "logs-clear 1";
+  }
+
   bool ControlClient::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
   {
     if (server_ != nullptr) return server_->link_project(id, std::move(identity), std::move(root));

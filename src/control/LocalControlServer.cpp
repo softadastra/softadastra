@@ -370,6 +370,19 @@ namespace softadastra
       return response;
     }
 
+    if (fields[0] == "logs" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      const auto logs = id ? server.logs(SoftwareId(*id)) : std::nullopt;
+      return logs ? "logs " + LocalControlProtocol::encode(*logs) : "error";
+    }
+
+    if (fields[0] == "logs-clear" && fields.size() == 2)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      return std::string("logs-clear ") + (id && server.clear_logs(SoftwareId(*id)) ? "1" : "0");
+    }
+
     if (fields[0] == "remove" && fields.size() == 2)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);
