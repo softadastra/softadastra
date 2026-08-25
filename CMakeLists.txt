@@ -43,10 +43,6 @@ add_library(
   src/host/HostPeerTrust.cpp
   src/host/HostLoop.cpp
   src/host/LocalAccess.cpp
-  src/host/LocalDns.cpp
-  src/host/LocalGateway.cpp
-  src/host/LocalGatewayProcessEndpoint.cpp
-  src/host/LocalReachability.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
   src/host/HostStateFile.cpp
@@ -70,6 +66,17 @@ add_library(
   src/software/ProjectConfig.cpp
   src/software/SoftwareRegistrationFormat.cpp
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_sources(
+    softadastra_internal
+    PRIVATE
+      src/host/LocalDns.cpp
+      src/host/LocalGateway.cpp
+      src/host/LocalGatewayProcessEndpoint.cpp
+  )
+endif()
+target_sources(softadastra_internal PRIVATE src/host/LocalReachability.cpp)
 
 target_include_directories(
   softadastra_internal
@@ -140,21 +147,23 @@ else()
   )
 endif()
 
-add_executable(
-  softadastra-gateway
-  src/gateway/main.cpp
-)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(
+    softadastra-gateway
+    src/gateway/main.cpp
+  )
 
-target_link_libraries(
-  softadastra-gateway
-  PRIVATE
-    softadastra_internal
-)
+  target_link_libraries(
+    softadastra-gateway
+    PRIVATE
+      softadastra_internal
+  )
 
-if(MSVC)
-  target_compile_options(softadastra-gateway PRIVATE /W4 /permissive-)
-else()
-  target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic)
+  if(MSVC)
+    target_compile_options(softadastra-gateway PRIVATE /W4 /permissive-)
+  else()
+    target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
 endif()
 
 if(SOFTADASTRA_BUILD_TESTS)
@@ -243,30 +252,20 @@ if(SOFTADASTRA_BUILD_TESTS)
     tests/host/local_access_test.cpp
   )
 
-  softadastra_add_test(
-    softadastra_local_gateway_test
-    tests/host/local_gateway_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_local_gateway_process_endpoint_test
-    tests/host/local_gateway_process_endpoint_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_local_dns_test
-    tests/host/local_dns_test.cpp
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    softadastra_add_test(softadastra_local_gateway_test tests/host/local_gateway_test.cpp)
+    softadastra_add_test(softadastra_local_gateway_process_endpoint_test tests/host/local_gateway_process_endpoint_test.cpp)
+    softadastra_add_test(softadastra_local_dns_test tests/host/local_dns_test.cpp)
+  endif()
 
   softadastra_add_test(
     softadastra_local_dns_delegation_test
     tests/platform/local_dns_delegation_test.cpp
   )
 
-  softadastra_add_test(
-    softadastra_local_reachability_test
-    tests/host/local_reachability_test.cpp
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    softadastra_add_test(softadastra_local_reachability_test tests/host/local_reachability_test.cpp)
+  endif()
 
   softadastra_add_test(
     softadastra_local_gateway_socket_provider_test
@@ -478,16 +477,11 @@ if(SOFTADASTRA_BUILD_TESTS)
     tests/gateway/control_local_gateway_target_resolver_test.cpp
   )
 
-  softadastra_add_test(
-    softadastra_gateway_process_test
-    tests/gateway/gateway_process_test.cpp
-  )
-  add_dependencies(softadastra_gateway_process_test softadastra-gateway)
-  target_compile_definitions(
-    softadastra_gateway_process_test
-    PRIVATE
-      SOFTADASTRA_GATEWAY_EXECUTABLE="$<TARGET_FILE:softadastra-gateway>"
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    softadastra_add_test(softadastra_gateway_process_test tests/gateway/gateway_process_test.cpp)
+    add_dependencies(softadastra_gateway_process_test softadastra-gateway)
+    target_compile_definitions(softadastra_gateway_process_test PRIVATE SOFTADASTRA_GATEWAY_EXECUTABLE="$<TARGET_FILE:softadastra-gateway>")
+  endif()
 
   softadastra_add_test(
     softadastra_host_runtime_test

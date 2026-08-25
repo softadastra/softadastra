@@ -21,7 +21,7 @@ namespace softadastra
   std::filesystem::path NativeDataDirectory::path()
   {
 #if defined(_WIN32)
-    const char *app_data = std::getenv("APPDATA");
+    const char *app_data = std::getenv("LOCALAPPDATA");
 
     if (app_data != nullptr)
     {

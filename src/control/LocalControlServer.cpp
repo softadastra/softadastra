@@ -21,6 +21,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <functional>
 #include <utility>
 
 #if defined(__linux__)
@@ -30,12 +31,19 @@
 #include <unistd.h>
 
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace softadastra
 {
   namespace
   {
     constexpr std::size_t maximum_message_size = 16384;
+#if defined(_WIN32)
+    std::wstring pipe_name(const std::filesystem::path &path)
+    { return L"\\\\.\\pipe\\Softadastra-" + std::to_wstring(std::hash<std::wstring>{}(path.wstring())); }
+#endif
 
     std::string operation_response(const SoftwareOperationResult &result)
     {
@@ -109,7 +117,14 @@ namespace softadastra
 
     return true;
 #else
+#if defined(_WIN32)
+    if (pipe_ != INVALID_HANDLE_VALUE) return true;
+    const auto name=pipe_name(path_);
+    pipe_=::CreateNamedPipeW(name.c_str(),PIPE_ACCESS_DUPLEX,PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE|PIPE_NOWAIT,1,maximum_message_size,maximum_message_size,0,nullptr);
+    return pipe_ != INVALID_HANDLE_VALUE;
+#else
     return false;
+#endif
 #endif
   }
 
@@ -175,7 +190,16 @@ namespace softadastra
       ::close(client);
     }
 #else
+#if defined(_WIN32)
+    if (pipe_ == INVALID_HANDLE_VALUE) return false;
+    if (!::ConnectNamedPipe(pipe_,nullptr)) { const auto error=::GetLastError(); if(error==ERROR_PIPE_LISTENING) return false; if(error!=ERROR_PIPE_CONNECTED) return false; }
+    std::array<char,maximum_message_size> buffer{}; DWORD received{};
+    bool processed=false;
+    if(::ReadFile(pipe_,buffer.data(),static_cast<DWORD>(buffer.size()),&received,nullptr)&&received>0) { const std::string_view request(buffer.data(),received); const auto fields=LocalControlProtocol::fields(request); std::string response; if(fields.size()==1&&fields[0]=="shutdown"&&shutdown_handler_){response="shutdown 1";shutdown_handler_();}else response=handle(server_,request); DWORD sent{};static_cast<void>(::WriteFile(pipe_,response.data(),static_cast<DWORD>(response.size()),&sent,nullptr));processed=true; }
+    ::FlushFileBuffers(pipe_);::DisconnectNamedPipe(pipe_);return processed;
+#else
     return false;
+#endif
 #endif
   }
 
@@ -190,6 +214,9 @@ namespace softadastra
 
     std::error_code error;
     std::filesystem::remove(path_, error);
+#endif
+#if defined(_WIN32)
+    if (pipe_ != INVALID_HANDLE_VALUE) { ::DisconnectNamedPipe(pipe_); ::CloseHandle(pipe_); pipe_=INVALID_HANDLE_VALUE; }
 #endif
   }
 

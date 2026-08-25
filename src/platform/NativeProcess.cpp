@@ -23,6 +23,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace softadastra
 {
@@ -31,14 +34,36 @@ namespace softadastra
       : child_(std::move(child))
   {
   }
+  NativeProcess::~NativeProcess()
+  {
+#if defined(_WIN32)
+    if (process_ != nullptr) ::CloseHandle(process_);
+    if (job_ != nullptr) ::CloseHandle(job_);
+#endif
+  }
 #if defined(__linux__)
   NativeProcess::NativeProcess(pid_t pid) noexcept : native_pid_(pid) {}
+#endif
+#if defined(_WIN32)
+  NativeProcess::NativeProcess(HANDLE process, HANDLE job, DWORD pid) noexcept
+      : native_pid_(static_cast<long>(pid)), process_(process), job_(job) {}
 #endif
 
   bool NativeProcess::stop()
   {
 #if defined(__linux__)
     if (native_pid_ > 0) { ::kill(-native_pid_, SIGTERM); int status=0; if (::waitpid(native_pid_, &status, 0) < 0) return false; exit_code_=WIFEXITED(status)?WEXITSTATUS(status):1; return true; }
+#endif
+#if defined(_WIN32)
+    if (process_ != nullptr)
+    {
+      if (!is_running()) return exit_code().has_value();
+      if (job_ != nullptr) static_cast<void>(::TerminateJobObject(job_, 1));
+      else static_cast<void>(::TerminateProcess(process_, 1));
+      static_cast<void>(::WaitForSingleObject(process_, INFINITE));
+      DWORD code = 1; if (::GetExitCodeProcess(process_, &code)) exit_code_ = static_cast<int>(code);
+      return exit_code_.has_value();
+    }
 #endif
     if (!child_.valid())
     {
@@ -74,6 +99,16 @@ namespace softadastra
 #if defined(__linux__)
     if (native_pid_ > 0) { int status=0; const auto result=::waitpid(native_pid_, &status, WNOHANG); if(result==0) return true; if(result==native_pid_) { const_cast<NativeProcess*>(this)->exit_code_=WIFEXITED(status)?WEXITSTATUS(status):1; } return false; }
 #endif
+#if defined(_WIN32)
+    if (process_ != nullptr)
+    {
+      DWORD code = STILL_ACTIVE;
+      if (!::GetExitCodeProcess(process_, &code)) return false;
+      if (code == STILL_ACTIVE) return true;
+      const_cast<NativeProcess *>(this)->exit_code_ = static_cast<int>(code);
+      return false;
+    }
+#endif
     if (!child_.valid())
     {
       return false;
@@ -100,6 +135,14 @@ namespace softadastra
   {
 #if defined(__linux__)
     if (native_pid_ > 0) { int status=0; const auto result=::waitpid(native_pid_, &status, WNOHANG); if(result==native_pid_) exit_code_=WIFEXITED(status)?WEXITSTATUS(status):1; return exit_code_; }
+#endif
+#if defined(_WIN32)
+    if (process_ != nullptr)
+    {
+      DWORD code = STILL_ACTIVE;
+      if (::GetExitCodeProcess(process_, &code) && code != STILL_ACTIVE) exit_code_ = static_cast<int>(code);
+      return exit_code_;
+    }
 #endif
     if (exit_code_.has_value())
     {
@@ -151,6 +194,9 @@ namespace softadastra
   {
 #if defined(__linux__)
     if (native_pid_ > 0) return native_pid_;
+#endif
+#if defined(_WIN32)
+    if (process_ != nullptr) return native_pid_;
 #endif
     return child_.valid() ? std::optional<long>(static_cast<long>(child_.id())) : std::nullopt;
   }

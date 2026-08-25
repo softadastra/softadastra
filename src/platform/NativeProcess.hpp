@@ -21,6 +21,9 @@
 #if defined(__linux__)
 #include <sys/types.h>
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 #include <vix/process/Child.hpp>
 
 namespace softadastra
@@ -38,8 +41,12 @@ namespace softadastra
      * @brief Creates a native process from a Vix child handle.
      */
     explicit NativeProcess(vix::process::Child child) noexcept;
+    ~NativeProcess() override;
 #if defined(__linux__)
     explicit NativeProcess(pid_t pid) noexcept;
+#endif
+#if defined(_WIN32)
+    NativeProcess(HANDLE process, HANDLE job, DWORD pid) noexcept;
 #endif
 
     /**
@@ -67,6 +74,10 @@ namespace softadastra
     vix::process::Child child_;
     long native_pid_{-1};
     std::optional<int> exit_code_;
+#if defined(_WIN32)
+    HANDLE process_{nullptr};
+    HANDLE job_{nullptr};
+#endif
   };
 
 } // namespace softadastra

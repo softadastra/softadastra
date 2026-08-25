@@ -37,11 +37,20 @@
 #include <unistd.h>
 
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace softadastra
 {
   namespace
   {
+#if defined(_WIN32)
+    std::wstring wide(const std::string &value)
+    { if (value.empty()) return {}; const int size=::MultiByteToWideChar(CP_UTF8,0,value.data(),static_cast<int>(value.size()),nullptr,0); std::wstring result(size,L'\0'); ::MultiByteToWideChar(CP_UTF8,0,value.data(),static_cast<int>(value.size()),result.data(),size); return result; }
+    std::wstring quote(const std::string &value)
+    { std::wstring result=L"\""; for (const wchar_t character:wide(value)) { if (character==L'\"') result+=L'\\'; result+=character; } return result+L"\""; }
+#endif
     bool executable_exists(const std::string &executable)
     {
       const std::filesystem::path path(executable);
@@ -129,6 +138,25 @@ namespace softadastra
       }
       return std::make_unique<NativeProcess>(pid);
     }
+#endif
+#if defined(_WIN32)
+    std::wstring command = quote(spec.executable());
+    for (const auto &argument : spec.arguments()) command += L" " + quote(argument);
+    STARTUPINFOW startup{}; startup.cb=sizeof(startup); PROCESS_INFORMATION information{};
+    HANDLE log=nullptr;
+    if (spec.output_file())
+    {
+      log=::CreateFileW(wide(*spec.output_file()).c_str(), FILE_APPEND_DATA, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (log==INVALID_HANDLE_VALUE) return ProcessLaunchError::LaunchFailed;
+      startup.dwFlags|=STARTF_USESTDHANDLES; startup.hStdOutput=log; startup.hStdError=log; startup.hStdInput=::GetStdHandle(STD_INPUT_HANDLE);
+    }
+    std::wstring cwd = spec.working_directory() ? wide(*spec.working_directory()) : std::wstring{};
+    if (!::CreateProcessW(nullptr, command.data(), nullptr, nullptr, log != nullptr, CREATE_NEW_PROCESS_GROUP, nullptr, cwd.empty()?nullptr:cwd.c_str(), &startup, &information))
+    { if(log) ::CloseHandle(log); const auto error=::GetLastError(); return error==ERROR_FILE_NOT_FOUND?ProcessLaunchError::ExecutableNotFound:(error==ERROR_ACCESS_DENIED?ProcessLaunchError::PermissionDenied:ProcessLaunchError::LaunchFailed); }
+    if(log) ::CloseHandle(log); ::CloseHandle(information.hThread);
+    HANDLE job=::CreateJobObjectW(nullptr,nullptr);
+    if(job!=nullptr) { JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{}; limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE; static_cast<void>(::SetInformationJobObject(job,JobObjectExtendedLimitInformation,&limits,sizeof(limits))); if(!::AssignProcessToJobObject(job,information.hProcess)){::CloseHandle(job);job=nullptr;} }
+    return std::make_unique<NativeProcess>(information.hProcess, job, information.dwProcessId);
 #endif
 
     vix::process::Command command(spec.executable());
