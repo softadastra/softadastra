@@ -16,6 +16,9 @@
 #define SOFTADASTRA_PLATFORM_HOST_INSTANCE_LOCK_HPP
 
 #include <filesystem>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace softadastra
 {
@@ -38,6 +41,9 @@ namespace softadastra
 
   private:
     int descriptor_{-1};
+#if defined(_WIN32)
+    HANDLE mutex_{nullptr};
+#endif
   };
 
 } // namespace softadastra

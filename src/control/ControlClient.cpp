@@ -18,6 +18,7 @@
 
 #include <array>
 #include <cstring>
+#include <functional>
 #include <utility>
 
 #if defined(__linux__)
@@ -27,9 +28,15 @@
 #include <unistd.h>
 
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace softadastra
 {
+#if defined(_WIN32)
+  namespace { std::wstring pipe_name(const std::filesystem::path &path) { return L"\\\\.\\pipe\\Softadastra-" + std::to_wstring(std::hash<std::wstring>{}(path.wstring())); } }
+#endif
   ControlClient::ControlClient(ControlServer &server) noexcept
       : server_(&server)
   {
@@ -616,8 +623,16 @@ namespace softadastra
 
     return std::string(buffer.data(), static_cast<std::size_t>(received));
 #else
-    static_cast<void>(message);
-    return std::nullopt;
+#if defined(_WIN32)
+    const auto name=pipe_name(path_);
+    if(!::WaitNamedPipeW(name.c_str(),50)) return std::nullopt;
+    HANDLE pipe=::CreateFileW(name.c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+    if(pipe==INVALID_HANDLE_VALUE) return std::nullopt;
+    DWORD written{}; if(!::WriteFile(pipe,message.data(),static_cast<DWORD>(message.size()),&written,nullptr)){::CloseHandle(pipe);return std::nullopt;}
+    std::array<char,16384> buffer{};DWORD received{};const bool ok=::ReadFile(pipe,buffer.data(),static_cast<DWORD>(buffer.size()),&received,nullptr);::CloseHandle(pipe);if(!ok||received==0)return std::nullopt;return std::string(buffer.data(),received);
+#else
+    static_cast<void>(message); return std::nullopt;
+#endif
 #endif
   }
 

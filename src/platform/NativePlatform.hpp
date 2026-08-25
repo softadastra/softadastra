@@ -48,7 +48,7 @@ namespace softadastra
      */
     [[nodiscard]] static constexpr bool host_supported() noexcept
     {
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
       return true;
 #else
       return false;

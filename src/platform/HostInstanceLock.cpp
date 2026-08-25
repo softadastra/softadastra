@@ -14,12 +14,17 @@
 
 #include "platform/HostInstanceLock.hpp"
 
+#include <functional>
+
 #if defined(__linux__)
 
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
 
+#endif
+#if defined(_WIN32)
+#include <windows.h>
 #endif
 
 namespace softadastra
@@ -31,6 +36,9 @@ namespace softadastra
     {
       static_cast<void>(::close(descriptor_));
     }
+#endif
+#if defined(_WIN32)
+    if (mutex_ != nullptr) ::CloseHandle(mutex_);
 #endif
   }
 
@@ -61,8 +69,16 @@ namespace softadastra
     descriptor_ = descriptor;
     return true;
 #else
-    static_cast<void>(directory);
+#if defined(_WIN32)
+    if (mutex_ != nullptr) return true;
+    const std::wstring name = L"Local\\SoftadastraHost-" + std::to_wstring(std::hash<std::wstring>{}(directory.wstring()));
+    mutex_ = ::CreateMutexW(nullptr, TRUE, name.c_str());
+    if (mutex_ == nullptr) return false;
+    if (::GetLastError() == ERROR_ALREADY_EXISTS) { ::CloseHandle(mutex_); mutex_ = nullptr; return false; }
     return true;
+#else
+    static_cast<void>(directory); return false;
+#endif
 #endif
   }
 

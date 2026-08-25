@@ -23,8 +23,6 @@
 #include "host/HostLoop.hpp"
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
-#include "host/LocalDns.hpp"
-#include "host/LocalGatewayProcessEndpoint.hpp"
 #include "host/LocalReachability.hpp"
 #include "host/RemoteReachability.hpp"
 #include "platform/NativeDataDirectory.hpp"
@@ -33,7 +31,6 @@
 #include "platform/NativePlatform.hpp"
 #include "platform/NativeNetwork.hpp"
 #include "platform/NativeManagedNetwork.hpp"
-#include "platform/NativeLocalDnsDelegation.hpp"
 #include "software/ProjectIdentity.hpp"
 #include "software/ProjectConfig.hpp"
 #include "webui/WebUiServer.hpp"
@@ -48,6 +45,10 @@
 
 #if defined(__linux__)
 
+#include "host/LocalDns.hpp"
+#include "host/LocalGatewayProcessEndpoint.hpp"
+#include "platform/NativeLocalDnsDelegation.hpp"
+
 #include <csignal>
 #include <fcntl.h>
 #include <pthread.h>
@@ -55,9 +56,16 @@
 #include <unistd.h>
 
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace
 {
+#if defined(_WIN32)
+  std::atomic_bool windows_stop{false};
+  BOOL WINAPI console_control(DWORD value) { if(value==CTRL_C_EVENT||value==CTRL_BREAK_EVENT||value==CTRL_CLOSE_EVENT){windows_stop=true;return TRUE;}return FALSE; }
+#endif
 #if defined(__linux__)
   bool block_host_signals()
   {
@@ -175,8 +183,14 @@ namespace
 
 #else
 
-    const bool completed = host_loop.run();
-    return completed ? 0 : 1;
+#if defined(_WIN32)
+    windows_stop=false; if(!::SetConsoleCtrlHandler(console_control,TRUE)) return 1;
+    std::atomic_bool completed{false}; std::thread thread([&]{completed=host_loop.run();});
+    while(!completed&&!windows_stop) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    if(windows_stop) host_loop.request_stop(); thread.join(); ::SetConsoleCtrlHandler(console_control,FALSE); return completed?0:1;
+#else
+    const bool completed = host_loop.run(); return completed ? 0 : 1;
+#endif
 
 #endif
   }
@@ -205,8 +219,14 @@ namespace
     }
     return true;
 #else
-    static_cast<void>(executable);
-    return false;
+#if defined(_WIN32)
+    std::wstring command=L"\""; for(const char c:std::string(executable)) command+=static_cast<wchar_t>(static_cast<unsigned char>(c)); command+=L"\" host";
+    STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};
+    const bool started=::CreateProcessW(nullptr,command.data(),nullptr,nullptr,FALSE,DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP,nullptr,nullptr,&startup,&process)!=FALSE;
+    if(started){::CloseHandle(process.hThread);::CloseHandle(process.hProcess);}return started;
+#else
+    static_cast<void>(executable); return false;
+#endif
 #endif
   }
 } // namespace
@@ -286,6 +306,7 @@ int main(int argc, char *argv[])
         data_directory / "control.sock",
         &remote_config,
         &remote_reachability);
+#if defined(__linux__)
     softadastra::LocalDns local_dns;
     softadastra::NativeLocalDnsDelegation local_dns_delegation;
     const auto gateway_executable = std::filesystem::absolute(argv[0]).parent_path() / "softadastra-gateway";
@@ -295,13 +316,17 @@ int main(int argc, char *argv[])
         platform.managed_network(), local_dns_delegation, local_dns,
         gateway_endpoint, 80);
     host_service.set_local_reachability(&local_reachability);
+#endif
     softadastra::HostLoop host_loop(
         host_service,
         state_file,
         std::chrono::seconds(1),
         &local_control_server,
-        &profile_store,
-        &local_reachability);
+        &profile_store
+#if defined(__linux__)
+        , &local_reachability
+#endif
+        );
     local_control_server.set_shutdown_handler([&host_loop]() { host_loop.request_stop(); });
     softadastra::MdnsPublisher mdns_publisher(identity.id());
     return run_host(
