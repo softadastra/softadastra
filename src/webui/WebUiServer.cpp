@@ -10,12 +10,6 @@
 #include <istream>
 #include <system_error>
 
-#if defined(__linux__)
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#endif
-
 namespace
 {
   using Tcp = asio::ip::tcp;
@@ -92,20 +86,12 @@ namespace softadastra
     const auto port = port_.load();
     if (worker_.joinable() && port != 0)
     {
-      // This temporary connection only wakes accept(); the worker owns all
-      // listener objects and will close the accepted socket itself.
-#if defined(__linux__)
-      const int wake = ::socket(AF_INET, SOCK_STREAM, 0);
-      if (wake >= 0)
-      {
-        sockaddr_in address{};
-        address.sin_family = AF_INET;
-        address.sin_port = htons(port);
-        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        static_cast<void>(::connect(wake, reinterpret_cast<const sockaddr *>(&address), sizeof(address)));
-        ::close(wake);
-      }
-#endif
+      // A loopback connection wakes the blocking accept on every supported
+      // platform; the worker remains the sole owner of the accepted socket.
+      asio::io_context context;
+      Tcp::socket wake(context);
+      std::error_code error;
+      wake.connect({asio::ip::make_address("127.0.0.1", error), port}, error);
     }
     if (worker_.joinable()) worker_.join();
     port_.store(0);

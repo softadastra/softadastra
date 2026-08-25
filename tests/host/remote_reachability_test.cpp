@@ -9,6 +9,20 @@
 #include <unistd.h>
 #endif
 namespace {
+struct InertResolver final : softadastra::LocalGatewayTargetResolver
+{
+  softadastra::LocalGatewayTarget resolve(std::string_view) const override { return {}; }
+};
+
+TEST(RemoteReachabilityTest, IsDisabledUntilAnOutboundEndpointIsConfigured)
+{
+  InertResolver resolver;
+  softadastra::RemoteReachability remote(resolver);
+  EXPECT_EQ(remote.state(), softadastra::RemoteReachabilityState::Disabled);
+  remote.disable();
+  EXPECT_EQ(remote.state(), softadastra::RemoteReachabilityState::Disabled);
+}
+
 #if defined(__linux__)
 using namespace std::chrono_literals;
 struct Resolver final:softadastra::LocalGatewayTargetResolver { softadastra::LocalGatewayTarget target{}; softadastra::LocalGatewayTarget resolve(std::string_view name)const override{return name=="app"?target:softadastra::LocalGatewayTarget{};} };

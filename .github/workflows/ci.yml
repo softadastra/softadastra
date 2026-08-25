@@ -5,23 +5,83 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  linux:
+    name: Linux (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - compiler: GCC
+            cc: gcc
+            cxx: g++
+          - compiler: Clang
+            cc: clang
+            cxx: clang++
     steps:
       - uses: actions/checkout@v4
-      - name: Install Vix.cpp on Linux
-        if: runner.os == 'Linux'
+      - name: Install Vix.cpp
         run: curl -fsSL https://vixcpp.com/install.sh | bash
-      - name: Install Vix.cpp on Windows
-        if: runner.os == 'Windows'
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: cmake -S . -B build-ci -G Ninja -DSOFTADASTRA_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build-ci --parallel
+      - name: Run main Linux suites
+        run: |
+          ./build-ci/softadastra_local_gateway_test
+          ./build-ci/softadastra_local_dns_test
+          ./build-ci/softadastra_local_reachability_test
+          ./build-ci/softadastra_web_ui_server_test
+          ./build-ci/softadastra_remote_reachability_test
+          ./build-ci/softadastra_control_client_test
+          ./build-ci/softadastra_control_server_test
+          ./build-ci/softadastra_host_service_test
+      - name: Upload Linux binaries
+        if: matrix.compiler == 'GCC'
+        uses: actions/upload-artifact@v4
+        with:
+          name: softadastra-linux
+          if-no-files-found: error
+          path: |
+            build-ci/softadastra
+            build-ci/softadastra-gateway
+
+  windows:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vix.cpp
         shell: pwsh
         run: irm https://vixcpp.com/install.ps1 | iex
-      - name: Build
-        run: vix build
-      - name: Test
-        run: vix tests
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON
+      - name: Build softadastra and Windows core
+        shell: pwsh
+        run: cmake --build build-ci --parallel
+      - name: Run Windows-compatible tests
+        shell: pwsh
+        run: |
+          ./build-ci/softadastra_process_launcher_test.exe
+          ./build-ci/softadastra_native_process_test.exe
+          ./build-ci/softadastra_native_process_launcher_test.exe
+          ./build-ci/softadastra_host_instance_lock_test.exe
+          ./build-ci/softadastra_native_data_directory_test.exe
+          ./build-ci/softadastra_native_network_test.exe
+          ./build-ci/softadastra_native_platform_test.exe
+          ./build-ci/softadastra_control_client_test.exe
+          ./build-ci/softadastra_control_server_test.exe
+          ./build-ci/softadastra_host_service_test.exe
+          ./build-ci/softadastra_web_ui_server_test.exe
+          ./build-ci/softadastra_remote_reachability_test.exe
+          ./build-ci/softadastra_cli_test.exe
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: softadastra-windows
+          if-no-files-found: error
+          path: build-ci/softadastra.exe
