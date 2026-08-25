@@ -21,11 +21,11 @@
 
 namespace softadastra
 {
-  /** @brief Persistent, explicitly configured remote listener settings. */
+  /** @brief Persistent, explicitly configured outbound relay settings. */
   struct RemoteAccessSettings
   {
     bool enabled{false};
-    std::string address;
+    std::string address; // relay address; never a local bind address
     std::uint16_t port{0};
   };
 

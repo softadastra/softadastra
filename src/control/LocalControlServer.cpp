@@ -147,19 +147,26 @@ namespace softadastra
         const std::string_view request(buffer.data(), static_cast<std::size_t>(received));
         std::string response;
         const auto fields = LocalControlProtocol::fields(request);
-        if (remote_config_ != nullptr && remote_server_ != nullptr && fields.size() >= 2 && fields[0] == "remote")
+        if (remote_config_ != nullptr && fields.size() >= 2 && fields[0] == "remote")
         {
           RemoteAccessSettings settings;
           if (fields[1] == "disable" && fields.size() == 2)
           {
-            response = remote_config_->save(settings) && remote_server_->apply() ? "remote 0" : "error";
+            response = remote_config_->save(settings) ? "remote 0" : "error";
           }
           else if (fields[1] == "enable" && fields.size() == 4)
           {
             const auto port = LocalControlProtocol::integer(fields[3]);
             const bool valid_port = port.has_value() && port.value() > 0 && port.value() <= 65535;
             settings = {true, fields[2], valid_port ? static_cast<std::uint16_t>(port.value()) : static_cast<std::uint16_t>(0)};
-            response = remote_config_->save(settings) && remote_server_->apply() ? "remote 1" : "error";
+            response = valid_port && !fields[2].empty() && remote_config_->save(settings) ? "remote 1" : "error";
+          }
+          else if (fields[1] == "status" && fields.size() == 2)
+          {
+            response = remote_config_->load(settings)
+                       ? std::string("remote-status ") + (settings.enabled ? "enabled " : "disabled - 0") +
+                             (settings.enabled ? settings.address + " " + std::to_string(settings.port) : "")
+                       : "error";
           }
           else response = "error";
         }
