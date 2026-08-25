@@ -17,7 +17,6 @@
 #include "control/ControlServer.hpp"
 #include "control/LocalControlServer.hpp"
 #include "control/RemoteAccessConfig.hpp"
-#include "control/RemoteControlServer.hpp"
 #include "host/Host.hpp"
 #include "host/HostIdentity.hpp"
 #include "host/HostProfile.hpp"
@@ -27,6 +26,7 @@
 #include "host/LocalDns.hpp"
 #include "host/LocalGatewayProcessEndpoint.hpp"
 #include "host/LocalReachability.hpp"
+#include "host/RemoteReachability.hpp"
 #include "platform/NativeDataDirectory.hpp"
 #include "platform/HostInstanceLock.hpp"
 #include "platform/MdnsPublisher.hpp"
@@ -275,18 +275,16 @@ int main(int argc, char *argv[])
       std::cerr << "failed to initialize remote access configuration\n";
       return 1;
     }
-    softadastra::RemoteControlServer remote_server(
-        control_server, remote_config, identity.secret(),
-        data_directory);
-    if (!remote_server.apply())
+    softadastra::RemoteReachability remote_reachability(host_service);
+    if (remote_settings.enabled)
     {
-      std::cerr << "failed to apply remote access configuration\n";
-      return 1;
+      remote_reachability.configure({remote_settings.address, remote_settings.port});
     }
     softadastra::LocalControlServer local_control_server(
         control_server,
         data_directory / "control.sock",
-        &remote_config, &remote_server);
+        &remote_config,
+        &remote_reachability);
     softadastra::LocalDns local_dns;
     softadastra::NativeLocalDnsDelegation local_dns_delegation;
     const auto gateway_executable = std::filesystem::absolute(argv[0]).parent_path() / "softadastra-gateway";

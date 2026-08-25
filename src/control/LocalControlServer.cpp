@@ -16,7 +16,7 @@
 
 #include "control/LocalControlProtocol.hpp"
 #include "control/RemoteAccessConfig.hpp"
-#include "control/RemoteControlServer.hpp"
+#include "host/RemoteReachability.hpp"
 
 #include <array>
 #include <cerrno>
@@ -54,11 +54,11 @@ namespace softadastra
       ControlServer &server,
       std::filesystem::path path,
       RemoteAccessConfig *remote_config,
-      RemoteControlServer *remote_server) noexcept
+      RemoteReachability *remote_reachability) noexcept
       : server_(server),
         path_(std::move(path)),
         remote_config_(remote_config),
-        remote_server_(remote_server)
+        remote_reachability_(remote_reachability)
   {
   }
 
@@ -147,19 +147,26 @@ namespace softadastra
         const std::string_view request(buffer.data(), static_cast<std::size_t>(received));
         std::string response;
         const auto fields = LocalControlProtocol::fields(request);
-        if (remote_config_ != nullptr && remote_server_ != nullptr && fields.size() >= 2 && fields[0] == "remote")
+        if (remote_config_ != nullptr && fields.size() >= 2 && fields[0] == "remote")
         {
           RemoteAccessSettings settings;
           if (fields[1] == "disable" && fields.size() == 2)
           {
-            response = remote_config_->save(settings) && remote_server_->apply() ? "remote 0" : "error";
+            if (remote_config_->save(settings)) { if (remote_reachability_ != nullptr) remote_reachability_->disable(); response = "remote 0"; } else response = "error";
           }
           else if (fields[1] == "enable" && fields.size() == 4)
           {
             const auto port = LocalControlProtocol::integer(fields[3]);
             const bool valid_port = port.has_value() && port.value() > 0 && port.value() <= 65535;
             settings = {true, fields[2], valid_port ? static_cast<std::uint16_t>(port.value()) : static_cast<std::uint16_t>(0)};
-            response = remote_config_->save(settings) && remote_server_->apply() ? "remote 1" : "error";
+            if (valid_port && !fields[2].empty() && remote_config_->save(settings)) { if (remote_reachability_ != nullptr) remote_reachability_->configure({settings.address,settings.port}); response = "remote 1"; } else response = "error";
+          }
+          else if (fields[1] == "status" && fields.size() == 2)
+          {
+            response = remote_config_->load(settings)
+                       ? std::string("remote-status ") + (settings.enabled ? "enabled " : "disabled - 0") +
+                             (settings.enabled ? settings.address + " " + std::to_string(settings.port) : "")
+                       : "error";
           }
           else response = "error";
         }

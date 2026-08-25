@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
 
 #include "control/RemoteAccessConfig.hpp"
 TEST(RemoteAccessConfigTest, PersistsDisabledAndExplicitEnabledConfiguration)
@@ -33,5 +34,9 @@ TEST(RemoteAccessConfigTest, PersistsDisabledAndExplicitEnabledConfiguration)
   EXPECT_TRUE(enabled.enabled);
   EXPECT_EQ(enabled.address, "127.0.0.1");
   EXPECT_EQ(enabled.port, 45678);
+  std::ofstream legacy(path, std::ios::trunc);
+  legacy << "1 127.0.0.1 45678\n";
+  legacy.close();
+  EXPECT_FALSE(config.load(enabled));
   std::filesystem::remove_all(path.parent_path());
 }
