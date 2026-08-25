@@ -6,6 +6,7 @@
  */
 
 #include "host/LocalAccess.hpp"
+#include "software/LocalName.hpp"
 
 #include <cctype>
 
@@ -66,7 +67,7 @@ namespace softadastra
       AccessPoint access_point,
       NetworkCapability network_capability,
       ManagedNetworkStatus managed_network_status,
-      bool software_running)
+      bool software_running, std::string software_name, LocalReachabilityState reachability)
   {
     LocalAccess access{
         LocalAccessState::Unavailable,
@@ -103,8 +104,14 @@ namespace softadastra
       return access;
     }
 
-    access.url = std::string(AccessPoint::name(access.protocol)) + "://" +
-                 access.ipv4 + ":" + std::to_string(access.port);
+    const auto local_name = LocalName::from_software_name(software_name);
+    if (access.network == LocalAccessNetwork::Managed &&
+        reachability == LocalReachabilityState::Ready &&
+        access.protocol == AccessProtocol::Http && local_name)
+      access.url = "http://" + local_name->short_name();
+    else
+      access.url = std::string(AccessPoint::name(access.protocol)) + "://" +
+                   access.ipv4 + ":" + std::to_string(access.port);
     return access;
   }
 

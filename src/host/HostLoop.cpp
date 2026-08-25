@@ -25,11 +25,13 @@ namespace softadastra
       HostStateFile &state_file,
       std::chrono::milliseconds interval,
       LocalControlServer *local_control_server,
-      const HostProfileStore *profile_store) noexcept
+      const HostProfileStore *profile_store,
+      LocalReachability *local_reachability) noexcept
       : host_service_(host_service),
         state_file_(state_file),
-        local_control_server_(local_control_server),
-        profile_store_(profile_store),
+      local_control_server_(local_control_server),
+      profile_store_(profile_store),
+      local_reachability_(local_reachability),
         interval_(interval > std::chrono::milliseconds::zero()
                       ? interval
                       : std::chrono::milliseconds(1))
@@ -44,16 +46,11 @@ namespace softadastra
       return false;
     }
 
-    if (profile_store_ != nullptr &&
-        profile_store_->profile() == HostProfile::Box)
+    if (profile_store_ != nullptr && profile_store_->profile() == HostProfile::Box)
     {
       const auto network = host_service_.managed_network_status();
-      if (network.capability == ManagedNetworkCapability::Available &&
-          network.state == ManagedNetworkState::Stopped)
-      {
+      if (network.capability == ManagedNetworkCapability::Available && network.state == ManagedNetworkState::Stopped)
         static_cast<void>(host_service_.start_managed_network());
-        static_cast<void>(host_service_.managed_network_status());
-      }
     }
 
     if (local_control_server_ != nullptr &&
@@ -61,6 +58,9 @@ namespace softadastra
     {
       return false;
     }
+
+    if (profile_store_ != nullptr && profile_store_->profile() == HostProfile::Box && local_reachability_ != nullptr)
+      static_cast<void>(local_reachability_->start());
 
     {
       std::lock_guard lock(mutex_);
@@ -127,6 +127,7 @@ namespace softadastra
 
   bool HostLoop::shutdown()
   {
+    if (local_reachability_ != nullptr) local_reachability_->stop();
     const bool stopped = host_service_.shutdown();
     const bool saved = state_file_.save(host_service_.host().state());
 

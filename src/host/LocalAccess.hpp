@@ -10,6 +10,7 @@
 
 #include "platform/Network.hpp"
 #include "platform/ManagedNetwork.hpp"
+#include "host/LocalReachability.hpp"
 #include "software/AccessPoint.hpp"
 
 #include <cstdint>
@@ -56,7 +57,8 @@ namespace softadastra
       AccessPoint access_point,
       NetworkCapability network_capability,
       ManagedNetworkStatus managed_network_status,
-      bool software_running);
+      bool software_running, std::string software_name = {},
+      LocalReachabilityState reachability = LocalReachabilityState::Unavailable);
 
   [[nodiscard]] const char *local_access_state_name(
       LocalAccessState state) noexcept;

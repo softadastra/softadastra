@@ -24,12 +24,16 @@
 #include "host/HostLoop.hpp"
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
+#include "host/LocalDns.hpp"
+#include "host/LocalGatewayProcessEndpoint.hpp"
+#include "host/LocalReachability.hpp"
 #include "platform/NativeDataDirectory.hpp"
 #include "platform/HostInstanceLock.hpp"
 #include "platform/MdnsPublisher.hpp"
 #include "platform/NativePlatform.hpp"
 #include "platform/NativeNetwork.hpp"
 #include "platform/NativeManagedNetwork.hpp"
+#include "platform/NativeLocalDnsDelegation.hpp"
 #include "software/ProjectIdentity.hpp"
 #include "software/ProjectConfig.hpp"
 
@@ -283,12 +287,22 @@ int main(int argc, char *argv[])
         control_server,
         data_directory / "control.sock",
         &remote_config, &remote_server);
+    softadastra::LocalDns local_dns;
+    softadastra::NativeLocalDnsDelegation local_dns_delegation;
+    const auto gateway_executable = std::filesystem::absolute(argv[0]).parent_path() / "softadastra-gateway";
+    softadastra::LocalGatewayProcessEndpoint gateway_endpoint(
+        platform.process_launcher(), gateway_executable, data_directory / "control.sock");
+    softadastra::LocalReachability local_reachability(
+        platform.managed_network(), local_dns_delegation, local_dns,
+        gateway_endpoint, 80);
+    host_service.set_local_reachability(&local_reachability);
     softadastra::HostLoop host_loop(
         host_service,
         state_file,
         std::chrono::seconds(1),
         &local_control_server,
-        &profile_store);
+        &profile_store,
+        &local_reachability);
     local_control_server.set_shutdown_handler([&host_loop]() { host_loop.request_stop(); });
     softadastra::MdnsPublisher mdns_publisher(identity.id());
     return run_host(
@@ -348,7 +362,8 @@ int main(int argc, char *argv[])
       const auto network = running
                                ? control_client.managed_network_status().value_or(softadastra::ManagedNetworkStatus{})
                                : softadastra::ManagedNetworkStatus{};
-      const auto state = softadastra::box_state(profile_store.profile(), running, network);
+      const auto reachability = running ? control_client.local_reachability_state().value_or(softadastra::LocalReachabilityState::Unavailable) : softadastra::LocalReachabilityState::Unavailable;
+      const auto state = softadastra::box_state(profile_store.profile(), running, network, reachability);
       if (state == softadastra::BoxState::NotProvisioned)
       {
         std::cout << "Not provisioned\n";
@@ -369,6 +384,11 @@ int main(int argc, char *argv[])
       if (state == softadastra::BoxState::Ready)
       {
         std::cout << "Managed network:  running\nLocal IPv4:       " << network.ipv4 << "\nState:            ready\n";
+        return 0;
+      }
+      if (network.state == softadastra::ManagedNetworkState::Running && reachability != softadastra::LocalReachabilityState::Ready)
+      {
+        std::cout << "Managed network:  running\nState:            degraded\nReason:           local reachability is not ready\n";
         return 0;
       }
       std::cout << "Managed network:  "

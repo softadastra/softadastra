@@ -45,6 +45,7 @@ add_library(
   src/host/LocalAccess.cpp
   src/host/LocalDns.cpp
   src/host/LocalGateway.cpp
+  src/host/LocalGatewayProcessEndpoint.cpp
   src/host/LocalReachability.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
@@ -52,6 +53,7 @@ add_library(
   src/platform/NativeNetwork.cpp
   src/platform/ManagedNetwork.cpp
   src/platform/NativeManagedNetwork.cpp
+  src/platform/GatewayCapabilityProvisioning.cpp
   src/platform/LocalDnsDelegation.cpp
   src/platform/NativeLocalDnsDelegation.cpp
   src/platform/NativeLocalGatewaySocketProvider.cpp
@@ -247,6 +249,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
+    softadastra_local_gateway_process_endpoint_test
+    tests/host/local_gateway_process_endpoint_test.cpp
+  )
+
+  softadastra_add_test(
     softadastra_local_dns_test
     tests/host/local_dns_test.cpp
   )
@@ -264,6 +271,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_gateway_socket_provider_test
     tests/platform/local_gateway_socket_provider_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_gateway_capability_provisioning_test
+    tests/platform/gateway_capability_provisioning_test.cpp
   )
 
   softadastra_add_test(

@@ -303,6 +303,9 @@ namespace softadastra
       return "http " + std::to_string(target.port);
     }
 
+    if (fields[0] == "local-reachability" && fields.size() == 1)
+      return "local-reachability " + std::to_string(static_cast<int>(server.local_reachability_state()));
+
     if (fields[0] == "project" && fields.size() == 2)
     {
       const auto identity = LocalControlProtocol::decode(fields[1]);

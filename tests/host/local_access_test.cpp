@@ -119,6 +119,20 @@ namespace
     EXPECT_EQ(second.url, "http://10.43.0.1:8080");
   }
 
+  TEST(LocalAccessTest, UsesShortHttpNameOnlyWhenManagedReachabilityIsReady)
+  {
+    const auto point = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080);
+    ASSERT_TRUE(point.has_value());
+    const auto named = softadastra::resolve_local_access(
+        *point, no_local_network(), managed_network(softadastra::ManagedNetworkState::Running, "10.42.0.1"),
+        true, "phone-test", softadastra::LocalReachabilityState::Ready);
+    const auto fallback = softadastra::resolve_local_access(
+        *point, no_local_network(), managed_network(softadastra::ManagedNetworkState::Running, "10.42.0.1"),
+        true, "phone-test", softadastra::LocalReachabilityState::Degraded);
+    EXPECT_EQ(named.url, "http://phone-test");
+    EXPECT_EQ(fallback.url, "http://10.42.0.1:8080");
+  }
+
   TEST(LocalAccessTest, FallsBackWhenRunningManagedNetworkHasNoUsableIpv4)
   {
     const auto point = softadastra::AccessPoint::create(

@@ -208,6 +208,16 @@ namespace softadastra
     return {LocalGatewayLookup::Http, static_cast<std::uint16_t>(*port)};
   }
 
+  std::optional<LocalReachabilityState> ControlClient::local_reachability_state() const noexcept
+  {
+    if (server_ != nullptr) return server_->local_reachability_state();
+    const auto response = request("local-reachability");
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    const auto state = fields.size() == 2 && fields[0] == "local-reachability" ? LocalControlProtocol::integer(fields[1]) : std::nullopt;
+    if (!state || *state < 0 || *state > static_cast<int>(LocalReachabilityState::Degraded)) return std::nullopt;
+    return static_cast<LocalReachabilityState>(*state);
+  }
+
   SoftwareOperationResult ControlClient::start_software(const SoftwareId &id)
   {
     if (server_ != nullptr)

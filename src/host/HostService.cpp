@@ -148,6 +148,9 @@ namespace softadastra
     return {LocalGatewayLookup::Http, access->port()};
   }
 
+  LocalReachabilityState HostService::local_reachability_state() const noexcept
+  { return local_reachability_ == nullptr ? LocalReachabilityState::Unavailable : local_reachability_->state(); }
+
   bool HostService::connectivity_available() const noexcept
   {
     return connectivity_manager_.is_available();
@@ -179,8 +182,8 @@ namespace softadastra
     auto access = resolve_local_access(
         entry->access_point().value(),
         network_capability(),
-        managed_network_status(),
-        entry->state() == SoftwareState::Running);
+        managed_network_status(), entry->state() == SoftwareState::Running,
+        entry->name(), local_reachability_state());
 
     // `access` may change networking only here: a real, running AccessPoint
     // has no usable local network and ManagedNetwork has conservatively
@@ -202,7 +205,8 @@ namespace softadastra
     static_cast<void>(start_managed_network());
     access = resolve_local_access(
         entry->access_point().value(), network_capability(),
-        managed_network_status(), true);
+        managed_network_status(), true, entry->name(),
+        local_reachability_ != nullptr ? local_reachability_->start() : LocalReachabilityState::Unavailable);
     if (access.state != LocalAccessState::Available)
     {
       access.managed_network_start_failed = true;

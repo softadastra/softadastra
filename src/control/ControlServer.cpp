@@ -64,6 +64,8 @@ namespace softadastra
 
   LocalGatewayTarget ControlServer::local_gateway_target(std::string_view host) const
   { return host_service_.resolve(host); }
+  LocalReachabilityState ControlServer::local_reachability_state() const noexcept
+  { return host_service_.local_reachability_state(); }
 
   SoftwareOperationResult ControlServer::start_software(const SoftwareId &id)
   {

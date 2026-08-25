@@ -1,6 +1,8 @@
 #ifndef SOFTADASTRA_HOST_LOCAL_DNS_HPP
 #define SOFTADASTRA_HOST_LOCAL_DNS_HPP
 
+#include "host/LocalReachability.hpp"
+
 #include <cstdint>
 #include <string>
 
@@ -9,15 +11,15 @@ namespace softadastra
   enum class LocalDnsState { Stopped, Running, Failed };
   struct LocalDnsStatus { LocalDnsState state{LocalDnsState::Stopped}; std::string address; std::uint16_t port{}; };
 
-  class LocalDns
+  class LocalDns : public LocalDnsEndpoint
   {
   public:
     LocalDns() = default;
     ~LocalDns();
     LocalDns(const LocalDns &) = delete;
     LocalDns &operator=(const LocalDns &) = delete;
-    bool start(std::string address, std::uint16_t port);
-    void stop() noexcept;
+    bool start(std::string address, std::uint16_t port) override;
+    void stop() noexcept override;
     [[nodiscard]] LocalDnsStatus status() const;
   private:
     void run() noexcept;

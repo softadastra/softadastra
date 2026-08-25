@@ -19,6 +19,7 @@
 #include "host/Host.hpp"
 #include "host/LocalAccess.hpp"
 #include "host/LocalGatewayTargetResolver.hpp"
+#include "host/LocalReachability.hpp"
 #include "platform/Network.hpp"
 #include "platform/ManagedNetwork.hpp"
 #include "platform/ProcessLauncher.hpp"
@@ -129,6 +130,8 @@ namespace softadastra
     [[nodiscard]] std::optional<AccessPoint> access_point(
         const SoftwareId &id) const noexcept;
     [[nodiscard]] LocalGatewayTarget resolve(std::string_view host) const override;
+    void set_local_reachability(LocalReachability *reachability) noexcept { local_reachability_ = reachability; }
+    [[nodiscard]] LocalReachabilityState local_reachability_state() const noexcept;
 
     /**
      * @brief Returns whether network connectivity is available.
@@ -174,6 +177,7 @@ namespace softadastra
     Host &host_;
     SoftwareManager software_manager_;
     ConnectivityManager connectivity_manager_;
+    LocalReachability *local_reachability_{nullptr};
   };
 
 } // namespace softadastra

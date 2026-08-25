@@ -16,6 +16,7 @@
 #define SOFTADASTRA_HOST_HOST_LOOP_HPP
 
 #include "host/HostService.hpp"
+#include "host/LocalReachability.hpp"
 #include "host/HostProfile.hpp"
 #include "host/HostStateFile.hpp"
 
@@ -51,8 +52,9 @@ namespace softadastra
         HostService &host_service,
         HostStateFile &state_file,
         std::chrono::milliseconds interval = std::chrono::seconds(1),
-        LocalControlServer *local_control_server = nullptr,
-        const HostProfileStore *profile_store = nullptr) noexcept;
+      LocalControlServer *local_control_server = nullptr,
+      const HostProfileStore *profile_store = nullptr,
+      LocalReachability *local_reachability = nullptr) noexcept;
 
     /**
      * @brief Restores state and runs until a stop request is received.
@@ -79,6 +81,7 @@ namespace softadastra
     HostStateFile &state_file_;
     LocalControlServer *local_control_server_;
     const HostProfileStore *profile_store_;
+    LocalReachability *local_reachability_;
     std::chrono::milliseconds interval_;
     mutable std::mutex mutex_;
     std::condition_variable condition_;

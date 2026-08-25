@@ -116,7 +116,8 @@ namespace softadastra
   BoxState box_state(
       HostProfile profile,
       bool host_running,
-      ManagedNetworkStatus managed_network) noexcept
+      ManagedNetworkStatus managed_network,
+      LocalReachabilityState reachability) noexcept
   {
     if (profile != HostProfile::Box)
     {
@@ -132,6 +133,6 @@ namespace softadastra
     {
       return BoxState::Degraded;
     }
-    return BoxState::Ready;
+    return reachability == LocalReachabilityState::Ready ? BoxState::Ready : BoxState::Degraded;
   }
 }

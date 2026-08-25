@@ -8,6 +8,7 @@
 #define SOFTADASTRA_HOST_HOST_PROFILE_HPP
 
 #include "platform/ManagedNetwork.hpp"
+#include "host/LocalReachability.hpp"
 
 #include <filesystem>
 #include <string>
@@ -38,7 +39,8 @@ namespace softadastra
   [[nodiscard]] BoxState box_state(
       HostProfile profile,
       bool host_running,
-      ManagedNetworkStatus managed_network) noexcept;
+      ManagedNetworkStatus managed_network,
+      LocalReachabilityState reachability = LocalReachabilityState::Ready) noexcept;
 }
 
 #endif // SOFTADASTRA_HOST_HOST_PROFILE_HPP

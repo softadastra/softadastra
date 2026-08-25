@@ -56,6 +56,7 @@ namespace softadastra
 
     [[nodiscard]] std::optional<AccessPoint> access_point(const SoftwareId &id) const noexcept;
     [[nodiscard]] LocalGatewayTarget local_gateway_target(std::string_view host) const;
+    [[nodiscard]] LocalReachabilityState local_reachability_state() const noexcept;
 
     /**
      * @brief Starts registered software.
