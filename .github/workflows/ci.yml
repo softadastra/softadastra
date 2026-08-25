@@ -20,8 +20,6 @@ jobs:
             cxx: clang++
     steps:
       - uses: actions/checkout@v4
-      - name: Install Vix.cpp
-        run: curl -fsSL https://vixcpp.com/install.sh | bash
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
@@ -54,12 +52,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Vix.cpp
-        shell: pwsh
-        run: irm https://vixcpp.com/install.ps1 | iex
+      - name: Enable MSVC
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Configure
         shell: pwsh
-        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON
       - name: Build softadastra and Windows core
         shell: pwsh
         run: cmake --build build-ci --parallel

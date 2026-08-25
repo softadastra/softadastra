@@ -17,7 +17,17 @@ option(
   ON
 )
 
-find_package(Vix CONFIG REQUIRED)
+find_package(Vix CONFIG QUIET)
+if(NOT Vix_FOUND)
+  include(FetchContent)
+  FetchContent_Declare(
+    vix
+    GIT_REPOSITORY https://github.com/vixcpp/vix.git
+    GIT_TAG v2.7.8
+    GIT_SHALLOW TRUE
+  )
+  FetchContent_MakeAvailable(vix)
+endif()
 find_package(OpenSSL REQUIRED)
 
 add_library(
