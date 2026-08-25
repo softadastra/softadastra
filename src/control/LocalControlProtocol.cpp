@@ -49,10 +49,11 @@ namespace softadastra
     std::string encoded;
     encoded.reserve(value.size() * 2);
 
-    for (const unsigned char character : value)
+    for (const char character : value)
     {
-      encoded += digits[character >> 4U];
-      encoded += digits[character & 0x0fU];
+      const auto byte = static_cast<unsigned char>(character);
+      encoded += digits[byte >> 4U];
+      encoded += digits[byte & 0x0fU];
     }
 
     return encoded;

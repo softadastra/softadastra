@@ -19,6 +19,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -234,6 +235,26 @@ namespace
            attribute->nla_len <= length;
   }
 
+  bool message_ok(const nlmsghdr *message, int length) noexcept
+  {
+    return length >= static_cast<int>(sizeof(nlmsghdr)) &&
+           message->nlmsg_len >= sizeof(nlmsghdr) &&
+           message->nlmsg_len <= static_cast<decltype(message->nlmsg_len)>(length);
+  }
+
+  const nlmsghdr *next_message(const nlmsghdr *message, int &length) noexcept
+  {
+    const auto message_length = static_cast<std::size_t>(message->nlmsg_len);
+    const auto aligned_length = (message_length + NLMSG_ALIGNTO - 1U) & ~(NLMSG_ALIGNTO - 1U);
+    if (aligned_length > static_cast<std::size_t>(length))
+    {
+      length = 0;
+      return message;
+    }
+    length -= static_cast<int>(aligned_length);
+    return reinterpret_cast<const nlmsghdr *>(reinterpret_cast<const char *>(message) + aligned_length);
+  }
+
   const nlattr *next_attribute(const nlattr *attribute, int &length) noexcept
   {
     const int aligned_length = NLA_ALIGN(attribute->nla_len);
@@ -244,12 +265,12 @@ namespace
 
   void *attribute_data(nlattr *attribute) noexcept
   {
-    return reinterpret_cast<char *>(attribute) + NLA_HDRLEN;
+    return reinterpret_cast<char *>(attribute) + sizeof(nlattr);
   }
 
   const void *attribute_data(const nlattr *attribute) noexcept
   {
-    return reinterpret_cast<const char *>(attribute) + NLA_HDRLEN;
+    return reinterpret_cast<const char *>(attribute) + sizeof(nlattr);
   }
 
   int attribute_type(const nlattr *attribute) noexcept
@@ -289,7 +310,9 @@ namespace
         reinterpret_cast<char *>(header) + GENL_HDRLEN);
     constexpr char family_name[] = "nl80211";
     attribute->nla_type = CTRL_ATTR_FAMILY_NAME;
-    attribute->nla_len = NLA_HDRLEN + sizeof(family_name);
+    constexpr auto attribute_size = sizeof(nlattr) + sizeof(family_name);
+    static_assert(attribute_size <= std::numeric_limits<decltype(attribute->nla_len)>::max());
+    attribute->nla_len = static_cast<decltype(attribute->nla_len)>(attribute_size);
     std::memcpy(attribute_data(attribute), family_name, sizeof(family_name));
     message->nlmsg_len += NLA_ALIGN(attribute->nla_len);
 
@@ -305,9 +328,9 @@ namespace
     }
 
     int remaining = static_cast<int>(received);
-    for (auto *reply = reinterpret_cast<nlmsghdr *>(buffer.data());
-         NLMSG_OK(reply, remaining);
-         reply = NLMSG_NEXT(reply, remaining))
+    for (const auto *reply = reinterpret_cast<const nlmsghdr *>(buffer.data());
+         message_ok(reply, remaining);
+         reply = next_message(reply, remaining))
     {
       if (reply->nlmsg_type == NLMSG_ERROR)
       {
@@ -315,7 +338,13 @@ namespace
       }
 
       auto *reply_header = reinterpret_cast<genlmsghdr *>(NLMSG_DATA(reply));
-      int attribute_length = reply->nlmsg_len - NLMSG_LENGTH(GENL_HDRLEN);
+      const auto header_length = static_cast<decltype(reply->nlmsg_len)>(NLMSG_LENGTH(GENL_HDRLEN));
+      if (reply->nlmsg_len < header_length ||
+          reply->nlmsg_len - header_length > static_cast<decltype(reply->nlmsg_len)>(std::numeric_limits<int>::max()))
+      {
+        continue;
+      }
+      int attribute_length = static_cast<int>(reply->nlmsg_len - header_length);
       const auto *attributes = reinterpret_cast<const nlattr *>(
           reinterpret_cast<const char *>(reply_header) + GENL_HDRLEN);
 
@@ -324,7 +353,7 @@ namespace
            current = next_attribute(current, attribute_length))
       {
         if (attribute_type(current) == CTRL_ATTR_FAMILY_ID &&
-            current->nla_len >= NLA_HDRLEN + sizeof(std::uint16_t))
+            current->nla_len >= sizeof(nlattr) + sizeof(std::uint16_t))
         {
           std::uint16_t id = 0;
           std::memcpy(&id, attribute_data(current), sizeof(id));
@@ -387,9 +416,9 @@ namespace
       }
 
       int remaining = static_cast<int>(received);
-      for (auto *reply = reinterpret_cast<nlmsghdr *>(buffer.data());
-           NLMSG_OK(reply, remaining);
-           reply = NLMSG_NEXT(reply, remaining))
+      for (const auto *reply = reinterpret_cast<const nlmsghdr *>(buffer.data());
+           message_ok(reply, remaining);
+           reply = next_message(reply, remaining))
       {
         if (reply->nlmsg_type == NLMSG_DONE || reply->nlmsg_type == NLMSG_ERROR)
         {
@@ -398,7 +427,13 @@ namespace
         }
 
         const auto *header = reinterpret_cast<const genlmsghdr *>(NLMSG_DATA(reply));
-        int attribute_length = reply->nlmsg_len - NLMSG_LENGTH(GENL_HDRLEN);
+        const auto header_length = static_cast<decltype(reply->nlmsg_len)>(NLMSG_LENGTH(GENL_HDRLEN));
+        if (reply->nlmsg_len < header_length ||
+            reply->nlmsg_len - header_length > static_cast<decltype(reply->nlmsg_len)>(std::numeric_limits<int>::max()))
+        {
+          continue;
+        }
+        int attribute_length = static_cast<int>(reply->nlmsg_len - header_length);
         const auto *attributes = reinterpret_cast<const nlattr *>(
             reinterpret_cast<const char *>(header) + GENL_HDRLEN);
 
@@ -411,7 +446,12 @@ namespace
             continue;
           }
 
-          int types_length = attribute->nla_len - NLA_HDRLEN;
+          if (attribute->nla_len < sizeof(nlattr))
+          {
+            continue;
+          }
+          const auto payload_length = attribute->nla_len - sizeof(nlattr);
+          const int types_length = static_cast<int>(payload_length);
           const auto *types = reinterpret_cast<const nlattr *>(attribute_data(attribute));
           if (has_attribute(types, types_length, NL80211_IFTYPE_AP))
           {

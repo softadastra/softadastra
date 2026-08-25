@@ -45,8 +45,6 @@ add_library(
   src/control/LocalControlProtocol.cpp
   src/control/LocalControlServer.cpp
   src/control/RemoteAccessConfig.cpp
-  src/control/RemoteControlClient.cpp
-  src/control/RemoteControlServer.cpp
   src/webui/WebUiServer.cpp
   src/gateway/ControlLocalGatewayTargetResolver.cpp
   src/host/Host.cpp
@@ -133,6 +131,8 @@ else()
       -Wall
       -Wextra
       -Wpedantic
+      -Wconversion
+      -Wsign-conversion
   )
 endif()
 
@@ -161,6 +161,8 @@ else()
       -Wall
       -Wextra
       -Wpedantic
+      -Wconversion
+      -Wsign-conversion
   )
 endif()
 
@@ -179,7 +181,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   if(MSVC)
     target_compile_options(softadastra-gateway PRIVATE /W4 /permissive-)
   else()
-    target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
   endif()
 endif()
 
@@ -248,6 +250,8 @@ if(SOFTADASTRA_BUILD_TESTS)
           -Wall
           -Wextra
           -Wpedantic
+          -Wconversion
+          -Wsign-conversion
       )
     endif()
 
@@ -464,10 +468,6 @@ if(SOFTADASTRA_BUILD_TESTS)
     tests/control/remote_access_config_test.cpp
   )
 
-  softadastra_add_test(
-    softadastra_remote_control_test
-    tests/integration/remote_control_test.cpp
-  )
 
   softadastra_add_test(
     softadastra_host_loop_test

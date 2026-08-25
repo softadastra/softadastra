@@ -81,12 +81,13 @@ TEST(AccessUrlTest, EncodesKnownUrlAsReferenceCodewords)
                           : bit == 7 ? std::pair{8, 8}
                           : bit == 8 ? std::pair{7, 8}
                                      : std::pair{14 - bit, 8};
-    format |= static_cast<std::uint16_t>(encoded.module(row, col)) << bit;
+    if (encoded.module(row, col))
+      format |= static_cast<std::uint16_t>(1U << bit);
   }
 
   int mask = -1;
   for (int candidate = 0; candidate < 8; ++candidate)
-    if (format == softadastra::internal::FORMAT_INFO[1][candidate])
+    if (format == softadastra::internal::FORMAT_INFO[1][static_cast<std::size_t>(candidate)])
       mask = candidate;
 
   ASSERT_GE(mask, 0);

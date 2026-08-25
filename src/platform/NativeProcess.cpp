@@ -14,6 +14,7 @@
 
 #include "platform/NativeProcess.hpp"
 
+#include <limits>
 #include <utility>
 #include <vix/process/Status.hpp>
 #include <vix/process/Terminate.hpp>
@@ -43,10 +44,19 @@ namespace softadastra
   }
 #if defined(__linux__)
   NativeProcess::NativeProcess(pid_t pid) noexcept : native_pid_(pid) {}
+
+  std::optional<pid_t> NativeProcess::native_pid() const noexcept
+  {
+    if (native_pid_ > 0) return native_pid_;
+    if (!child_.valid()) return std::nullopt;
+    const auto identifier = child_.id();
+    if (identifier > static_cast<Id>(std::numeric_limits<pid_t>::max())) return std::nullopt;
+    return static_cast<pid_t>(identifier);
+  }
 #endif
 #if defined(_WIN32)
   NativeProcess::NativeProcess(HANDLE process, HANDLE job, DWORD pid) noexcept
-      : native_pid_(static_cast<long>(pid)), process_(process), job_(job) {}
+      : native_pid_(pid), process_(process), job_(job) {}
 #endif
 
   bool NativeProcess::stop()
@@ -196,7 +206,7 @@ namespace softadastra
     if (native_pid_ > 0) return native_pid_;
 #endif
 #if defined(_WIN32)
-    if (process_ != nullptr) return native_pid_;
+    if (process_ != nullptr && native_pid_ <= static_cast<DWORD>(std::numeric_limits<long>::max())) return static_cast<long>(native_pid_);
 #endif
     return child_.valid() ? std::optional<long>(static_cast<long>(child_.id())) : std::nullopt;
   }

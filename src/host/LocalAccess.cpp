@@ -20,7 +20,7 @@ namespace
     bool non_zero = false;
     unsigned int first = 0;
 
-    for (const unsigned char character : value)
+    for (const char character : value)
     {
       if (character == '.')
       {
@@ -37,10 +37,11 @@ namespace
         octet = 0;
         has_digit = false;
       }
-      else if (std::isdigit(character) != 0)
+      else if (std::isdigit(static_cast<unsigned char>(character)) != 0)
       {
         has_digit = true;
-        octet = octet * 10 + (character - '0');
+        const auto digit = static_cast<unsigned int>(character - '0');
+        octet = octet * 10U + digit;
         if (octet > 255)
         {
           return false;

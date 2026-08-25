@@ -125,9 +125,11 @@ namespace
     const auto *native_process = dynamic_cast<softadastra::NativeProcess *>(
         &*process);
     ASSERT_NE(native_process, nullptr);
+    const auto native_pid = native_process->native_pid();
+    ASSERT_TRUE(native_pid.has_value());
     EXPECT_EQ(
-        ::getpgid(native_process->id()),
-        native_process->id());
+        ::getpgid(native_pid.value()),
+        native_pid.value());
     EXPECT_TRUE(process->stop());
 #endif
   }

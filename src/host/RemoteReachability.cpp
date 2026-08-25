@@ -20,8 +20,38 @@ int close_socket(int fd){
  return ::close(fd);
 #endif
 }
-bool send_all(int fd,std::string_view v){for(std::size_t n=0;n<v.size();){auto r=::send(fd,v.data()+n,static_cast<int>(v.size()-n),0);if(r<=0)return false;n+=static_cast<std::size_t>(r);}return true;}
-bool receive_all(int fd,char *out,std::size_t n){for(std::size_t at=0;at<n;){auto r=::recv(fd,out+at,static_cast<int>(n-at),0);if(r<=0)return false;at+=static_cast<std::size_t>(r);}return true;}
+bool send_all(int fd, std::string_view value)
+{
+ for (std::size_t sent = 0; sent < value.size();) {
+  const std::size_t remaining = value.size() - sent;
+#if defined(_WIN32)
+  if (remaining > static_cast<std::size_t>(std::numeric_limits<int>::max())) return false;
+  const int length = static_cast<int>(remaining);
+#else
+  const std::size_t length = remaining;
+#endif
+  const auto result = ::send(fd, value.data() + sent, length, 0);
+  if (result <= 0) return false;
+  sent += static_cast<std::size_t>(result);
+ }
+ return true;
+}
+bool receive_all(int fd, char *out, std::size_t size)
+{
+ for (std::size_t received = 0; received < size;) {
+  const std::size_t remaining = size - received;
+#if defined(_WIN32)
+  if (remaining > static_cast<std::size_t>(std::numeric_limits<int>::max())) return false;
+  const int length = static_cast<int>(remaining);
+#else
+  const std::size_t length = remaining;
+#endif
+  const auto result = ::recv(fd, out + received, length, 0);
+  if (result <= 0) return false;
+  received += static_cast<std::size_t>(result);
+ }
+ return true;
+}
 std::uint16_t u16(const char *p){return (static_cast<unsigned char>(p[0])<<8)|static_cast<unsigned char>(p[1]);}
 std::uint32_t u32(const char *p){return (static_cast<std::uint32_t>(static_cast<unsigned char>(p[0]))<<24)|(static_cast<std::uint32_t>(static_cast<unsigned char>(p[1]))<<16)|(static_cast<std::uint32_t>(static_cast<unsigned char>(p[2]))<<8)|static_cast<unsigned char>(p[3]);}
 void put32(std::string &v,std::uint32_t x){v.push_back(static_cast<char>(x>>24));v.push_back(static_cast<char>(x>>16));v.push_back(static_cast<char>(x>>8));v.push_back(static_cast<char>(x));}
@@ -35,7 +65,7 @@ int connect_to(const softadastra::RemoteEndpoint &endpoint,std::atomic_int &acti
  std::call_once(winsock_once,[]{WSADATA data{};winsock_ready=WSAStartup(MAKEWORD(2,2),&data)==0;});
  if(!winsock_ready)return -1;
 #endif
-addrinfo hints{};hints.ai_family=AF_UNSPEC;hints.ai_socktype=SOCK_STREAM;addrinfo *found{};const auto port=std::to_string(endpoint.port);if(::getaddrinfo(endpoint.address.c_str(),port.c_str(),&hints,&found)!=0)return -1;int fd=-1;for(auto *it=found;it;it=it->ai_next){fd=::socket(it->ai_family,it->ai_socktype,it->ai_protocol);if(fd<0)continue;active=fd;if(::connect(fd,it->ai_addr,static_cast<int>(it->ai_addrlen))==0)break;if(active.exchange(-1)==fd)close_socket(fd);fd=-1;}::freeaddrinfo(found);return fd;}
+addrinfo hints{};hints.ai_family=AF_UNSPEC;hints.ai_socktype=SOCK_STREAM;addrinfo *found{};const auto port=std::to_string(endpoint.port);if(::getaddrinfo(endpoint.address.c_str(),port.c_str(),&hints,&found)!=0)return -1;int fd=-1;for(auto *it=found;it;it=it->ai_next){fd=::socket(it->ai_family,it->ai_socktype,it->ai_protocol);if(fd<0)continue;active=fd;if(::connect(fd,it->ai_addr,it->ai_addrlen)==0)break;if(active.exchange(-1)==fd)close_socket(fd);fd=-1;}::freeaddrinfo(found);return fd;}
 }
 namespace softadastra {
 RemoteReachability::RemoteReachability(LocalGatewayTargetResolver &resolver) noexcept:resolver_(resolver){} RemoteReachability::~RemoteReachability(){disable();}

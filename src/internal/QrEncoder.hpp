@@ -291,6 +291,12 @@ namespace softadastra
   }};
 
   // BitBuffer
+  [[nodiscard]] inline std::size_t checked_index(int value)
+  {
+    assert(value >= 0);
+    return static_cast<std::size_t>(value);
+  }
+
   class BitBuffer
   {
   public:
@@ -305,7 +311,7 @@ namespace softadastra
         if ((value >> i) & 1)
         {
           ensure_bit(bit_length_);
-          data_[bit_length_ / 8] |= static_cast<uint8_t>(1 << (7 - (bit_length_ % 8)));
+          data_[checked_index(bit_length_ / 8)] |= static_cast<uint8_t>(1 << (7 - (bit_length_ % 8)));
         }
         else
         {
@@ -323,12 +329,12 @@ namespace softadastra
     [[nodiscard]] bool get_bit(int index) const
     {
       assert(index >= 0 && index < bit_length_);
-      return (data_[index / 8] >> (7 - (index % 8))) & 1;
+      return (data_[checked_index(index / 8)] >> (7 - (index % 8))) & 1;
     }
 
     [[nodiscard]] uint8_t get_byte(int byte_index) const
     {
-      return data_.at(byte_index);
+      return data_.at(checked_index(byte_index));
     }
 
     [[nodiscard]] int byte_count() const noexcept { return (bit_length_ + 7) / 8; }
@@ -375,7 +381,8 @@ namespace softadastra
 
     [[nodiscard]] std::vector<uint8_t> compute(std::span<const uint8_t> data) const
     {
-      std::vector<uint8_t> result(num_ec_, 0);
+      assert(num_ec_ >= 0);
+      std::vector<uint8_t> result(checked_index(num_ec_), 0);
       for (uint8_t b : data)
       {
         const uint8_t factor = b ^ result[0];
@@ -383,7 +390,7 @@ namespace softadastra
         result.push_back(0);
         for (int i = 0; i < num_ec_; ++i)
         {
-          result[i] ^= gf_mul(generator_[i + 1], factor);
+          result[checked_index(i)] ^= gf_mul(generator_[checked_index(i + 1)], factor);
         }
       }
       return result;
@@ -405,7 +412,7 @@ namespace softadastra
         int v = 1;
         for (int i = 0; i < 255; ++i)
         {
-          t[i] = static_cast<uint8_t>(v);
+          t[checked_index(i)] = static_cast<uint8_t>(v);
           v <<= 1;
           if (v >= 256)
             v ^= PRIM_POLY;
@@ -423,7 +430,7 @@ namespace softadastra
         std::array<uint8_t, 256> t{};
         const auto &e = exp_table();
         for (int i = 0; i < 255; ++i)
-          t[e[i]] = static_cast<uint8_t>(i);
+          t[e[checked_index(i)]] = static_cast<uint8_t>(i);
         return t;
       }();
       return tbl;
@@ -435,7 +442,7 @@ namespace softadastra
         return 0;
       const auto &exp = exp_table();
       const auto &log = log_table();
-      return exp[(log[a] + log[b]) % 255];
+      return exp[static_cast<std::size_t>((log[a] + log[b]) % 255)];
     }
 
     static std::vector<uint8_t> build_generator(int degree)
@@ -444,7 +451,7 @@ namespace softadastra
       const auto &exp = exp_table();
       for (int i = 0; i < degree; ++i)
       {
-        std::vector<uint8_t> factor = {1, exp[i]};
+        std::vector<uint8_t> factor = {1, exp[checked_index(i)]};
         g = poly_mul(g, factor);
       }
       return g;
@@ -632,9 +639,9 @@ namespace softadastra
             for (int k = 0; k < 11; ++k)
             {
               bool v = horiz ? m.get(a, b + k) : m.get(b + k, a);
-              if (v != P1[k])
+              if (v != P1[checked_index(k)])
                 match1 = false;
-              if (v != P2[k])
+              if (v != P2[checked_index(k)])
                 match2 = false;
             }
             if (match1)
@@ -787,13 +794,18 @@ namespace softadastra
       std::size_t i = 0;
       while (i + 3 <= data.size())
       {
-        uint32_t v = (data[i] - '0') * 100 + (data[i + 1] - '0') * 10 + (data[i + 2] - '0');
+        const auto first = static_cast<uint32_t>(data[i] - '0');
+        const auto second = static_cast<uint32_t>(data[i + 1] - '0');
+        const auto third = static_cast<uint32_t>(data[i + 2] - '0');
+        const uint32_t v = first * 100U + second * 10U + third;
         buf.append(v, 10);
         i += 3;
       }
       if (data.size() - i == 2)
       {
-        uint32_t v = (data[i] - '0') * 10 + (data[i + 1] - '0');
+        const auto first = static_cast<uint32_t>(data[i] - '0');
+        const auto second = static_cast<uint32_t>(data[i + 1] - '0');
+        const uint32_t v = first * 10U + second;
         buf.append(v, 7);
       }
       else if (data.size() - i == 1)
@@ -817,8 +829,8 @@ namespace softadastra
 
     static void encode_byte(BitBuffer &buf, std::string_view data)
     {
-      for (unsigned char c : data)
-        buf.append(c, 8);
+      for (char c : data)
+        buf.append(static_cast<unsigned char>(c), 8);
     }
   };
 
@@ -1008,7 +1020,7 @@ namespace softadastra
               {
                 int byte_i = bit_idx / 8;
                 int bit_i = 7 - (bit_idx % 8);
-                bit = (cw[byte_i] >> bit_i) & 1;
+                bit = (cw[checked_index(byte_i)] >> bit_i) & 1;
                 ++bit_idx;
               }
               m.set(row, c, bit, false);
@@ -1046,7 +1058,9 @@ namespace softadastra
     static void place_format_info(QRMatrix &m, ECLevel ec, int mask)
     {
       const int sz = m.size();
-      uint16_t fi = FORMAT_INFO[static_cast<int>(ec)][mask];
+      const auto ec_index = checked_index(static_cast<int>(ec));
+      const auto mask_index = checked_index(mask);
+      uint16_t fi = FORMAT_INFO[ec_index][mask_index];
       // XOR with mask 101010000010010
       fi ^= 0x5412;
 
@@ -1085,11 +1099,11 @@ namespace softadastra
       // bit 6 -> row 8, col 7 and row 7, col 8
       // bit 7 -> row 8, col 8 and (dark module stays)
       // bits 8..14 -> top-right (row 8) and bottom-left (col 8)
-      uint16_t data = FORMAT_INFO[static_cast<int>(ec)][mask];
+      uint16_t data = FORMAT_INFO[ec_index][mask_index];
       for (int i = 0; i < 15; ++i)
       {
         bool b = (data >> i) & 1;
-        auto [r1, c1] = TL_COORDS[i];
+        auto [r1, c1] = TL_COORDS[checked_index(i)];
         m.set(r1, c1, b, true);
       }
       // Top-right
@@ -1108,7 +1122,7 @@ namespace softadastra
       if (version < 7)
         return;
       const int sz = m.size();
-      uint32_t vi = VERSION_INFO[version - 7];
+      uint32_t vi = VERSION_INFO[checked_index(version - 7)];
       for (int i = 0; i < 18; ++i)
       {
         bool b = (vi >> i) & 1;
@@ -1126,7 +1140,8 @@ namespace softadastra
     [[nodiscard]] static std::vector<uint8_t> interleave(int version, ECLevel ec,
                                                          const std::vector<uint8_t> &data_bytes)
     {
-      const auto &info = EC_BLOCKS[version - 1][static_cast<int>(ec)];
+      assert(version >= 1 && version <= 40);
+      const auto &info = EC_BLOCKS[checked_index(version - 1)][checked_index(static_cast<int>(ec))];
 
       // Split data into blocks
       std::vector<std::vector<uint8_t>> blocks;
@@ -1189,7 +1204,8 @@ namespace softadastra
   private:
     static bool fits(std::string_view data, int version, int ec_idx, Mode)
     {
-      int cap = BYTE_CAPACITY[version - 1][ec_idx];
+      assert(version >= 1 && version <= 40 && ec_idx >= 0 && ec_idx < 4);
+      int cap = BYTE_CAPACITY[checked_index(version - 1)][checked_index(ec_idx)];
       return static_cast<int>(data.size()) <= cap;
     }
   };
@@ -1310,7 +1326,7 @@ namespace softadastra
 
     const Mode mode = DataEncoder::detect_mode(data);
     const int version = VersionSelector::select(data, ec, mode);
-    const int data_codewords = DATA_CODEWORDS[version - 1][static_cast<int>(ec)];
+    const int data_codewords = DATA_CODEWORDS[checked_index(version - 1)][checked_index(static_cast<int>(ec))];
     BitBuffer encoded = DataEncoder::encode(data, mode, version, data_codewords);
     std::vector<uint8_t> data_bytes = encoded.bytes();
     data_bytes.resize(static_cast<std::size_t>(data_codewords), 0);

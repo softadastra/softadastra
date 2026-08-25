@@ -44,6 +44,7 @@ namespace softadastra
     ~NativeProcess() override;
 #if defined(__linux__)
     explicit NativeProcess(pid_t pid) noexcept;
+    [[nodiscard]] std::optional<pid_t> native_pid() const noexcept;
 #endif
 #if defined(_WIN32)
     NativeProcess(HANDLE process, HANDLE job, DWORD pid) noexcept;
@@ -72,7 +73,13 @@ namespace softadastra
 
   private:
     vix::process::Child child_;
+#if defined(__linux__)
+    pid_t native_pid_{-1};
+#elif defined(_WIN32)
+    DWORD native_pid_{0};
+#else
     long native_pid_{-1};
+#endif
     std::optional<int> exit_code_;
 #if defined(_WIN32)
     HANDLE process_{nullptr};

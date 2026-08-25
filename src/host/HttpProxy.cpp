@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <limits>
 #include <set>
 #include <sstream>
 #if defined(_WIN32)
@@ -23,7 +24,22 @@ int close_socket(int fd) {
   return ::close(fd);
 #endif
 }
-bool send_all(int fd,std::string_view value) { for(std::size_t n=0;n<value.size();){const auto r=::send(fd,value.data()+n,static_cast<int>(value.size()-n),0);if(r<=0)return false;n+=static_cast<std::size_t>(r);}return true; }
+bool send_all(int fd, std::string_view value)
+{
+  for (std::size_t sent = 0; sent < value.size();) {
+    const std::size_t remaining = value.size() - sent;
+#if defined(_WIN32)
+    if (remaining > static_cast<std::size_t>(std::numeric_limits<int>::max())) return false;
+    const int length = static_cast<int>(remaining);
+#else
+    const std::size_t length = remaining;
+#endif
+    const auto result = ::send(fd, value.data() + sent, length, 0);
+    if (result <= 0) return false;
+    sent += static_cast<std::size_t>(result);
+  }
+  return true;
+}
 std::set<std::string> blocked(const std::vector<std::pair<std::string,std::string>>& headers) { std::set<std::string> out{"connection","proxy-connection","keep-alive","te","trailer","transfer-encoding","upgrade"}; for(const auto &[k,v]:headers)if(lower(k)=="connection"){std::istringstream s(v);std::string token;while(std::getline(s,token,',')){while(!token.empty()&&token.front()==' ')token.erase(0,1);out.insert(lower(token));}} return out; }
 std::string error(int status,const char *reason) { return "HTTP/1.1 "+std::to_string(status)+" "+reason+"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"; }
 std::string sanitize_response(const std::string &response) {
@@ -55,7 +71,28 @@ std::string HttpProxy::forward(std::string_view software,const HttpProxyRequest 
 #else
   ::shutdown(fd,SHUT_WR);
 #endif
-  std::string response; std::array<char,8192> buffer{}; for(;;){const auto n=::recv(fd,buffer.data(),static_cast<int>(buffer.size()),0);if(n==0)break;if(n<0||response.size()+static_cast<std::size_t>(n)>max_response){close_socket(fd);return error(502,"Bad Gateway");}response.append(buffer.data(),static_cast<std::size_t>(n));} close_socket(fd);
+  std::string response;
+  std::array<char, 8192> buffer{};
+  for (;;) {
+#if defined(_WIN32)
+    const int length = static_cast<int>(buffer.size());
+#else
+    const std::size_t length = buffer.size();
+#endif
+    const auto received = ::recv(fd, buffer.data(), length, 0);
+    if (received == 0) break;
+    if (received < 0) {
+      close_socket(fd);
+      return error(502, "Bad Gateway");
+    }
+    const auto received_size = static_cast<std::size_t>(received);
+    if (received_size > max_response - response.size()) {
+      close_socket(fd);
+      return error(502, "Bad Gateway");
+    }
+    response.append(buffer.data(), received_size);
+  }
+  close_socket(fd);
   if(response.empty()||!response.starts_with("HTTP/"))return error(502,"Bad Gateway");
   response=sanitize_response(response);
   return response.empty()?error(502,"Bad Gateway"):response;

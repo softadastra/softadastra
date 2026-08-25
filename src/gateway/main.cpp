@@ -31,10 +31,11 @@ namespace
     const std::string port = value.substr(delimiter + 1);
     if (port.empty() || port.size() > 5) return false;
     unsigned long number = 0;
-    for (const unsigned char character : port)
+    for (const char character : port)
     {
       if (character < '0' || character > '9') return false;
-      number = number * 10 + character - '0';
+      const auto digit = static_cast<unsigned long>(character - '0');
+      number = number * 10UL + digit;
     }
     in_addr parsed{};
     if (number == 0 || number > 65535 || ::inet_pton(AF_INET, address.c_str(), &parsed) != 1) return false;

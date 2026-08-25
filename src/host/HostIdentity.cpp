@@ -27,6 +27,15 @@ namespace softadastra
 {
   namespace
   {
+    FILE *open_binary_file(const std::filesystem::path &path, const char *mode)
+    {
+#if defined(_WIN32)
+      return _wfopen(path.c_str(), L"wb");
+#else
+      return std::fopen(path.c_str(), mode);
+#endif
+    }
+
     std::string hexadecimal(const unsigned char *bytes, std::size_t size)
     {
       constexpr char digits[] = "0123456789abcdef";
@@ -273,9 +282,9 @@ namespace softadastra
     }
 
     FILE *certificate_file =
-        valid && !error ? std::fopen(certificate_path.c_str(), "wb") : nullptr;
+        valid && !error ? open_binary_file(certificate_path, "wb") : nullptr;
     FILE *key_file = certificate_file != nullptr
-                         ? std::fopen(private_key_path.c_str(), "wb")
+                         ? open_binary_file(private_key_path, "wb")
                          : nullptr;
     const bool written =
         key_file != nullptr &&

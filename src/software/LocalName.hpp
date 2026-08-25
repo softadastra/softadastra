@@ -56,7 +56,7 @@ namespace softadastra
         return false;
       }
 
-      for (const unsigned char character : value)
+      for (const char character : value)
       {
         if (!((character >= 'a' && character <= 'z') ||
               (character >= '0' && character <= '9') || character == '-'))
