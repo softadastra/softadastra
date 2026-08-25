@@ -7,6 +7,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include "host/NativeSocket.hpp"
 namespace softadastra {
 struct RemoteEndpoint { std::string address; std::uint16_t port{0}; [[nodiscard]] bool valid() const noexcept { return !address.empty() && port != 0; } };
 enum class RemoteReachabilityState { Disabled, Connecting, Ready, Degraded };
@@ -28,7 +29,7 @@ private:
   RemoteEndpoint endpoint_;
   RemoteReachabilityState state_{RemoteReachabilityState::Disabled};
   std::atomic_bool stopping_{false};
-  std::atomic_int socket_{-1};
+  std::atomic<NativeSocket> socket_{InvalidSocket};
   std::thread thread_;
 };
 }

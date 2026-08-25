@@ -30,7 +30,9 @@ namespace softadastra
     FILE *open_binary_file(const std::filesystem::path &path, const char *mode)
     {
 #if defined(_WIN32)
-      return _wfopen(path.c_str(), L"wb");
+      static_cast<void>(mode);
+      FILE *file = nullptr;
+      return _wfopen_s(&file, path.c_str(), L"wb") == 0 ? file : nullptr;
 #else
       return std::fopen(path.c_str(), mode);
 #endif

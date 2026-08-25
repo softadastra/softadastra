@@ -1,4 +1,5 @@
 #include "host/HttpProxy.hpp"
+#include "host/NativeSocket.hpp"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -17,20 +18,19 @@ namespace {
 constexpr std::size_t max_response = 1048576;
 std::string lower(std::string x) { for (char &c:x) c=static_cast<char>(std::tolower(static_cast<unsigned char>(c))); return x; }
 std::string title(std::string x) { bool upper=true; for(char &c:x){c=static_cast<char>(upper?std::toupper(static_cast<unsigned char>(c)):std::tolower(static_cast<unsigned char>(c)));upper=c=='-';} return x; }
-int close_socket(int fd) {
+int close_socket(softadastra::NativeSocket fd) {
 #if defined(_WIN32)
-  return closesocket(static_cast<SOCKET>(fd));
+  return closesocket(fd);
 #else
   return ::close(fd);
 #endif
 }
-bool send_all(int fd, std::string_view value)
+bool send_all(softadastra::NativeSocket fd, std::string_view value)
 {
   for (std::size_t sent = 0; sent < value.size();) {
     const std::size_t remaining = value.size() - sent;
 #if defined(_WIN32)
-    if (remaining > static_cast<std::size_t>(std::numeric_limits<int>::max())) return false;
-    const int length = static_cast<int>(remaining);
+    const int length = static_cast<int>(std::min(remaining, static_cast<std::size_t>(std::numeric_limits<int>::max())));
 #else
     const std::size_t length = remaining;
 #endif
@@ -59,8 +59,8 @@ std::string HttpProxy::forward(std::string_view software,const HttpProxyRequest 
   const auto target=resolver_.resolve(software);
   if(target.result==LocalGatewayLookup::NotFound) return error(404,"Not Found");
   if(target.result==LocalGatewayLookup::Unavailable) return error(503,"Service Unavailable");
-  int fd=::socket(AF_INET,SOCK_STREAM,0); sockaddr_in address{}; address.sin_family=AF_INET; address.sin_port=htons(target.port); address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-  if(fd<0 || ::connect(fd,reinterpret_cast<sockaddr*>(&address),sizeof(address))!=0){if(fd>=0)close_socket(fd);return error(502,"Bad Gateway");}
+  NativeSocket fd=::socket(AF_INET,SOCK_STREAM,0); sockaddr_in address{}; address.sin_family=AF_INET; address.sin_port=htons(target.port); address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+  if(fd==InvalidSocket || ::connect(fd,reinterpret_cast<sockaddr*>(&address),sizeof(address))!=0){if(fd!=InvalidSocket)close_socket(fd);return error(502,"Bad Gateway");}
   std::string wire=request.method+" "+request.target+" HTTP/1.1\r\n"; const auto hops=blocked(request.headers);
   bool has_length=false; for(const auto &[name,value]:request.headers){const auto key=lower(name);if(key.empty()||key.find_first_of(" \t\r\n:")!=std::string::npos||value.find_first_of("\r\n")!=std::string::npos||key=="transfer-encoding"){close_socket(fd);return error(400,"Bad Request");}if(key=="content-length"){if(has_length||value.empty()||!std::all_of(value.begin(),value.end(),[](unsigned char c){return std::isdigit(c);})) {close_socket(fd);return error(400,"Bad Request");}try{if(std::stoull(value)!=request.body.size()){close_socket(fd);return error(400,"Bad Request");}}catch(...){close_socket(fd);return error(400,"Bad Request");}has_length=true;}if(!hops.contains(key))wire+=title(key)+": "+value+"\r\n";}
   if(!request.body.empty()&&!has_length) wire+="Content-Length: "+std::to_string(request.body.size())+"\r\n";
