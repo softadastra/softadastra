@@ -50,6 +50,8 @@ add_library(
   src/platform/NativeNetwork.cpp
   src/platform/ManagedNetwork.cpp
   src/platform/NativeManagedNetwork.cpp
+  src/platform/LocalDnsDelegation.cpp
+  src/platform/NativeLocalDnsDelegation.cpp
   src/platform/NativeDataDirectory.cpp
   src/platform/HostInstanceLock.cpp
   src/platform/MdnsPublisher.cpp
@@ -227,6 +229,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_dns_test
     tests/host/local_dns_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_local_dns_delegation_test
+    tests/platform/local_dns_delegation_test.cpp
   )
 
   softadastra_add_test(
