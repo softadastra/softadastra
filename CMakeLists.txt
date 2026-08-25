@@ -33,6 +33,7 @@ add_library(
   src/control/RemoteAccessConfig.cpp
   src/control/RemoteControlClient.cpp
   src/control/RemoteControlServer.cpp
+  src/gateway/ControlLocalGatewayTargetResolver.cpp
   src/host/Host.cpp
   src/host/HostIdentity.cpp
   src/host/HostProfile.cpp
@@ -135,6 +136,23 @@ else()
       -Wextra
       -Wpedantic
   )
+endif()
+
+add_executable(
+  softadastra-gateway
+  src/gateway/main.cpp
+)
+
+target_link_libraries(
+  softadastra-gateway
+  PRIVATE
+    softadastra_internal
+)
+
+if(MSVC)
+  target_compile_options(softadastra-gateway PRIVATE /W4 /permissive-)
+else()
+  target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 if(SOFTADASTRA_BUILD_TESTS)
@@ -441,6 +459,22 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_control_protocol_test
     tests/control/local_control_protocol_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_control_local_gateway_target_resolver_test
+    tests/gateway/control_local_gateway_target_resolver_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_gateway_process_test
+    tests/gateway/gateway_process_test.cpp
+  )
+  add_dependencies(softadastra_gateway_process_test softadastra-gateway)
+  target_compile_definitions(
+    softadastra_gateway_process_test
+    PRIVATE
+      SOFTADASTRA_GATEWAY_EXECUTABLE="$<TARGET_FILE:softadastra-gateway>"
   )
 
   softadastra_add_test(
