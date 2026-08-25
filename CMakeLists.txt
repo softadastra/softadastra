@@ -44,6 +44,7 @@ add_library(
   src/host/LocalAccess.cpp
   src/host/LocalDns.cpp
   src/host/LocalGateway.cpp
+  src/host/LocalReachability.cpp
   src/host/HostService.cpp
   src/host/HostState.cpp
   src/host/HostStateFile.cpp
@@ -234,6 +235,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_local_dns_delegation_test
     tests/platform/local_dns_delegation_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_local_reachability_test
+    tests/host/local_reachability_test.cpp
   )
 
   softadastra_add_test(
