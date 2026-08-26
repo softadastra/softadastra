@@ -267,7 +267,7 @@ namespace
     const auto state_home = std::filesystem::temp_directory_path() / ("softadastra-toml-restart-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     const auto project = state_home / "project"; const auto socket = state_home / "softadastra" / "control.sock";
     std::filesystem::create_directories(project);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
     HostProcess host(state_home); ASSERT_TRUE(wait_for([&socket] { return std::filesystem::exists(socket); }));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
     softadastra::ControlClient before_restart(socket);
@@ -315,12 +315,12 @@ namespace
     const auto state_home = std::filesystem::temp_directory_path() / ("softadastra-rename-restart-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     const auto project = state_home / "project"; const auto socket = state_home / "softadastra" / "control.sock";
     std::filesystem::create_directories(project);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
     HostProcess host(state_home); ASSERT_TRUE(wait_for([&socket] { return std::filesystem::exists(socket); }));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
     const auto toml = project / "softadastra.toml";
     std::filesystem::remove(toml);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-api", "sleep 30", std::nullopt}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-api", "sleep 30", std::nullopt, {}}));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
     host.stop();
     HostProcess restarted(state_home); ASSERT_TRUE(wait_for([&socket] { return std::filesystem::exists(socket); }));

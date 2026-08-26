@@ -17,7 +17,8 @@ namespace softadastra
   enum class AccessProtocol
   {
     Http,
-    Https
+    Https,
+    Ws
   };
 
   /**
@@ -42,13 +43,15 @@ namespace softadastra
         return AccessProtocol::Http;
       if (value == "https")
         return AccessProtocol::Https;
+      if (value == "ws")
+        return AccessProtocol::Ws;
       return std::nullopt;
     }
 
     [[nodiscard]] static constexpr std::string_view name(
         AccessProtocol protocol) noexcept
     {
-      return protocol == AccessProtocol::Http ? "http" : "https";
+      return protocol == AccessProtocol::Http ? "http" : protocol == AccessProtocol::Https ? "https" : "ws";
     }
 
     [[nodiscard]] constexpr AccessProtocol protocol() const noexcept
@@ -60,6 +63,9 @@ namespace softadastra
     {
       return port_;
     }
+
+    [[nodiscard]] friend constexpr bool operator==(AccessPoint,
+                                                    AccessPoint) noexcept = default;
 
   private:
     constexpr AccessPoint(AccessProtocol protocol, std::uint16_t port) noexcept

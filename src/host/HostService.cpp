@@ -85,6 +85,8 @@ namespace softadastra
 
   bool HostService::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
   { return software_manager_.synchronize(id, std::move(process_spec), access_point, std::move(name)); }
+  bool HostService::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name)
+  { return software_manager_.synchronize(id, std::move(process_spec), std::move(access_points), std::move(name)); }
 
   SoftwareOperationResult HostService::start_software(const SoftwareId &id)
   {

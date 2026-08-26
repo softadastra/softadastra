@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Softadastra</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div><h1>Softadastra</h1><p>This computer · Host running</p></div>
+      <button id="refresh-button" class="secondary" type="button">Refresh</button>
+    </header>
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section><div class="section-heading"><div><h2>Applications</h2><p class="hint">Applications managed by Softadastra on this computer.</p></div><button id="add-application-button" type="button">Add application</button></div><div id="applications" class="applications loading">Loading applications…</div></section>
+    <section id="add-application-panel" hidden>
+      <div class="section-heading"><h2>Add application</h2><button id="close-add-button" class="secondary" type="button">Cancel</button></div>
+      <p class="hint">Choose an application on this computer and Softadastra will run and manage it for you.</p>
+      <button id="choose-project-folder-button" type="button">Choose project folder</button>
+      <form id="add-application-form">
+        <input name="project_directory" type="hidden">
+        <div id="selected-project" class="selected-project" hidden><strong id="project-name"></strong><span id="project-directory"></span></div>
+        <div id="application-configuration" hidden>
+          <label>Name<input name="name" required autocomplete="off"></label>
+          <label>Command<input name="command" required autocomplete="off" placeholder="npm run start"></label>
+          <fieldset><legend>Access endpoints</legend><div class="endpoints"></div><button id="add-endpoint-button" class="secondary" type="button">+ Add endpoint</button></fieldset>
+          <div class="form-actions"><button type="submit">Add to Softadastra</button></div>
+        </div>
+      </form>
+    </section>
+    <section id="details-panel" hidden></section>
+    <section id="host-summary"><div class="section-heading"><div><h2>Host</h2><p id="host-status" class="hint">Loading host status…</p></div><button id="host-details-button" class="secondary" type="button">View details</button></div><div id="host" class="details" hidden></div></section>
+    <section id="logs-panel" hidden>
+      <div class="section-heading"><div><h2 id="logs-title">Logs</h2><p id="logs-status" class="hint">● Live</p></div><div class="actions"><button id="pause-logs-button" class="secondary" type="button">Pause</button><button id="clear-logs-button" class="secondary" type="button">Clear logs</button><button id="close-logs-button" class="secondary" type="button">Close</button></div></div>
+      <pre id="logs-output">Loading logs…</pre>
+      <button id="jump-to-latest-button" class="secondary" type="button" hidden>Jump to latest</button>
+    </section>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>

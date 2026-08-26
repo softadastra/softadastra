@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace softadastra
 {
@@ -16,6 +17,7 @@ namespace softadastra
     std::string name;
     std::string command;
     std::optional<AccessPoint> access;
+    std::vector<AccessPoint> access_points;
   };
 
   class ProjectConfigFile

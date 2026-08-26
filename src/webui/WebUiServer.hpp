@@ -2,12 +2,14 @@
 #define SOFTADASTRA_WEBUI_WEB_UI_SERVER_HPP
 
 #include "control/ControlClient.hpp"
+#include "platform/NativeDirectoryChooser.hpp"
 
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <thread>
+#include <functional>
 
 namespace softadastra
 {
@@ -15,7 +17,11 @@ namespace softadastra
   class WebUiServer
   {
   public:
-    explicit WebUiServer(ControlClient &client) noexcept;
+    using ProjectDirectoryChooser = std::function<DirectoryChooserResult()>;
+
+    explicit WebUiServer(
+        ControlClient &client,
+        ProjectDirectoryChooser directory_chooser = choose_project_directory) noexcept;
     ~WebUiServer();
     WebUiServer(const WebUiServer &) = delete;
     WebUiServer &operator=(const WebUiServer &) = delete;
@@ -29,6 +35,7 @@ namespace softadastra
     void publish_startup(bool success, std::uint16_t port) noexcept;
 
     ControlClient &client_;
+    ProjectDirectoryChooser directory_chooser_;
     std::atomic_bool stopping_{false};
     std::atomic_uint16_t port_{0};
     std::mutex startup_mutex_;

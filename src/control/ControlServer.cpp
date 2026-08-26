@@ -17,6 +17,7 @@
 #include "platform/NativeDataDirectory.hpp"
 
 #include <fstream>
+#include <filesystem>
 
 #include <utility>
 
@@ -56,14 +57,28 @@ namespace softadastra
   bool ControlServer::remove_software(const SoftwareId &id) { return host_service_.remove_software(id); }
   std::optional<std::string> ControlServer::logs(const SoftwareId &id) const noexcept
   {
+    const auto chunk = logs_since(id, std::nullopt);
+    return chunk ? std::optional<std::string>(chunk->logs) : std::nullopt;
+  }
+
+  std::optional<LogChunk> ControlServer::logs_since(
+      const SoftwareId &id, std::optional<std::uintmax_t> offset) const noexcept
+  {
     if (!host_service_.software(id)) return std::nullopt;
-    std::ifstream input(NativeDataDirectory::path() / "logs" / (id.value() + ".log"), std::ios::binary);
-    if (!input) return std::string{};
-    input.seekg(0, std::ios::end);
-    const auto size = input.tellg();
-    constexpr std::streamoff maximum = 4096;
-    input.seekg(size > maximum ? size - maximum : std::streampos(0));
-    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    const auto path = NativeDataDirectory::path() / "logs" / (id.value() + ".log");
+    std::error_code error;
+    const auto size = std::filesystem::file_size(path, error);
+    if (error) return LogChunk{"", 0, offset.has_value() && offset.value() != 0};
+    constexpr std::uintmax_t initial_maximum = 4096;
+    const bool reset = offset.has_value() && offset.value() > size;
+    const std::uintmax_t start = !offset.has_value() ? (size > initial_maximum ? size - initial_maximum : 0) : (reset ? 0 : offset.value());
+    std::ifstream input(path, std::ios::binary);
+    if (!input) return LogChunk{"", 0, offset.has_value() && offset.value() != 0};
+    input.seekg(static_cast<std::streamoff>(start));
+    std::string logs(static_cast<std::size_t>(size - start), '\0');
+    input.read(logs.data(), static_cast<std::streamsize>(logs.size()));
+    logs.resize(static_cast<std::size_t>(input.gcount()));
+    return LogChunk{std::move(logs), size, reset};
   }
   bool ControlServer::clear_logs(const SoftwareId &id) const noexcept
   {
@@ -77,6 +92,8 @@ namespace softadastra
 
   bool ControlServer::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
   { return host_service_.synchronize_software(id, std::move(process_spec), access_point, std::move(name)); }
+  bool ControlServer::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name)
+  { return host_service_.synchronize_software(id, std::move(process_spec), std::move(access_points), std::move(name)); }
 
   std::optional<AccessPoint> ControlServer::access_point(const SoftwareId &id) const noexcept
   {

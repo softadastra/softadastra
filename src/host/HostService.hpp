@@ -87,6 +87,7 @@ namespace softadastra
     [[nodiscard]] bool remove_software(const SoftwareId &id);
     bool link_project(const SoftwareId &id, ProjectIdentity identity, std::string root);
     [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name = {});
+    [[nodiscard]] bool synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name = {});
 
     /**
      * @brief Starts registered software.

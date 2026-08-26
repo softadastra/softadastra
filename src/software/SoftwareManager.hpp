@@ -62,6 +62,7 @@ namespace softadastra
         const ProjectIdentity &identity) const noexcept;
     bool update_project_root(const ProjectIdentity &identity, std::string root);
     [[nodiscard]] bool synchronize(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name = {});
+    [[nodiscard]] bool synchronize(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name = {});
     [[nodiscard]] std::optional<SoftwareEntry> find_by_name(const std::string &name) const noexcept;
 
     [[nodiscard]] std::optional<AccessPoint> access_point(const SoftwareId &id) const noexcept;

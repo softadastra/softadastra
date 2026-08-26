@@ -1,0 +1,8 @@
+#pragma once
+
+namespace softadastra::webui_assets
+{
+inline constexpr char index_html[] = R"SA(@SOFTADASTRA_WEBUI_INDEX_HTML@)SA";
+inline constexpr char app_js[] = R"SA(@SOFTADASTRA_WEBUI_APP_JS@)SA";
+inline constexpr char style_css[] = R"SA(@SOFTADASTRA_WEBUI_STYLE_CSS@)SA";
+}

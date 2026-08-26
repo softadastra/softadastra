@@ -177,6 +177,24 @@ namespace softadastra
     return LocalControlProtocol::decode(fields[1]);
   }
 
+  std::optional<LogChunk> ControlClient::logs_since(
+      const SoftwareId &id, std::optional<std::uintmax_t> offset) const noexcept
+  {
+    if (server_ != nullptr) return server_->logs_since(id, offset);
+    const std::string requested_offset = offset ? std::to_string(*offset) : "-1";
+    const auto response = request("logs-since " + LocalControlProtocol::encode(id.value()) + " " + requested_offset);
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    if (fields.size() != 4 || fields[0] != "logs-since") return std::nullopt;
+    const auto logs = LocalControlProtocol::decode(fields[1]);
+    try
+    {
+      const auto returned_offset = std::stoull(fields[2]);
+      if (!logs || (fields[3] != "0" && fields[3] != "1")) return std::nullopt;
+      return LogChunk{*logs, static_cast<std::uintmax_t>(returned_offset), fields[3] == "1"};
+    }
+    catch (const std::exception &) { return std::nullopt; }
+  }
+
   bool ControlClient::clear_logs(const SoftwareId &id) const noexcept
   {
     if (server_ != nullptr) return server_->clear_logs(id);
@@ -200,6 +218,17 @@ namespace softadastra
     for (const auto &argument : process_spec.arguments()) message += " " + LocalControlProtocol::encode(argument);
     const auto response = request(message);
     return response.has_value() && response.value() == "sync 1";
+  }
+
+  bool ControlClient::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name)
+  {
+    if (server_ != nullptr) return server_->synchronize_software(id, std::move(process_spec), std::move(access_points), std::move(name));
+    std::string message = "sync-v2 " + LocalControlProtocol::encode(id.value()) + " " + LocalControlProtocol::encode(name) + " " + LocalControlProtocol::encode(process_spec.executable()) + " " + LocalControlProtocol::encode(process_spec.working_directory().value_or("")) + " " + std::to_string(access_points.size());
+    for (const auto &access : access_points) message += " " + std::string(AccessPoint::name(access.protocol())) + " " + std::to_string(access.port());
+    message += " " + std::to_string(process_spec.arguments().size());
+    for (const auto &argument : process_spec.arguments()) message += " " + LocalControlProtocol::encode(argument);
+    const auto response = request(message);
+    return response && *response == "sync-v2 1";
   }
 
   std::optional<AccessPoint> ControlClient::access_point(const SoftwareId &id) const noexcept

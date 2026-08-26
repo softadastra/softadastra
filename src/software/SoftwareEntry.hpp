@@ -25,6 +25,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace softadastra
 {
@@ -53,9 +54,16 @@ namespace softadastra
         : id_(std::move(id)),
           name_(std::move(name)),
           process_spec_(std::move(process_spec)), project_identity_(std::move(project_identity)),
-          access_point_(access_point), declared_command_(std::move(declared_command))
-    {
-    }
+          declared_command_(std::move(declared_command))
+    { if (access_point) access_points_.push_back(*access_point); }
+
+    SoftwareEntry(SoftwareId id, ProcessSpec process_spec,
+                  std::optional<ProjectIdentity> project_identity,
+                  std::vector<AccessPoint> access_points,
+                  std::string declared_command = {}, std::string name = {})
+        : id_(std::move(id)), name_(std::move(name)), process_spec_(std::move(process_spec)),
+          project_identity_(std::move(project_identity)), access_points_(std::move(access_points)),
+          declared_command_(std::move(declared_command)) {}
 
     SoftwareEntry(SoftwareId id, ProcessSpec process_spec, std::optional<AccessPoint> access_point)
         : SoftwareEntry(std::move(id), std::move(process_spec), std::nullopt, access_point) {}
@@ -93,11 +101,15 @@ namespace softadastra
     void set_declared_command(std::string command) { declared_command_ = std::move(command); }
     [[nodiscard]] std::optional<long> pid() const noexcept { return pid_; }
     void set_pid(std::optional<long> pid) noexcept { pid_ = pid; }
-    void set_access_point(std::optional<AccessPoint> access_point) { access_point_ = access_point; }
+    void set_access_point(std::optional<AccessPoint> access_point)
+    { access_points_.clear(); if (access_point) access_points_.push_back(*access_point); }
+    void set_access_points(std::vector<AccessPoint> access_points) { access_points_ = std::move(access_points); }
+
+    [[nodiscard]] const std::vector<AccessPoint> &access_points() const noexcept { return access_points_; }
 
     [[nodiscard]] std::optional<AccessPoint> access_point() const noexcept
     {
-      return access_point_;
+      return access_points_.empty() ? std::nullopt : std::optional<AccessPoint>(access_points_.front());
     }
 
     /**
@@ -147,7 +159,7 @@ namespace softadastra
     std::string name_;
     ProcessSpec process_spec_;
     std::optional<ProjectIdentity> project_identity_;
-    std::optional<AccessPoint> access_point_;
+    std::vector<AccessPoint> access_points_;
     std::string declared_command_;
     std::optional<long> pid_;
     SoftwareState state_{SoftwareState::Stopped};

@@ -53,15 +53,31 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #endif
 #if defined(_WIN32)
 #include <windows.h>
+#include <shellapi.h>
 #endif
 
 namespace
 {
+#if defined(__linux__)
+  void open_browser(const std::string &url)
+  {
+    const pid_t child = fork();
+    if (child != 0) { if (child > 0) static_cast<void>(waitpid(child, nullptr, 0)); return; }
+    if (fork() == 0) { execlp("xdg-open", "xdg-open", url.c_str(), nullptr); }
+    _exit(0);
+  }
+#elif defined(_WIN32)
+  void open_browser(const std::string &url)
+  { static_cast<void>(ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL)); }
+#else
+  void open_browser(const std::string &) {}
+#endif
 #if defined(_WIN32)
   std::atomic_bool windows_stop{false};
   BOOL WINAPI console_control(DWORD value) { if(value==CTRL_C_EVENT||value==CTRL_BREAK_EVENT||value==CTRL_CLOSE_EVENT){windows_stop=true;return TRUE;}return FALSE; }
@@ -384,7 +400,9 @@ int main(int argc, char *argv[])
       std::cerr << "failed to start Softadastra UI on 127.0.0.1\n";
       return 1;
     }
-    std::cout << "Softadastra UI:\nhttp://127.0.0.1:" << ui.port() << '\n';
+    const std::string url = "http://127.0.0.1:" + std::to_string(ui.port());
+    std::cout << "Softadastra UI: " << url << '\n';
+    open_browser(url);
     for (;;) std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 

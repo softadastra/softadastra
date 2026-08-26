@@ -29,7 +29,8 @@ namespace softadastra
   {
     std::string declared_command(const ProcessSpec &spec)
     {
-      if (spec.executable() == "/bin/sh" && spec.arguments().size() == 2 && spec.arguments()[0] == "-lc") return spec.arguments()[1];
+      if ((spec.executable() == "/bin/sh" && spec.arguments().size() == 2 && spec.arguments()[0] == "-lc") ||
+          (spec.executable() == "cmd.exe" && spec.arguments().size() == 2 && spec.arguments()[0] == "/C")) return spec.arguments()[1];
       std::string command = spec.executable(); for (const auto &argument : spec.arguments()) command += " " + argument; return command;
     }
     SoftwareOperationError software_error(
@@ -91,13 +92,13 @@ namespace softadastra
   }
 
   bool SoftwareManager::synchronize(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
+  { return synchronize(id, std::move(process_spec), access_point ? std::vector<AccessPoint>{*access_point} : std::vector<AccessPoint>{}, std::move(name)); }
+
+  bool SoftwareManager::synchronize(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name)
   {
     auto *entry = state_.find_software(id);
     if (entry == nullptr) return false;
-    const auto existing_access = entry->access_point();
-    const bool access_changed = existing_access.has_value() != access_point.has_value() ||
-        (existing_access.has_value() && access_point.has_value() &&
-         (existing_access->protocol() != access_point->protocol() || existing_access->port() != access_point->port()));
+    const bool access_changed = entry->access_points() != access_points;
     if (!name.empty()) { const auto *other=state_.find_software_by_name(name); if(other!=nullptr && other->id()!=id) return false; }
     const bool changed = entry->name()!=name || entry->process_spec().executable() != process_spec.executable() ||
                          entry->process_spec().arguments() != process_spec.arguments() ||
@@ -108,11 +109,13 @@ namespace softadastra
       if (entry->declared_command().empty()) entry->set_declared_command(declared_command(process_spec));
       return false;
     }
+    // Configuration changes are explicit.  Never stop or restart an
+    // application behind the user's back merely to apply an edit.
+    if (entry->state() == SoftwareState::Running) return false;
     entry->set_name(std::move(name));
-    if (entry->state() == SoftwareState::Running) static_cast<void>(stop(id));
     entry->set_process_spec(std::move(process_spec));
     entry->set_declared_command(declared_command(entry->process_spec()));
-    entry->set_access_point(access_point);
+    entry->set_access_points(std::move(access_points));
     return true;
   }
   std::optional<SoftwareEntry> SoftwareManager::find_by_name(const std::string &name) const noexcept { if(name.empty()) return std::nullopt; const auto *entry=state_.find_software_by_name(name); return entry?std::optional<SoftwareEntry>(*entry):std::nullopt; }

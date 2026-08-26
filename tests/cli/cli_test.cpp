@@ -108,7 +108,7 @@ namespace
     ASSERT_TRUE(identity.has_value());
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
         old_root,
-        {identity.value(), "app", "./build/app", std::nullopt}));
+        {identity.value(), "app", "./build/app", std::nullopt, {}}));
 
     Platform platform;
     softadastra::Host host(platform);
@@ -139,7 +139,7 @@ namespace
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-name-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
     Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher); softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
     const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
     const char *arguments[] = {"softadastra", "run"};
@@ -217,7 +217,7 @@ namespace
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-wins-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
-    const softadastra::ProjectConfig config{softadastra::ProjectIdentity("toml-stable-id"), "pico", "./build/app", std::nullopt};
+    const softadastra::ProjectConfig config{softadastra::ProjectIdentity("toml-stable-id"), "pico", "./build/app", std::nullopt, {}};
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, config));
     Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
     softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
@@ -445,7 +445,7 @@ namespace
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-target-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("project-app"), "app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("project-app"), "app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080), {}}));
     Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
     softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("project-app"), softadastra::ProcessSpec("--access"), std::nullopt, softadastra::ProjectIdentity("project-app")));

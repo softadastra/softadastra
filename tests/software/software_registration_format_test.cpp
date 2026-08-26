@@ -80,6 +80,35 @@ namespace
     EXPECT_EQ(restored->front().process_spec().working_directory(), "/old/project");
   }
 
+  TEST(SoftwareRegistrationFormatTest, PreservesDeclaredCommandAndMultipleAccessPoints)
+  {
+    const auto http = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080);
+    const auto websocket = softadastra::AccessPoint::create(softadastra::AccessProtocol::Ws, 9090);
+    ASSERT_TRUE(http); ASSERT_TRUE(websocket);
+    const std::vector<softadastra::SoftwareEntry> entries{softadastra::SoftwareEntry(
+        softadastra::SoftwareId("cloud"), softadastra::ProcessSpec("/bin/sh", {"-lc", "vix run"}, "/project"),
+        std::nullopt, {*http, *websocket}, "vix run", "Cloud")};
+    const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(
+        softadastra::SoftwareRegistrationFormat::serialize(entries));
+    ASSERT_TRUE(restored); ASSERT_EQ(restored->size(), 1U);
+    EXPECT_EQ(restored->front().declared_command(), "vix run");
+    ASSERT_EQ(restored->front().access_points().size(), 2U);
+    EXPECT_EQ(restored->front().access_points()[1].protocol(), softadastra::AccessProtocol::Ws);
+  }
+
+  TEST(SoftwareRegistrationFormatTest, ReadsVersionSixSingleAccessRegistrations)
+  {
+    const auto access = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080);
+    ASSERT_TRUE(access);
+    const std::vector<softadastra::SoftwareEntry> entries{softadastra::SoftwareEntry(
+        softadastra::SoftwareId("legacy"), softadastra::ProcessSpec("app"), std::nullopt, access, "app", "Legacy")};
+    auto serialized = softadastra::SoftwareRegistrationFormat::serialize(entries);
+    serialized.replace(0, std::string("softadastra-registrations 7\n").size(), "softadastra-registrations 6\n");
+    const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(serialized);
+    ASSERT_TRUE(restored); ASSERT_EQ(restored->front().access_points().size(), 1U);
+    EXPECT_EQ(restored->front().access_points().front().port(), 8080);
+  }
+
   TEST(SoftwareRegistrationFormatTest, RejectsInvalidInput)
   {
     EXPECT_FALSE(softadastra::SoftwareRegistrationFormat::deserialize("invalid").has_value());

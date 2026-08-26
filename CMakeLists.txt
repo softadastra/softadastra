@@ -5,6 +5,27 @@ project(
   LANGUAGES CXX
 )
 
+# Keep the Web UI maintainable as normal source files while embedding it in the
+# offline executable.  Reconfigure when an asset changes so the generated
+# header always follows the source assets.
+set(SOFTADASTRA_WEBUI_ASSET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/webui/assets")
+set(SOFTADASTRA_WEBUI_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/webui")
+set(SOFTADASTRA_WEBUI_ASSETS
+  "${SOFTADASTRA_WEBUI_ASSET_DIR}/index.html"
+  "${SOFTADASTRA_WEBUI_ASSET_DIR}/app.js"
+  "${SOFTADASTRA_WEBUI_ASSET_DIR}/style.css"
+)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${SOFTADASTRA_WEBUI_ASSETS})
+file(MAKE_DIRECTORY "${SOFTADASTRA_WEBUI_GENERATED_DIR}")
+file(READ "${SOFTADASTRA_WEBUI_ASSET_DIR}/index.html" SOFTADASTRA_WEBUI_INDEX_HTML)
+file(READ "${SOFTADASTRA_WEBUI_ASSET_DIR}/app.js" SOFTADASTRA_WEBUI_APP_JS)
+file(READ "${SOFTADASTRA_WEBUI_ASSET_DIR}/style.css" SOFTADASTRA_WEBUI_STYLE_CSS)
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/webui/WebUiAssets.hpp.in"
+  "${SOFTADASTRA_WEBUI_GENERATED_DIR}/WebUiAssets.hpp"
+  @ONLY
+)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -69,6 +90,7 @@ add_library(
   src/platform/NativeLocalDnsDelegation.cpp
   src/platform/NativeLocalGatewaySocketProvider.cpp
   src/platform/NativeDataDirectory.cpp
+  src/platform/NativeDirectoryChooser.cpp
   src/platform/HostInstanceLock.cpp
   src/platform/MdnsPublisher.cpp
   src/platform/NativePlatform.cpp
@@ -97,6 +119,8 @@ target_include_directories(
   softadastra_internal
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+  PRIVATE
+    ${SOFTADASTRA_WEBUI_GENERATED_DIR}
 )
 
 target_link_libraries(
@@ -113,6 +137,8 @@ if(WIN32)
     PRIVATE
       advapi32
       iphlpapi
+      ole32
+      shell32
       ws2_32
   )
 endif()

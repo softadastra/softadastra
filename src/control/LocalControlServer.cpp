@@ -404,6 +404,20 @@ namespace softadastra
       return logs ? "logs " + LocalControlProtocol::encode(*logs) : "error";
     }
 
+    if (fields[0] == "logs-since" && fields.size() == 3)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]);
+      std::optional<std::uintmax_t> offset;
+      if (fields[2] != "-1")
+      {
+        try { offset = static_cast<std::uintmax_t>(std::stoull(fields[2])); }
+        catch (const std::exception &) { return "error"; }
+      }
+      const auto logs = id ? server.logs_since(SoftwareId(*id), offset) : std::nullopt;
+      return logs ? "logs-since " + LocalControlProtocol::encode(logs->logs) + " " +
+                        std::to_string(logs->offset) + " " + (logs->reset ? "1" : "0") : "error";
+    }
+
     if (fields[0] == "logs-clear" && fields.size() == 2)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);
@@ -435,6 +449,22 @@ namespace softadastra
       for (std::size_t index = 8; index < fields.size(); ++index) { const auto argument = LocalControlProtocol::decode(fields[index]); if (!argument) return "error"; arguments.push_back(argument.value()); }
       const auto access = protocol ? AccessPoint::create(protocol.value(), static_cast<std::uint16_t>(port.value())) : std::nullopt;
       return std::string("sync ") + (server.synchronize_software(SoftwareId(id.value()), ProcessSpec(executable.value(), std::move(arguments), root->empty() ? std::nullopt : std::optional<std::string>(root.value())), access, name.value()) ? "1" : "0");
+    }
+
+    if (fields[0] == "sync-v2" && fields.size() >= 7)
+    {
+      const auto id = LocalControlProtocol::decode(fields[1]); const auto name = LocalControlProtocol::decode(fields[2]); const auto executable = LocalControlProtocol::decode(fields[3]); const auto root = LocalControlProtocol::decode(fields[4]); const auto access_count = LocalControlProtocol::integer(fields[5]);
+      if (!id || !name || name->empty() || !executable || !root || !access_count || *access_count < 0) return "error";
+      const std::size_t endpoints = static_cast<std::size_t>(*access_count);
+      const std::size_t arguments_index = 6 + endpoints * 2;
+      if (fields.size() <= arguments_index) return "error";
+      std::vector<AccessPoint> accesses;
+      for (std::size_t index = 0; index < endpoints; ++index) { const auto protocol = AccessPoint::protocol(fields[6 + index * 2]); const auto port = LocalControlProtocol::integer(fields[7 + index * 2]); if (!protocol || !port || *port < 1 || *port > 65535) return "error"; const auto access = AccessPoint::create(*protocol, static_cast<std::uint16_t>(*port)); if (!access) return "error"; accesses.push_back(*access); }
+      const auto argument_count = LocalControlProtocol::integer(fields[arguments_index]);
+      if (!argument_count || *argument_count < 0 || fields.size() != arguments_index + 1 + static_cast<std::size_t>(*argument_count)) return "error";
+      std::vector<std::string> arguments;
+      for (std::size_t index = arguments_index + 1; index < fields.size(); ++index) { const auto argument = LocalControlProtocol::decode(fields[index]); if (!argument) return "error"; arguments.push_back(*argument); }
+      return std::string("sync-v2 ") + (server.synchronize_software(SoftwareId(*id), ProcessSpec(*executable, std::move(arguments), root->empty() ? std::nullopt : std::optional<std::string>(*root)), std::move(accesses), *name) ? "1" : "0");
     }
 
     if (fields[0] == "register" && fields.size() >= 9)
