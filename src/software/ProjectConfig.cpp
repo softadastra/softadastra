@@ -9,15 +9,15 @@ namespace softadastra
     std::optional<std::string> string_value(const std::string &line, const std::string &key)
     {
       if (!line.starts_with(key + " = ")) return std::nullopt;
-      const auto value = line.substr(key.size() + 3);
-      if (value.size() < 2 || value.front() != '"' || value.back() != '"') return std::nullopt;
+      const auto text = line.substr(key.size() + 3);
+      if (text.size() < 2 || text.front() != '"' || text.back() != '"') return std::nullopt;
       std::string decoded;
       bool escaped = false;
-      for (std::size_t i = 1; i + 1 < value.size(); ++i)
+      for (std::size_t i = 1; i + 1 < text.size(); ++i)
       {
-        if (escaped) { decoded += value[i]; escaped = false; }
-        else if (value[i] == '\\') escaped = true;
-        else decoded += value[i];
+        if (escaped) { decoded += text[i]; escaped = false; }
+        else if (text[i] == '\\') escaped = true;
+        else decoded += text[i];
       }
       return escaped ? std::nullopt : std::optional<std::string>(decoded);
     }

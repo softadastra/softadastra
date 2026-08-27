@@ -69,11 +69,6 @@ namespace
     softadastra::HostService service(host, platform.process_launcher());
     softadastra::ControlServer server(service);
     softadastra::ControlClient client(server);
-    ASSERT_TRUE(service.register_software(
-        softadastra::SoftwareId("stable-id"), softadastra::ProcessSpec("app"),
-        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080),
-        std::nullopt, "phone-test"));
-
     const auto project = std::filesystem::temp_directory_path() /
                          ("softadastra-web-ui-project-" + std::to_string(
                               std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -88,10 +83,14 @@ namespace
     ASSERT_NE(ui.port(), 0);
 
     const auto page_response = get(ui.port(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    EXPECT_NE(page_response.find("HTTP/1.1 200 OK"), std::string::npos);
+    EXPECT_NE(page_response.find("Content-Type: text/html"), std::string::npos);
+    EXPECT_NE(page_response.find("<!doctype html>"), std::string::npos);
+    EXPECT_NE(page_response.find("<title>Softadastra</title>"), std::string::npos);
     EXPECT_NE(page_response.find("<h2>Host</h2>"), std::string::npos);
     EXPECT_NE(page_response.find("<h2>Applications</h2>"), std::string::npos);
     EXPECT_NE(page_response.find("This computer"), std::string::npos);
-    EXPECT_NE(page_response.find("No applications yet."), std::string::npos);
+    EXPECT_EQ(page_response.find("No applications yet."), std::string::npos);
     EXPECT_LT(page_response.find("<h2>Applications</h2>"), page_response.find("<h2>Host</h2>"));
     EXPECT_NE(page_response.find("/style.css"), std::string::npos);
     EXPECT_NE(page_response.find("/app.js"), std::string::npos);
@@ -101,8 +100,19 @@ namespace
     EXPECT_NE(script_response.find("async function api"), std::string::npos);
     EXPECT_NE(script_response.find("Edit configuration"), std::string::npos);
     EXPECT_NE(script_response.find("access_points"), std::string::npos);
+    // The empty-state wording is a frontend behaviour, not server-rendered HTML.
+    EXPECT_NE(script_response.find("No applications yet."), std::string::npos);
     const auto style_response = get(ui.port(), "GET /style.css HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(style_response.find("Content-Type: text/css"), std::string::npos);
+
+    const auto empty_list_response = get(ui.port(), "GET /api/software HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    EXPECT_NE(empty_list_response.find("HTTP/1.1 200 OK"), std::string::npos);
+    EXPECT_NE(empty_list_response.find("\r\n\r\n[]"), std::string::npos);
+
+    ASSERT_TRUE(service.register_software(
+        softadastra::SoftwareId("stable-id"), softadastra::ProcessSpec("app"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080),
+        std::nullopt, "phone-test"));
 
     const auto host_response = get(ui.port(), "GET /api/host HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(host_response.find("200 OK"), std::string::npos);

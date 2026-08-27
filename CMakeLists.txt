@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 project(
   softadastra
@@ -210,6 +210,45 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
   endif()
 endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  install(
+    TARGETS softadastra
+    RUNTIME DESTINATION bin
+  )
+  install(
+    TARGETS softadastra-gateway
+    RUNTIME DESTINATION bin
+  )
+  install(
+    FILES packaging/softadastra.service
+    DESTINATION lib/systemd/system
+  )
+endif()
+
+if(WIN32)
+  install(
+    TARGETS softadastra
+    RUNTIME_DEPENDENCIES
+      PRE_EXCLUDE_REGEXES "^api-ms-" "^ext-ms-"
+      POST_EXCLUDE_REGEXES ".*/[Ss]ystem32/.*"
+    RUNTIME DESTINATION bin
+  )
+endif()
+
+set(CPACK_PACKAGE_NAME "Softadastra")
+set(CPACK_PACKAGE_VENDOR "Softadastra")
+set(CPACK_PACKAGE_CONTACT "Softadastra <support@softadastra.com>")
+set(CPACK_PACKAGE_VERSION "0.1.0")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "Softadastra")
+if(WIN32)
+  set(CPACK_GENERATOR "ZIP")
+else()
+  set(CPACK_GENERATOR "DEB")
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "systemd")
+endif()
+include(CPack)
 
 if(SOFTADASTRA_BUILD_TESTS)
   include(CTest)

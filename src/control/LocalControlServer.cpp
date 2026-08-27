@@ -397,6 +397,30 @@ namespace softadastra
       return response;
     }
 
+    if (fields[0] == "software-list-v2" && fields.size() == 1)
+    {
+      const auto entries = server.software();
+      std::string response = "software-list-v2 " + std::to_string(entries.size());
+      for (const auto &entry : entries)
+      {
+        response += " " + LocalControlProtocol::encode(entry.id().value()) +
+                    " " + LocalControlProtocol::encode(entry.name()) +
+                    " " + std::to_string(static_cast<int>(entry.state())) +
+                    " " + LocalControlProtocol::encode(entry.process_spec().executable()) +
+                    " " + LocalControlProtocol::encode(entry.process_spec().working_directory().value_or("")) +
+                    " " + LocalControlProtocol::encode(entry.project_identity().has_value() ? entry.project_identity()->value() : "") +
+                    " " + LocalControlProtocol::encode(entry.declared_command()) +
+                    " " + std::to_string(entry.pid().value_or(-1)) +
+                    " " + std::to_string(entry.access_points().size());
+        for (const auto &access : entry.access_points())
+          response += " " + std::string(AccessPoint::name(access.protocol())) + " " + std::to_string(access.port());
+        response += " " + std::to_string(entry.process_spec().arguments().size());
+        for (const auto &argument : entry.process_spec().arguments())
+          response += " " + LocalControlProtocol::encode(argument);
+      }
+      return response;
+    }
+
     if (fields[0] == "logs" && fields.size() == 2)
     {
       const auto id = LocalControlProtocol::decode(fields[1]);

@@ -583,6 +583,7 @@ namespace
     EXPECT_EQ(client.local_gateway_target("phone-test").result, softadastra::LocalGatewayLookup::Http);
     EXPECT_EQ(client.local_gateway_target("phone-test.softadastra.home.arpa").port, 8080);
 
+    ASSERT_TRUE(client.stop_software(id));
     ASSERT_TRUE(client.synchronize_software(
         id, softadastra::ProcessSpec("app"),
         softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 9000), "phone-api"));

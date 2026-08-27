@@ -17,6 +17,10 @@
 #include <string_view>
 #include <system_error>
 
+#if defined(__linux__)
+#include <fcntl.h>
+#endif
+
 namespace
 {
   using Tcp = asio::ip::tcp;
@@ -247,6 +251,11 @@ namespace softadastra
         acceptor.accept(socket, error);
         if (error) continue;
         if (stopping_.load()) break;
+#if defined(__linux__)
+        // Hosted commands are forked from this thread.  They must not retain
+        // an HTTP client connection and delay its EOF until they exit.
+        static_cast<void>(::fcntl(socket.native_handle(), F_SETFD, FD_CLOEXEC));
+#endif
 
         asio::streambuf request;
         asio::read_until(socket, request, "\r\n\r\n", error);

@@ -558,6 +558,7 @@ namespace
     EXPECT_EQ(service.resolve("phone-test.softadastra.home.arpa").result, softadastra::LocalGatewayLookup::Http);
     EXPECT_EQ(service.resolve("example.com").result, softadastra::LocalGatewayLookup::NotFound);
 
+    ASSERT_TRUE(service.stop_software(id));
     ASSERT_TRUE(service.synchronize_software(
         id, softadastra::ProcessSpec("app"),
         softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 9000), "phone-api"));

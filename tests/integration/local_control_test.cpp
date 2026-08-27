@@ -318,11 +318,13 @@ namespace
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
     HostProcess host(state_home); ASSERT_TRUE(wait_for([&socket] { return std::filesystem::exists(socket); }));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
+    host.stop();
     const auto toml = project / "softadastra.toml";
     std::filesystem::remove(toml);
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-api", "sleep 30", std::nullopt, {}}));
+    HostProcess updated(state_home); ASSERT_TRUE(wait_for([&socket] { return std::filesystem::exists(socket); }));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
-    host.stop();
+    updated.stop();
     HostProcess restarted(state_home); ASSERT_TRUE(wait_for([&socket] { return std::filesystem::exists(socket); }));
     restarted.stop();
     softadastra::HostState restored; ASSERT_TRUE(softadastra::HostStateFile(state_home / "softadastra" / "host-state").load(restored));

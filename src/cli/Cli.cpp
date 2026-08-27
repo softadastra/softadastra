@@ -47,7 +47,20 @@ bool sync_project(ControlClient &client,Target &t) {
   if(!t.root) return true;
   const auto existing=t.entry->project_identity(); const auto legacy=ProjectIdentity::find(*t.root);
   if(existing&&existing->value()!=t.config->id.value()&&(!legacy||legacy->second!=*existing)) { std::cerr<<"Software identifier is linked to another project: "<<t.id.value()<<'\n'; return false; }
-  static_cast<void>(client.synchronize_software(t.id,ProcessSpec("/bin/sh",{"-lc",t.config->command},t.root->string()),t.config->access,t.config->name));
+  const ProcessSpec configured_process("/bin/sh", {"-lc", t.config->command}, t.root->string());
+  auto access_points = t.config->access_points;
+  if (access_points.empty() && t.config->access) access_points.push_back(*t.config->access);
+  const bool configuration_changed = t.entry->name() != t.config->name ||
+      t.entry->process_spec().executable() != configured_process.executable() ||
+      t.entry->process_spec().arguments() != configured_process.arguments() ||
+      t.entry->process_spec().working_directory() != configured_process.working_directory() ||
+      t.entry->access_points() != access_points;
+  if (configuration_changed && !client.synchronize_software(
+          t.id, configured_process, std::move(access_points), t.config->name))
+  {
+    std::cerr << "Stop the application before changing its configuration.\n";
+    return false;
+  }
   if(existing&&!client.update_project_root(*existing,t.root->string())) { std::cerr<<"failed to update project location on this Host\n"; return false; } t.entry=client.software(t.id); return true;
 }
 bool print_access(ControlClient &client,const Target &t) {
@@ -108,7 +121,8 @@ int Cli::run(int argc,const char *const argv[]) {
   if(command=="logs") { for(int i=2;i<argc;++i) { const std::string value(argv[i]); if(value=="-f"||value=="--follow") follow=true; else if(value=="--clear") clear=true; else if(!name) name=value; else { command_usage(command); return 2; } } if(follow&&clear) { std::cerr<<"--clear cannot be used with --follow\n"; return 2; } }
   else { if(argc>3) { command_usage(command); return 2; } name=argc==3?std::optional<std::string>(argv[2]):std::nullopt; }
   if(command=="run"&&!name) { std::string error; const auto cfg=ProjectConfigFile::find(std::filesystem::current_path(),&error); if(!error.empty()) { std::cerr<<error<<'\n'; return 1; } if(cfg&&cfg->second.command.empty()) { std::cerr<<"No command configured for: "<<cfg->second.name<<"\n\nSet `command` in:\n\n  "<<(cfg->first/"softadastra.toml").string()<<'\n'; return 1; } if(cfg&&!client_.software(SoftwareId(cfg->second.id.value()))) { const auto legacy=ProjectIdentity::find(cfg->first); const auto identity=legacy?legacy->second:cfg->second.id; if(!client_.register_software(SoftwareId(cfg->second.id.value()),ProcessSpec("/bin/sh",{"-lc",cfg->second.command},cfg->first.string()),cfg->second.access,identity,cfg->second.name)) { std::cerr<<"Failed to start software: "<<cfg->second.name<<'\n'; return 1; } } }
-  auto target=resolve_target(client_,name,command); if(!target) return 1; if(!sync_project(client_,*target)) return 1;
+  auto target=resolve_target(client_,name,command); if(!target) return 1;
+  if(command=="run" && !sync_project(client_,*target)) return 1;
   if(command=="remove") { if(target->entry->state()==SoftwareState::Running) { std::cerr<<"Cannot remove running software: "<<target->name<<"\n\nStop it first:\n\n  softadastra stop"<<(name?" "+*name:"")<<"\n"; return 1; } if(!client_.remove_software(target->id)) { unknown_software(target->name); return 1; } std::cout<<"removed: "<<target->name<<'\n'; return 0; }
   if(command=="logs") { const auto path=NativeDataDirectory::path()/"logs"/(target->id.value()+".log"); if(clear) { std::ofstream output(path, std::ios::trunc); return 0; } std::uintmax_t offset=0; do { std::ifstream input(path, std::ios::binary); if(input) { input.seekg(static_cast<std::streamoff>(offset)); std::cout<<input.rdbuf()<<std::flush; const auto size=std::filesystem::file_size(path); offset=size; } if(!follow) break; std::this_thread::sleep_for(std::chrono::milliseconds(150)); } while(true); return 0; }
   if(command=="access") return print_access(client_,*target)?0:1;

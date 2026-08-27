@@ -134,30 +134,52 @@ namespace softadastra
   std::vector<SoftwareEntry> ControlClient::software() const noexcept
   {
     if (server_ != nullptr) return server_->software();
-    const auto response = request("software-list");
+    const auto response = request("software-list-v2");
     const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
-    if (fields.size() < 2 || fields[0] != "software-list") return {};
+    if (fields.size() < 2 || fields[0] != "software-list-v2") return {};
     const auto count = LocalControlProtocol::integer(fields[1]);
-    if (!count || count.value() < 0 || fields.size() != 2 + static_cast<std::size_t>(count.value()) * 10) return {};
+    if (!count || count.value() < 0) return {};
     std::vector<SoftwareEntry> entries;
-    for (std::size_t index = 0; index < static_cast<std::size_t>(count.value()); ++index)
+    std::size_t offset = 2;
+    for (std::size_t index = 0; index < static_cast<std::size_t>(*count); ++index)
     {
-      const auto base = 2 + index * 10;
-      const auto id = LocalControlProtocol::decode(fields[base]);
-      const auto name = LocalControlProtocol::decode(fields[base + 1]);
-      const auto executable = LocalControlProtocol::decode(fields[base + 3]);
-      const auto root = LocalControlProtocol::decode(fields[base + 4]);
-      const auto identity = LocalControlProtocol::decode(fields[base + 5]);
-      const auto declared = LocalControlProtocol::decode(fields[base + 6]);
-      const auto pid = LocalControlProtocol::integer(fields[base + 7]);
-      const auto protocol = fields[base + 8] == "-" ? std::optional<AccessProtocol>{} : AccessPoint::protocol(fields[base + 8]);
-      const auto port = LocalControlProtocol::integer(fields[base + 9]);
-      if (!id || !name || !executable || !root || !identity || !declared || !pid || !port || port.value() < 0 || port.value() > 65535 || (fields[base + 8] != "-" && !protocol)) return {};
-      const auto access = protocol ? AccessPoint::create(*protocol, static_cast<std::uint16_t>(*port)) : std::nullopt;
-      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, {}, root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), access, *declared, *name);
+      if (offset + 9 > fields.size()) return {};
+      const auto id = LocalControlProtocol::decode(fields[offset++]);
+      const auto name = LocalControlProtocol::decode(fields[offset++]);
+      const auto state = LocalControlProtocol::integer(fields[offset++]);
+      const auto executable = LocalControlProtocol::decode(fields[offset++]);
+      const auto root = LocalControlProtocol::decode(fields[offset++]);
+      const auto identity = LocalControlProtocol::decode(fields[offset++]);
+      const auto declared = LocalControlProtocol::decode(fields[offset++]);
+      const auto pid = LocalControlProtocol::integer(fields[offset++]);
+      const auto access_count = LocalControlProtocol::integer(fields[offset++]);
+      if (!id || !name || !state || !executable || !root || !identity || !declared || !pid || !access_count || *access_count < 0) return {};
+      std::vector<AccessPoint> accesses;
+      for (int access_index = 0; access_index < *access_count; ++access_index)
+      {
+        if (offset + 2 > fields.size()) return {};
+        const auto protocol = AccessPoint::protocol(fields[offset++]);
+        const auto port = LocalControlProtocol::integer(fields[offset++]);
+        if (!protocol || !port || *port < 1 || *port > 65535) return {};
+        const auto access = AccessPoint::create(*protocol, static_cast<std::uint16_t>(*port));
+        if (!access) return {};
+        accesses.push_back(*access);
+      }
+      if (offset >= fields.size()) return {};
+      const auto argument_count = LocalControlProtocol::integer(fields[offset++]);
+      if (!argument_count || *argument_count < 0 || offset + static_cast<std::size_t>(*argument_count) > fields.size()) return {};
+      std::vector<std::string> arguments;
+      for (int argument_index = 0; argument_index < *argument_count; ++argument_index)
+      {
+        const auto argument = LocalControlProtocol::decode(fields[offset++]);
+        if (!argument) return {};
+        arguments.push_back(*argument);
+      }
+      entries.emplace_back(SoftwareId(*id), ProcessSpec(*executable, std::move(arguments), root->empty() ? std::nullopt : std::optional<std::string>(*root)), identity->empty() ? std::nullopt : std::optional<ProjectIdentity>(ProjectIdentity(*identity)), std::move(accesses), *declared, *name);
       if (*pid >= 0) entries.back().set_pid(*pid);
-      entries.back().set_state(static_cast<SoftwareState>(std::stoi(fields[base + 2])));
+      entries.back().set_state(static_cast<SoftwareState>(*state));
     }
+    if (offset != fields.size()) return {};
     return entries;
   }
 
@@ -291,11 +313,13 @@ namespace softadastra
       return SoftwareOperationError::LaunchFailed;
     }
 
-    return error.value() < 0
+    const int error_code = *error;
+    const int exit_code = *code;
+    return error_code < 0
                ? SoftwareOperationResult()
                : SoftwareOperationResult(
-                     static_cast<SoftwareOperationError>(error.value()),
-                     has_code.value() != 0 ? std::optional<int>(code.value()) : std::nullopt);
+                     static_cast<SoftwareOperationError>(error_code),
+                     *has_code != 0 ? std::optional<int>(exit_code) : std::nullopt);
   }
 
   SoftwareOperationResult ControlClient::stop_software(const SoftwareId &id)
@@ -319,11 +343,13 @@ namespace softadastra
       return SoftwareOperationError::LaunchFailed;
     }
 
-    return error.value() < 0
+    const int error_code = *error;
+    const int exit_code = *code;
+    return error_code < 0
                ? SoftwareOperationResult()
                : SoftwareOperationResult(
-                     static_cast<SoftwareOperationError>(error.value()),
-                     has_code.value() != 0 ? std::optional<int>(code.value()) : std::nullopt);
+                     static_cast<SoftwareOperationError>(error_code),
+                     *has_code != 0 ? std::optional<int>(exit_code) : std::nullopt);
   }
 
   SoftwareOperationResult ControlClient::restart_software(const SoftwareId &id)
@@ -347,11 +373,13 @@ namespace softadastra
       return SoftwareOperationError::LaunchFailed;
     }
 
-    return error.value() < 0
+    const int error_code = *error;
+    const int exit_code = *code;
+    return error_code < 0
                ? SoftwareOperationResult()
                : SoftwareOperationResult(
-                     static_cast<SoftwareOperationError>(error.value()),
-                     has_code.value() != 0 ? std::optional<int>(code.value()) : std::nullopt);
+                     static_cast<SoftwareOperationError>(error_code),
+                     *has_code != 0 ? std::optional<int>(exit_code) : std::nullopt);
   }
 
   void ControlClient::refresh()
@@ -376,12 +404,14 @@ namespace softadastra
                             : std::vector<std::string>{};
     const auto state = fields.size() == 5 ? LocalControlProtocol::integer(fields[1]) : std::nullopt;
 
-    if (fields.empty() || fields[0] != "status" || !state.has_value() || state.value() < 0)
+    if (fields.empty() || fields[0] != "status" || !state.has_value())
     {
       return std::nullopt;
     }
 
-    return static_cast<SoftwareState>(state.value());
+    const int state_value = *state;
+    if (state_value < 0) return std::nullopt;
+    return static_cast<SoftwareState>(state_value);
   }
 
   std::optional<SoftwareOperationResult> ControlClient::software_result(
@@ -406,11 +436,13 @@ namespace softadastra
       return std::nullopt;
     }
 
-    return error.value() < 0
+    const int error_code = *error;
+    const int exit_code = *code;
+    return error_code < 0
                ? std::optional<SoftwareOperationResult>()
                : std::optional<SoftwareOperationResult>(SoftwareOperationResult(
-                     static_cast<SoftwareOperationError>(error.value()),
-                     has_code.value() != 0 ? std::optional<int>(code.value())
+                     static_cast<SoftwareOperationError>(error_code),
+                     *has_code != 0 ? std::optional<int>(exit_code)
                                            : std::nullopt));
   }
 

@@ -13,40 +13,39 @@
  */
 
 #include "platform/NativeDataDirectory.hpp"
-
-#include <cstdlib>
+#include "platform/Environment.hpp"
 
 namespace softadastra
 {
   std::filesystem::path NativeDataDirectory::path()
   {
 #if defined(_WIN32)
-    const char *app_data = std::getenv("LOCALAPPDATA");
+    const auto app_data = environment_value("LOCALAPPDATA");
 
-    if (app_data != nullptr)
+    if (app_data)
     {
-      return std::filesystem::path(app_data) / "Softadastra";
+      return std::filesystem::path(*app_data) / "Softadastra";
     }
 #else
-    const char *state_home = std::getenv("XDG_STATE_HOME");
+    const auto state_home = environment_value("XDG_STATE_HOME");
 
-    if (state_home != nullptr)
+    if (state_home)
     {
-      return std::filesystem::path(state_home) / "softadastra";
+      return std::filesystem::path(*state_home) / "softadastra";
     }
 #endif
 
-    const char *home = std::getenv("HOME");
+    const auto home = environment_value("HOME");
 
-    if (home == nullptr)
+    if (!home)
     {
       return std::filesystem::temp_directory_path() / "softadastra";
     }
 
 #if defined(_WIN32)
-    return std::filesystem::path(home) / "AppData" / "Roaming" / "Softadastra";
+    return std::filesystem::path(*home) / "AppData" / "Roaming" / "Softadastra";
 #else
-    return std::filesystem::path(home) / ".local" / "state" / "softadastra";
+    return std::filesystem::path(*home) / ".local" / "state" / "softadastra";
 #endif
   }
 

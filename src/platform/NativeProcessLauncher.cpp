@@ -14,9 +14,9 @@
 
 #include "platform/NativeProcessLauncher.hpp"
 
+#include "platform/Environment.hpp"
 #include "platform/NativeProcess.hpp"
 
-#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string_view>
@@ -60,9 +60,9 @@ namespace softadastra
         return std::filesystem::exists(path);
       }
 
-      const char *environment_path = std::getenv("PATH");
+      const auto environment_path = environment_value("PATH");
 
-      if (environment_path == nullptr)
+      if (!environment_path)
       {
         return false;
       }
@@ -73,7 +73,7 @@ namespace softadastra
       constexpr char separator = ':';
 #endif
 
-      std::string_view directories(environment_path);
+      std::string_view directories(*environment_path);
 
       while (!directories.empty())
       {
@@ -157,7 +157,7 @@ namespace softadastra
     HANDLE job=::CreateJobObjectW(nullptr,nullptr);
     if(job!=nullptr) { JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{}; limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE; static_cast<void>(::SetInformationJobObject(job,JobObjectExtendedLimitInformation,&limits,sizeof(limits))); if(!::AssignProcessToJobObject(job,information.hProcess)){::CloseHandle(job);job=nullptr;} }
     return std::make_unique<NativeProcess>(information.hProcess, job, information.dwProcessId);
-#endif
+#else
 
     vix::process::Command command(spec.executable());
 
@@ -216,7 +216,7 @@ namespace softadastra
 
     return std::make_unique<NativeProcess>(
         std::move(child));
-
+#endif
   }
 
 } // namespace softadastra
