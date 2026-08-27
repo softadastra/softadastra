@@ -320,7 +320,11 @@ if(SOFTADASTRA_BUILD_TESTS)
       )
     endif()
 
-    gtest_discover_tests(${target})
+    if(target STREQUAL "softadastra_local_control_test")
+      gtest_discover_tests(${target} PROPERTIES RUN_SERIAL TRUE)
+    else()
+      gtest_discover_tests(${target})
+    endif()
   endfunction()
 
   softadastra_add_test(
@@ -349,28 +353,29 @@ if(SOFTADASTRA_BUILD_TESTS)
     softadastra_add_test(softadastra_local_dns_test tests/host/local_dns_test.cpp)
   endif()
 
-  softadastra_add_test(
-    softadastra_local_dns_delegation_test
-    tests/platform/local_dns_delegation_test.cpp
-  )
-
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    softadastra_add_test(
+      softadastra_local_dns_delegation_test
+      tests/platform/local_dns_delegation_test.cpp
+    )
     softadastra_add_test(softadastra_local_reachability_test tests/host/local_reachability_test.cpp)
+    softadastra_add_test(
+      softadastra_local_gateway_socket_provider_test
+      tests/platform/local_gateway_socket_provider_test.cpp
+    )
+    softadastra_add_test(
+      softadastra_gateway_capability_provisioning_test
+      tests/platform/gateway_capability_provisioning_test.cpp
+    )
+    softadastra_add_test(
+      softadastra_native_managed_network_test
+      tests/platform/native_managed_network_test.cpp
+    )
   endif()
 
   softadastra_add_test(
     softadastra_remote_reachability_test
     tests/host/remote_reachability_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_local_gateway_socket_provider_test
-    tests/platform/local_gateway_socket_provider_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_gateway_capability_provisioning_test
-    tests/platform/gateway_capability_provisioning_test.cpp
   )
 
   softadastra_add_test(
@@ -381,11 +386,6 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_native_data_directory_test
     tests/platform/native_data_directory_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_native_managed_network_test
-    tests/platform/native_managed_network_test.cpp
   )
 
   softadastra_add_test(

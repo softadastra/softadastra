@@ -93,6 +93,7 @@ namespace
   }
 #endif
 
+#if defined(__linux__)
   void print_host_started(
       const softadastra::HostService &host_service,
       const softadastra::RemoteAccessSettings &remote_settings,
@@ -124,8 +125,6 @@ namespace
       const softadastra::RemoteAccessSettings &remote_settings,
       softadastra::MdnsPublisher &mdns_publisher)
   {
-#if defined(__linux__)
-
     sigset_t signals;
     sigemptyset(&signals);
     sigaddset(&signals, SIGINT);
@@ -196,9 +195,11 @@ namespace
     }
 
     return 1;
+  }
 
 #else
-
+  int run_host(softadastra::HostLoop &host_loop)
+  {
 #if defined(_WIN32)
     windows_stop=false; if(!::SetConsoleCtrlHandler(console_control,TRUE)) return 1;
     std::atomic_bool completed{false}; std::thread thread([&]{completed=host_loop.run();});
@@ -207,9 +208,8 @@ namespace
 #else
     const bool completed = host_loop.run(); return completed ? 0 : 1;
 #endif
-
-#endif
   }
+#endif
   bool start_host_automatically(const char *executable)
   {
 #if defined(__linux__)
@@ -344,12 +344,16 @@ int main(int argc, char *argv[])
 #endif
         );
     local_control_server.set_shutdown_handler([&host_loop]() { host_loop.request_stop(); });
+#if defined(__linux__)
     softadastra::MdnsPublisher mdns_publisher(identity.id());
     return run_host(
         host_loop,
         host_service,
         remote_settings,
         mdns_publisher);
+#else
+    return run_host(host_loop);
+#endif
   }
 
   softadastra::ControlClient control_client(

@@ -450,7 +450,7 @@ namespace
     softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("project-app"), softadastra::ProcessSpec("--access"), std::nullopt, softadastra::ProjectIdentity("project-app")));
     const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
-    const char *start_project[] = {"softadastra", "start"}; const char *stop_project[] = {"softadastra", "stop"};
+    const char *start_project[] = {"softadastra", "run"}; const char *stop_project[] = {"softadastra", "stop"};
     const char *restart_project[] = {"softadastra", "restart"}; const char *status_project[] = {"softadastra", "status"};
     const char *info_project[] = {"softadastra", "info"}; const char *access_project[] = {"softadastra", "access"};
     const char *start_named[] = {"softadastra", "start", "project-app"}; const char *stop_named[] = {"softadastra", "stop", "project-app"};

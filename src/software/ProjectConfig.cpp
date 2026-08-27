@@ -59,10 +59,10 @@ namespace softadastra
           { if (!finish_access()) { if (error) *error = "invalid access in " + path.string(); return std::nullopt; } in_access = true; endpoint_protocol.reset(); endpoint_port.reset(); }
           else if (in_access && string_value(line, "protocol")) endpoint_protocol = string_value(line, "protocol");
           else if (in_access && string_value(line, "port")) endpoint_port = string_value(line, "port");
-          else if (const auto value = string_value(line, "id")) id = value;
-          else if (const auto value = string_value(line, "name")) name = value;
-          else if (const auto value = string_value(line, "command")) command = value;
-          else if (const auto value = string_value(line, "access")) access = value;
+          else if (const auto id_text = string_value(line, "id")) id = id_text;
+          else if (const auto name_text = string_value(line, "name")) name = name_text;
+          else if (const auto command_text = string_value(line, "command")) command = command_text;
+          else if (const auto access_text = string_value(line, "access")) access = access_text;
           else if (!line.empty() && line[0] != '#') { if (error) *error = "invalid softadastra.toml: " + path.string(); return std::nullopt; }
         }
         if (!finish_access()) { if (error) *error = "invalid access in " + path.string(); return std::nullopt; }
