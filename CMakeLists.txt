@@ -136,6 +136,16 @@ target_include_directories(
     ${SOFTADASTRA_WEBUI_GENERATED_DIR}
 )
 
+if(WIN32)
+  target_compile_definitions(
+    softadastra_internal
+    PUBLIC
+      WIN32_LEAN_AND_MEAN
+      NOMINMAX
+      _WIN32_WINNT=0x0A00
+  )
+endif()
+
 target_link_libraries(
   softadastra_internal
   PUBLIC

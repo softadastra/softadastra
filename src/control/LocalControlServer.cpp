@@ -118,10 +118,12 @@ namespace softadastra
     return true;
 #else
 #if defined(_WIN32)
-    if (pipe_ != INVALID_HANDLE_VALUE) return true;
+    if (pipe_ != nullptr) return true;
     const auto name=pipe_name(path_);
-    pipe_=::CreateNamedPipeW(name.c_str(),PIPE_ACCESS_DUPLEX,PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE|PIPE_NOWAIT,1,maximum_message_size,maximum_message_size,0,nullptr);
-    return pipe_ != INVALID_HANDLE_VALUE;
+    const HANDLE pipe=::CreateNamedPipeW(name.c_str(),PIPE_ACCESS_DUPLEX,PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE|PIPE_NOWAIT,1,maximum_message_size,maximum_message_size,0,nullptr);
+    if (pipe == INVALID_HANDLE_VALUE) return false;
+    pipe_=pipe;
+    return true;
 #else
     return false;
 #endif
@@ -198,12 +200,13 @@ namespace softadastra
     }
 #else
 #if defined(_WIN32)
-    if (pipe_ == INVALID_HANDLE_VALUE) return false;
-    if (!::ConnectNamedPipe(pipe_,nullptr)) { const auto error=::GetLastError(); if(error==ERROR_PIPE_LISTENING) return false; if(error!=ERROR_PIPE_CONNECTED) return false; }
+    const HANDLE pipe=static_cast<HANDLE>(pipe_);
+    if (pipe == nullptr) return false;
+    if (!::ConnectNamedPipe(pipe,nullptr)) { const auto error=::GetLastError(); if(error==ERROR_PIPE_LISTENING) return false; if(error!=ERROR_PIPE_CONNECTED) return false; }
     std::array<char,maximum_message_size> buffer{}; DWORD received{};
     bool processed=false;
-    if(::ReadFile(pipe_,buffer.data(),static_cast<DWORD>(buffer.size()),&received,nullptr)&&received>0) { const std::string_view request(buffer.data(),received); const auto fields=LocalControlProtocol::fields(request); std::string response; if(fields.size()==1&&fields[0]=="shutdown"&&shutdown_handler_){response="shutdown 1";shutdown_handler_();}else response=handle(server_,request); DWORD sent{};static_cast<void>(::WriteFile(pipe_,response.data(),static_cast<DWORD>(response.size()),&sent,nullptr));processed=true; }
-    ::FlushFileBuffers(pipe_);::DisconnectNamedPipe(pipe_);return processed;
+    if(::ReadFile(pipe,buffer.data(),static_cast<DWORD>(buffer.size()),&received,nullptr)&&received>0) { const std::string_view request(buffer.data(),received); const auto fields=LocalControlProtocol::fields(request); std::string response; if(fields.size()==1&&fields[0]=="shutdown"&&shutdown_handler_){response="shutdown 1";shutdown_handler_();}else response=handle(server_,request); DWORD sent{};static_cast<void>(::WriteFile(pipe,response.data(),static_cast<DWORD>(response.size()),&sent,nullptr));processed=true; }
+    ::FlushFileBuffers(pipe);::DisconnectNamedPipe(pipe);return processed;
 #else
     return false;
 #endif
@@ -223,7 +226,8 @@ namespace softadastra
     std::filesystem::remove(path_, error);
 #endif
 #if defined(_WIN32)
-    if (pipe_ != INVALID_HANDLE_VALUE) { ::DisconnectNamedPipe(pipe_); ::CloseHandle(pipe_); pipe_=INVALID_HANDLE_VALUE; }
+    const HANDLE pipe=static_cast<HANDLE>(pipe_);
+    if (pipe != nullptr) { ::DisconnectNamedPipe(pipe); ::CloseHandle(pipe); pipe_=nullptr; }
 #endif
   }
 

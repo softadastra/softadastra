@@ -21,9 +21,6 @@
 #include <functional>
 #include <string>
 #include <string_view>
-#if defined(_WIN32)
-#include <windows.h>
-#endif
 
 namespace softadastra
 {
@@ -73,7 +70,7 @@ namespace softadastra
     std::filesystem::path path_;
     int descriptor_{-1};
 #if defined(_WIN32)
-    HANDLE pipe_{INVALID_HANDLE_VALUE};
+    void *pipe_{nullptr};
 #endif
     RemoteAccessConfig *remote_config_;
     RemoteReachability *remote_reachability_;
