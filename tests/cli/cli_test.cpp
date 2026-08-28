@@ -98,6 +98,43 @@ namespace
     Launcher launcher; Service service_; Network network_; ManagedNetwork managed_network_;
   };
 
+  std::string shell_executable()
+  {
+#if defined(_WIN32)
+    return "cmd.exe";
+#else
+    return "/bin/sh";
+#endif
+  }
+
+  std::vector<std::string> shell_arguments(const std::string &command)
+  {
+#if defined(_WIN32)
+    return {"/C", command};
+#else
+    return {"-lc", command};
+#endif
+  }
+
+  void expect_same_path(
+      const std::optional<std::string> &actual,
+      const std::filesystem::path &expected)
+  {
+    ASSERT_TRUE(actual.has_value());
+    const std::filesystem::path actual_path(*actual);
+    std::error_code error;
+
+    if (std::filesystem::exists(actual_path, error) &&
+        std::filesystem::exists(expected, error))
+    {
+      EXPECT_TRUE(std::filesystem::equivalent(actual_path, expected, error));
+      EXPECT_FALSE(error);
+      return;
+    }
+
+    EXPECT_EQ(actual_path.lexically_normal(), expected.lexically_normal());
+  }
+
   TEST(CliTest, RunsMovedProjectFromRootAndSubdirectoryUsingCurrentRoot)
   {
     const auto base = std::filesystem::temp_directory_path() / ("softadastra-cli-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -123,14 +160,14 @@ namespace
     softadastra::Cli cli(client);
     EXPECT_EQ(cli.run(2, root_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
-    EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
-    EXPECT_EQ(platform.launcher.last_spec->working_directory(), new_root.string());
+    EXPECT_EQ(platform.launcher.last_spec->executable(), shell_executable());
+    expect_same_path(platform.launcher.last_spec->working_directory(), new_root);
     std::filesystem::current_path(new_root / "src");
     ASSERT_TRUE(client.stop_software(softadastra::SoftwareId(identity->value())));
     EXPECT_EQ(cli.run(2, root_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
-    EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
-    EXPECT_EQ(platform.launcher.last_spec->working_directory(), new_root.string());
+    EXPECT_EQ(platform.launcher.last_spec->executable(), shell_executable());
+    expect_same_path(platform.launcher.last_spec->working_directory(), new_root);
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(base);
   }
@@ -178,7 +215,7 @@ namespace
     std::filesystem::current_path(source);
     EXPECT_EQ(cli.run(2, run_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
-    EXPECT_EQ(platform.launcher.last_spec->working_directory(), root.string());
+    expect_same_path(platform.launcher.last_spec->working_directory(), root);
     EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("./build/app"), std::string::npos);
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(root);
@@ -206,9 +243,9 @@ namespace
     const char *run_args[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, run_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
-    EXPECT_EQ(platform.launcher.last_spec->executable(), "/bin/sh");
+    EXPECT_EQ(platform.launcher.last_spec->executable(), shell_executable());
     EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("python3 server.py --port 8000"), std::string::npos);
-    EXPECT_EQ(platform.launcher.last_spec->working_directory(), root.string());
+    expect_same_path(platform.launcher.last_spec->working_directory(), root);
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(root);
   }
@@ -458,7 +495,7 @@ namespace
     const char *info_named[] = {"softadastra", "info", "project-app"}; const char *access_named[] = {"softadastra", "access", "project-app"};
     EXPECT_EQ(cli.run(2, start_project), 0); EXPECT_EQ(cli.run(2, status_project), 0); EXPECT_EQ(cli.run(2, info_project), 0); EXPECT_EQ(cli.run(2, access_project), 0); EXPECT_EQ(cli.run(2, stop_project), 0); EXPECT_EQ(cli.run(2, restart_project), 0);
     EXPECT_EQ(cli.run(3, start_named), 0); EXPECT_EQ(cli.run(3, status_named), 0); EXPECT_EQ(cli.run(3, info_named), 0); EXPECT_EQ(cli.run(3, access_named), 0); EXPECT_EQ(cli.run(3, stop_named), 0); EXPECT_EQ(cli.run(3, restart_named), 0);
-    EXPECT_EQ(client.software(softadastra::SoftwareId("project-app"))->process_spec().arguments(), (std::vector<std::string>{"-lc", "sleep 30"}));
+    EXPECT_EQ(client.software(softadastra::SoftwareId("project-app"))->process_spec().arguments(), shell_arguments("sleep 30"));
     std::filesystem::current_path(previous); std::filesystem::remove_all(root);
   }
 }

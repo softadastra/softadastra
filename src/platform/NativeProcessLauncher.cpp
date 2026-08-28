@@ -19,6 +19,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -49,7 +50,43 @@ namespace softadastra
     std::wstring wide(const std::string &value)
     { if (value.empty()) return {}; const int size=::MultiByteToWideChar(CP_UTF8,0,value.data(),static_cast<int>(value.size()),nullptr,0); std::wstring result(size,L'\0'); ::MultiByteToWideChar(CP_UTF8,0,value.data(),static_cast<int>(value.size()),result.data(),size); return result; }
     std::wstring quote(const std::string &value)
-    { std::wstring result=L"\""; for (const wchar_t character:wide(value)) { if (character==L'\"') result+=L'\\'; result+=character; } return result+L"\""; }
+    {
+      const std::wstring argument = wide(value);
+
+      if (!argument.empty() &&
+          argument.find_first_of(L" \t\"") == std::wstring::npos)
+      {
+        return argument;
+      }
+
+      std::wstring result(L"\"");
+      std::size_t backslashes = 0;
+
+      for (const wchar_t character : argument)
+      {
+        if (character == L'\\')
+        {
+          ++backslashes;
+          continue;
+        }
+
+        if (character == L'\"')
+        {
+          result.append(backslashes * 2 + 1, L'\\');
+          result += character;
+          backslashes = 0;
+          continue;
+        }
+
+        result.append(backslashes, L'\\');
+        backslashes = 0;
+        result += character;
+      }
+
+      result.append(backslashes * 2, L'\\');
+      result += L'\"';
+      return result;
+    }
 #endif
     bool executable_exists(const std::string &executable)
     {

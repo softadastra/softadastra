@@ -33,6 +33,13 @@ void usage() { std::cout<<"Softadastra runs software on this Host.\n\nUsage:\n  
 void command_usage(const std::string &c) { if(c=="logs") std::cout<<"Usage:\n  softadastra logs [software-name] [--follow]\n\nWithout a name:\n  Show logs for the current Softadastra project.\n\nWith a name:\n  Show logs for a registered software.\n\nOptions:\n  -f, --follow    Follow new log output\n"; else if(c=="access") std::cout<<"Usage:\n  softadastra access [software-name]\n\nShow local access for a Software. If no local network is available, Softadastra may start a safe managed local network when the Host supports it.\n"; else if(c=="network") std::cout<<"Usage:\n  softadastra network info\n  softadastra network status\n  softadastra network start\n  softadastra network stop\n\nCommands:\n  info      Show current Host network state and capabilities\n  status    Show managed local network state\n  start     Start the managed local network\n  stop      Stop the managed local network\n"; else if(c=="init") std::cout<<"Usage: softadastra init [name] [--command <command>] [--access http:port]\n"; else if(c=="run") std::cout<<"Usage: softadastra run [name]\n"; else if(c=="list") std::cout<<"Usage: softadastra list [--running|--stopped]\n"; else if(c=="register") std::cout<<"Usage: softadastra register <name> [--access http:port] -- <command> [arguments...]\n"; else if(c=="connectivity") std::cout<<"Usage: softadastra connectivity\n"; else if(c=="remote") std::cout<<"Usage: softadastra remote enable <ipv4-address> <port>\n       softadastra remote disable\n"; else if(c=="start"||c=="stop"||c=="restart"||c=="status"||c=="info") std::cout<<"Usage: softadastra "<<c<<" [name]\n"; else { std::cerr<<"Unknown command: "<<c<<'\n'; usage(); } }
 bool is_help(const std::string &s) { return s=="-h"||s=="--help"; }
 std::optional<AccessPoint> parse_access(const std::string &v) { const auto p=v.find(':'); if(p==std::string::npos) return std::nullopt; const auto protocol=AccessPoint::protocol(v.substr(0,p)); const auto port=AccessUrl::port(v.substr(p+1)); return protocol&&port ? AccessPoint::create(*protocol,*port):std::nullopt; }
+ProcessSpec shell_process(const std::string &command, const std::string &working_directory) {
+#if defined(_WIN32)
+  return ProcessSpec("cmd.exe", {"/C", command}, working_directory);
+#else
+  return ProcessSpec("/bin/sh", {"-lc", command}, working_directory);
+#endif
+}
 
 struct Target { SoftwareId id{""}; std::string name; std::optional<SoftwareEntry> entry; std::optional<std::filesystem::path> root; std::optional<ProjectConfig> config; };
 std::optional<Target> resolve_target(ControlClient &client,const std::optional<std::string> &name,const std::string &command) {
@@ -47,7 +54,7 @@ bool sync_project(ControlClient &client,Target &t) {
   if(!t.root) return true;
   const auto existing=t.entry->project_identity(); const auto legacy=ProjectIdentity::find(*t.root);
   if(existing&&existing->value()!=t.config->id.value()&&(!legacy||legacy->second!=*existing)) { std::cerr<<"Software identifier is linked to another project: "<<t.id.value()<<'\n'; return false; }
-  const ProcessSpec configured_process("/bin/sh", {"-lc", t.config->command}, t.root->string());
+  const ProcessSpec configured_process=shell_process(t.config->command,t.root->string());
   auto access_points = t.config->access_points;
   if (access_points.empty() && t.config->access) access_points.push_back(*t.config->access);
   const bool configuration_changed = t.entry->name() != t.config->name ||
@@ -120,7 +127,7 @@ int Cli::run(int argc,const char *const argv[]) {
   bool follow=false, clear=false; std::optional<std::string> name;
   if(command=="logs") { for(int i=2;i<argc;++i) { const std::string value(argv[i]); if(value=="-f"||value=="--follow") follow=true; else if(value=="--clear") clear=true; else if(!name) name=value; else { command_usage(command); return 2; } } if(follow&&clear) { std::cerr<<"--clear cannot be used with --follow\n"; return 2; } }
   else { if(argc>3) { command_usage(command); return 2; } name=argc==3?std::optional<std::string>(argv[2]):std::nullopt; }
-  if(command=="run"&&!name) { std::string error; const auto cfg=ProjectConfigFile::find(std::filesystem::current_path(),&error); if(!error.empty()) { std::cerr<<error<<'\n'; return 1; } if(cfg&&cfg->second.command.empty()) { std::cerr<<"No command configured for: "<<cfg->second.name<<"\n\nSet `command` in:\n\n  "<<(cfg->first/"softadastra.toml").string()<<'\n'; return 1; } if(cfg&&!client_.software(SoftwareId(cfg->second.id.value()))) { const auto legacy=ProjectIdentity::find(cfg->first); const auto identity=legacy?legacy->second:cfg->second.id; if(!client_.register_software(SoftwareId(cfg->second.id.value()),ProcessSpec("/bin/sh",{"-lc",cfg->second.command},cfg->first.string()),cfg->second.access,identity,cfg->second.name)) { std::cerr<<"Failed to start software: "<<cfg->second.name<<'\n'; return 1; } } }
+  if(command=="run"&&!name) { std::string error; const auto cfg=ProjectConfigFile::find(std::filesystem::current_path(),&error); if(!error.empty()) { std::cerr<<error<<'\n'; return 1; } if(cfg&&cfg->second.command.empty()) { std::cerr<<"No command configured for: "<<cfg->second.name<<"\n\nSet `command` in:\n\n  "<<(cfg->first/"softadastra.toml").string()<<'\n'; return 1; } if(cfg&&!client_.software(SoftwareId(cfg->second.id.value()))) { const auto legacy=ProjectIdentity::find(cfg->first); const auto identity=legacy?legacy->second:cfg->second.id; if(!client_.register_software(SoftwareId(cfg->second.id.value()),shell_process(cfg->second.command,cfg->first.string()),cfg->second.access,identity,cfg->second.name)) { std::cerr<<"Failed to start software: "<<cfg->second.name<<'\n'; return 1; } } }
   auto target=resolve_target(client_,name,command); if(!target) return 1;
   if(command=="run" && !sync_project(client_,*target)) return 1;
   if(command=="remove") { if(target->entry->state()==SoftwareState::Running) { std::cerr<<"Cannot remove running software: "<<target->name<<"\n\nStop it first:\n\n  softadastra stop"<<(name?" "+*name:"")<<"\n"; return 1; } if(!client_.remove_software(target->id)) { unknown_software(target->name); return 1; } std::cout<<"removed: "<<target->name<<'\n'; return 0; }

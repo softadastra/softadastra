@@ -62,8 +62,18 @@ namespace
     return response;
   }
 
+  std::string long_running_command()
+  {
+#if defined(_WIN32)
+    return "ping -n 30 127.0.0.1 >NUL";
+#else
+    return "sleep 30";
+#endif
+  }
+
   TEST(WebUiServerTest, ServesLoopbackControlBackedHostAndSoftwareRoutes)
   {
+    const std::string command = long_running_command();
     softadastra::NativePlatform platform;
     softadastra::Host host(platform);
     softadastra::HostService service(host, platform.process_launcher());
@@ -74,7 +84,7 @@ namespace
                               std::chrono::steady_clock::now().time_since_epoch().count()));
     ASSERT_TRUE(std::filesystem::create_directories(project));
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
-        project, {softadastra::ProjectIdentity("web-project"), "Pico", "sleep 30",
+        project, {softadastra::ProjectIdentity("web-project"), "Pico", command,
                   softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081), {}}));
     softadastra::WebUiServer ui(client, [project] {
       return softadastra::DirectoryChooserResult{softadastra::DirectoryChooserStatus::Selected, project};
@@ -120,14 +130,14 @@ namespace
 
     const auto project_response = get(ui.port(), "POST /api/project-folder HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(project_response.find("\"name\":\"Pico\""), std::string::npos);
-    EXPECT_NE(project_response.find("\"command\":\"sleep 30\""), std::string::npos);
+    EXPECT_NE(project_response.find("\"command\":\"" + command + "\""), std::string::npos);
     EXPECT_NE(project_response.find("\"access_points\""), std::string::npos);
 
     const auto list_response = get(ui.port(), "GET /api/software HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(list_response.find("\"name\":\"phone-test\""), std::string::npos);
     EXPECT_NE(list_response.find("\"access_configured\":\"http:8080\""), std::string::npos);
 
-    const std::string update_body = R"({"name":"cloud","project_directory":".","command":"sleep 30","access_points":[{"protocol":"http","port":"8080"},{"protocol":"ws","port":"9090"}]})";
+    const std::string update_body = "{\"name\":\"cloud\",\"project_directory\":\".\",\"command\":\"" + command + "\",\"access_points\":[{\"protocol\":\"http\",\"port\":\"8080\"},{\"protocol\":\"ws\",\"port\":\"9090\"}]}";
     const auto update_response = get(
         ui.port(), "PUT /api/software/phone-test HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: " +
                        std::to_string(update_body.size()) + "\r\n\r\n" + update_body);
@@ -135,14 +145,14 @@ namespace
     const auto updated = client.software(softadastra::SoftwareId("stable-id"));
     ASSERT_TRUE(updated);
     EXPECT_EQ(updated->id().value(), "stable-id");
-    EXPECT_EQ(updated->declared_command(), "sleep 30");
+    EXPECT_EQ(updated->declared_command(), command);
     ASSERT_EQ(updated->access_points().size(), 2U);
     EXPECT_EQ(updated->access_points()[1].protocol(), softadastra::AccessProtocol::Ws);
     const auto updated_list = get(ui.port(), "GET /api/software HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(updated_list.find("\"configured\":\"http:8080\""), std::string::npos);
     EXPECT_NE(updated_list.find("\"configured\":\"ws:9090\""), std::string::npos);
 
-    const std::string add_body = R"({"name":"web-added","project_directory":".","command":"sleep 30","access_points":[{"protocol":"http","port":"8081"},{"protocol":"ws","port":"9091"}]})";
+    const std::string add_body = "{\"name\":\"web-added\",\"project_directory\":\".\",\"command\":\"" + command + "\",\"access_points\":[{\"protocol\":\"http\",\"port\":\"8081\"},{\"protocol\":\"ws\",\"port\":\"9091\"}]}";
     const auto add_response = get(
         ui.port(), "POST /api/software HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: " +
                        std::to_string(add_body.size()) + "\r\n\r\n" + add_body);
