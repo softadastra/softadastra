@@ -1,10 +1,142 @@
 #include "host/LocalReachability.hpp"
 #include <gtest/gtest.h>
 #include <vector>
-namespace { struct Network final:softadastra::ManagedNetwork{softadastra::ManagedNetworkStatus value{};softadastra::ManagedNetworkStartResult result{softadastra::ManagedNetworkStartResult::Started};int starts{},stops{};softadastra::ManagedNetworkStatus status()const override{return value;}softadastra::ManagedNetworkStartResult start()override{++starts;return result;}bool stop()override{++stops;return true;}};struct Delegation final:softadastra::LocalDnsDelegation{softadastra::LocalDnsDelegationState value{softadastra::LocalDnsDelegationState::Available};softadastra::LocalDnsDelegationState status()const override{return value;}};struct Endpoint:softadastra::LocalDnsEndpoint{bool succeeds{true};int starts{},stops{};std::vector<std::string>*order{};bool start(std::string,std::uint16_t)override{++starts;if(order)order->push_back("dns-start");return succeeds;}void stop()noexcept override{++stops;if(order)order->push_back("dns-stop");}};struct Gateway:softadastra::LocalGatewayEndpoint{bool succeeds{true};int starts{},stops{};std::vector<std::string>*order{};bool start(std::string,std::uint16_t)override{++starts;if(order)order->push_back("gateway-start");return succeeds;}void stop()noexcept override{++stops;if(order)order->push_back("gateway-stop");}};Network ready_network(){Network n;n.value={softadastra::ManagedNetworkCapability::Available,softadastra::ManagedNetworkState::Running,"wlan0","10.42.0.1","test"};return n;}
-TEST(LocalReachabilityTest, IsUnavailableWhenNetworkUnavailable){Network n;Delegation d;Endpoint dns;Gateway g;softadastra::LocalReachability r(n,d,dns,g,18080);EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Unavailable);EXPECT_EQ(dns.starts,0);}
-TEST(LocalReachabilityTest, StartsInOrderAndStopsInReverse){auto n=ready_network();Delegation d;Endpoint dns;Gateway g;std::vector<std::string> order;dns.order=&order;g.order=&order;softadastra::LocalReachability r(n,d,dns,g,18080);EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Ready);EXPECT_EQ(dns.starts,1);EXPECT_EQ(g.starts,1);r.stop();EXPECT_EQ((order),std::vector<std::string>({"dns-start","gateway-start","gateway-stop","dns-stop"}));EXPECT_EQ(n.stops,1);r.stop();EXPECT_EQ(n.stops,1);}
-TEST(LocalReachabilityTest, DegradesWithoutDelegationOrIpv4){auto n=ready_network();Delegation d;Endpoint dns;Gateway g;d.value=softadastra::LocalDnsDelegationState::Unavailable;softadastra::LocalReachability r(n,d,dns,g,18080);EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Degraded);EXPECT_EQ(dns.starts,0);n.value.ipv4.clear();EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Degraded);}
-TEST(LocalReachabilityTest, RollsBackDnsWhenGatewayFails){auto n=ready_network();Delegation d;Endpoint dns;Gateway g;g.succeeds=false;softadastra::LocalReachability r(n,d,dns,g,18080);EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Degraded);EXPECT_EQ(dns.stops,1);EXPECT_EQ(g.starts,1);}
-TEST(LocalReachabilityTest, DoesNotStartGatewayWhenDnsFailsAndStartIsStable){auto n=ready_network();Delegation d;Endpoint dns;Gateway g;dns.succeeds=false;softadastra::LocalReachability r(n,d,dns,g,18080);EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Degraded);EXPECT_EQ(g.starts,0);dns.succeeds=true;EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Ready);EXPECT_EQ(r.start(),softadastra::LocalReachabilityState::Ready);EXPECT_EQ(dns.starts,2);EXPECT_EQ(g.starts,1);}
+namespace
+{
+  struct Network final : softadastra::ManagedNetwork
+  {
+    softadastra::ManagedNetworkStatus value{};
+    softadastra::ManagedNetworkStartResult result{softadastra::ManagedNetworkStartResult::Started};
+    int starts{}, stops{};
+    softadastra::ManagedNetworkStatus status() const override { return value; }
+    softadastra::ManagedNetworkStartResult start() override
+    {
+      ++starts;
+      return result;
+    }
+    bool stop() override
+    {
+      ++stops;
+      return true;
+    }
+  };
+  struct Delegation final : softadastra::LocalDnsDelegation
+  {
+    softadastra::LocalDnsDelegationState value{softadastra::LocalDnsDelegationState::Available};
+    softadastra::LocalDnsDelegationState status() const override { return value; }
+  };
+  struct Endpoint : softadastra::LocalDnsEndpoint
+  {
+    bool succeeds{true};
+    int starts{}, stops{};
+    std::vector<std::string> *order{};
+    bool start(std::string, std::uint16_t) override
+    {
+      ++starts;
+      if (order)
+        order->push_back("dns-start");
+      return succeeds;
+    }
+    void stop() noexcept override
+    {
+      ++stops;
+      if (order)
+        order->push_back("dns-stop");
+    }
+  };
+  struct Gateway : softadastra::LocalGatewayEndpoint
+  {
+    bool succeeds{true};
+    int starts{}, stops{};
+    std::vector<std::string> *order{};
+    bool start(std::string, std::uint16_t) override
+    {
+      ++starts;
+      if (order)
+        order->push_back("gateway-start");
+      return succeeds;
+    }
+    void stop() noexcept override
+    {
+      ++stops;
+      if (order)
+        order->push_back("gateway-stop");
+    }
+  };
+  Network ready_network()
+  {
+    Network n;
+    n.value = {softadastra::ManagedNetworkCapability::Available, softadastra::ManagedNetworkState::Running, "wlan0", "10.42.0.1", "test"};
+    return n;
+  }
+  TEST(LocalReachabilityTest, IsUnavailableWhenNetworkUnavailable)
+  {
+    Network n;
+    Delegation d;
+    Endpoint dns;
+    Gateway g;
+    softadastra::LocalReachability r(n, d, dns, g, 18080);
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Unavailable);
+    EXPECT_EQ(dns.starts, 0);
+  }
+  TEST(LocalReachabilityTest, StartsInOrderAndStopsInReverse)
+  {
+    auto n = ready_network();
+    Delegation d;
+    Endpoint dns;
+    Gateway g;
+    std::vector<std::string> order;
+    dns.order = &order;
+    g.order = &order;
+    softadastra::LocalReachability r(n, d, dns, g, 18080);
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Ready);
+    EXPECT_EQ(dns.starts, 1);
+    EXPECT_EQ(g.starts, 1);
+    r.stop();
+    EXPECT_EQ((order), std::vector<std::string>({"dns-start", "gateway-start", "gateway-stop", "dns-stop"}));
+    EXPECT_EQ(n.stops, 1);
+    r.stop();
+    EXPECT_EQ(n.stops, 1);
+  }
+  TEST(LocalReachabilityTest, DegradesWithoutDelegationOrIpv4)
+  {
+    auto n = ready_network();
+    Delegation d;
+    Endpoint dns;
+    Gateway g;
+    d.value = softadastra::LocalDnsDelegationState::Unavailable;
+    softadastra::LocalReachability r(n, d, dns, g, 18080);
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Degraded);
+    EXPECT_EQ(dns.starts, 0);
+    n.value.ipv4.clear();
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Degraded);
+  }
+  TEST(LocalReachabilityTest, RollsBackDnsWhenGatewayFails)
+  {
+    auto n = ready_network();
+    Delegation d;
+    Endpoint dns;
+    Gateway g;
+    g.succeeds = false;
+    softadastra::LocalReachability r(n, d, dns, g, 18080);
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Degraded);
+    EXPECT_EQ(dns.stops, 1);
+    EXPECT_EQ(g.starts, 1);
+  }
+  TEST(LocalReachabilityTest, DoesNotStartGatewayWhenDnsFailsAndStartIsStable)
+  {
+    auto n = ready_network();
+    Delegation d;
+    Endpoint dns;
+    Gateway g;
+    dns.succeeds = false;
+    softadastra::LocalReachability r(n, d, dns, g, 18080);
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Degraded);
+    EXPECT_EQ(g.starts, 0);
+    dns.succeeds = true;
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Ready);
+    EXPECT_EQ(r.start(), softadastra::LocalReachabilityState::Ready);
+    EXPECT_EQ(dns.starts, 2);
+    EXPECT_EQ(g.starts, 1);
+  }
 }

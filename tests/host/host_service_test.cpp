@@ -201,9 +201,14 @@ namespace
   class TestManagedNetwork final : public softadastra::ManagedNetwork
   {
   public:
-    [[nodiscard]] softadastra::ManagedNetworkStatus status() const override { return {softadastra::ManagedNetworkCapability::Available,state,{},{},{}}; }
+    [[nodiscard]] softadastra::ManagedNetworkStatus status() const override { return {softadastra::ManagedNetworkCapability::Available, state, {}, {}, {}}; }
     [[nodiscard]] softadastra::ManagedNetworkStartResult start() override { return softadastra::ManagedNetworkStartResult::Failed; }
-    bool stop() override { ++stop_calls; state=softadastra::ManagedNetworkState::Stopped; return true; }
+    bool stop() override
+    {
+      ++stop_calls;
+      state = softadastra::ManagedNetworkState::Stopped;
+      return true;
+    }
     softadastra::ManagedNetworkState state{softadastra::ManagedNetworkState::Stopped};
     int stop_calls{0};
   };
@@ -528,16 +533,25 @@ namespace
 
   TEST(HostServiceTest, StopsRunningManagedNetworkDuringShutdown)
   {
-    TestPlatform platform; platform.managed_network().start();
-    auto &managed=static_cast<TestManagedNetwork &>(platform.managed_network()); managed.state=softadastra::ManagedNetworkState::Running;
-    TestProcessLauncher launcher; softadastra::Host host(platform); softadastra::HostService service(host,launcher);
-    EXPECT_TRUE(service.shutdown()); EXPECT_EQ(managed.stop_calls,1);
+    TestPlatform platform;
+    platform.managed_network().start();
+    auto &managed = static_cast<TestManagedNetwork &>(platform.managed_network());
+    managed.state = softadastra::ManagedNetworkState::Running;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    EXPECT_TRUE(service.shutdown());
+    EXPECT_EQ(managed.stop_calls, 1);
   }
 
   TEST(HostServiceTest, DoesNotStopManagedNetworkWhenAlreadyStopped)
   {
-    TestPlatform platform; TestProcessLauncher launcher; softadastra::Host host(platform); softadastra::HostService service(host,launcher);
-    EXPECT_TRUE(service.shutdown()); EXPECT_EQ(static_cast<TestManagedNetwork &>(platform.managed_network()).stop_calls,0);
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    EXPECT_TRUE(service.shutdown());
+    EXPECT_EQ(static_cast<TestManagedNetwork &>(platform.managed_network()).stop_calls, 0);
   }
 
   TEST(HostServiceTest, ResolvesLocalGatewayTargetsDynamically)

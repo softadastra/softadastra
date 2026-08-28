@@ -183,8 +183,12 @@ namespace
     input.close();
     private_key[0] = private_key[0] == '0' ? '1' : '0';
     std::ofstream output(path, std::ios::trunc);
-    output << version << '\n' << id << '\n' << secret << '\n' << public_key
-           << '\n' << private_key << '\n';
+    output << version << '\n'
+           << id << '\n'
+           << secret << '\n'
+           << public_key
+           << '\n'
+           << private_key << '\n';
     output.close();
 
     softadastra::HostIdentity reloaded(path);

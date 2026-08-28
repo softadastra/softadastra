@@ -13,12 +13,10 @@
  */
 
 #include "control/ControlServer.hpp"
-
 #include "platform/NativeDataDirectory.hpp"
 
-#include <fstream>
 #include <filesystem>
-
+#include <fstream>
 #include <utility>
 
 namespace softadastra
@@ -32,90 +30,207 @@ namespace softadastra
       SoftwareId id,
       ProcessSpec process_spec,
       std::optional<AccessPoint> access_point,
-      std::optional<ProjectIdentity> project_identity, std::string name)
+      std::optional<ProjectIdentity> project_identity,
+      std::string name)
   {
     return host_service_.register_software(
         std::move(id),
-        std::move(process_spec), access_point, std::move(project_identity), std::move(name));
+        std::move(process_spec),
+        access_point,
+        std::move(project_identity),
+        std::move(name));
   }
 
   std::optional<SoftwareEntry> ControlServer::software_by_project_identity(
       const ProjectIdentity &identity) const noexcept
-  { return host_service_.software_by_project_identity(identity); }
+  {
+    return host_service_.software_by_project_identity(identity);
+  }
 
-  bool ControlServer::update_project_root(const ProjectIdentity &identity, std::string root)
-  { return host_service_.update_project_root(identity, std::move(root)); }
+  bool ControlServer::update_project_root(
+      const ProjectIdentity &identity,
+      std::string root)
+  {
+    return host_service_.update_project_root(identity, std::move(root));
+  }
 
-  std::optional<ProjectIdentity> ControlServer::project_identity(const SoftwareId &id) const noexcept
-  { return host_service_.project_identity(id); }
+  std::optional<ProjectIdentity> ControlServer::project_identity(
+      const SoftwareId &id) const noexcept
+  {
+    return host_service_.project_identity(id);
+  }
 
-  std::optional<SoftwareEntry> ControlServer::software(const SoftwareId &id) const noexcept
-  { return host_service_.software(id); }
+  std::optional<SoftwareEntry> ControlServer::software(
+      const SoftwareId &id) const noexcept
+  {
+    return host_service_.software(id);
+  }
 
   std::vector<SoftwareEntry> ControlServer::software() const
-  { return host_service_.software(); }
-  bool ControlServer::remove_software(const SoftwareId &id) { return host_service_.remove_software(id); }
-  std::optional<std::string> ControlServer::logs(const SoftwareId &id) const noexcept
+  {
+    return host_service_.software();
+  }
+
+  bool ControlServer::remove_software(const SoftwareId &id)
+  {
+    return host_service_.remove_software(id);
+  }
+
+  std::optional<std::string> ControlServer::logs(
+      const SoftwareId &id) const noexcept
   {
     const auto chunk = logs_since(id, std::nullopt);
-    return chunk ? std::optional<std::string>(chunk->logs) : std::nullopt;
+
+    return chunk
+               ? std::optional<std::string>(chunk->logs)
+               : std::nullopt;
   }
 
   std::optional<LogChunk> ControlServer::logs_since(
-      const SoftwareId &id, std::optional<std::uintmax_t> offset) const noexcept
+      const SoftwareId &id,
+      std::optional<std::uintmax_t> offset) const noexcept
   {
-    if (!host_service_.software(id)) return std::nullopt;
-    const auto path = NativeDataDirectory::path() / "logs" / (id.value() + ".log");
+    if (!host_service_.software(id))
+    {
+      return std::nullopt;
+    }
+
+    const auto path =
+        NativeDataDirectory::path() / "logs" / (id.value() + ".log");
+
     std::error_code error;
     const auto size = std::filesystem::file_size(path, error);
-    if (error) return LogChunk{"", 0, offset.has_value() && offset.value() != 0};
+
+    if (error)
+    {
+      return LogChunk{
+          "",
+          0,
+          offset.has_value() && offset.value() != 0};
+    }
+
     constexpr std::uintmax_t initial_maximum = 4096;
-    const bool reset = offset.has_value() && offset.value() > size;
-    const std::uintmax_t start = !offset.has_value() ? (size > initial_maximum ? size - initial_maximum : 0) : (reset ? 0 : offset.value());
+
+    const bool reset =
+        offset.has_value() && offset.value() > size;
+
+    const std::uintmax_t start =
+        !offset.has_value()
+            ? (size > initial_maximum ? size - initial_maximum : 0)
+            : (reset ? 0 : offset.value());
+
     std::ifstream input(path, std::ios::binary);
-    if (!input) return LogChunk{"", 0, offset.has_value() && offset.value() != 0};
+
+    if (!input)
+    {
+      return LogChunk{
+          "",
+          0,
+          offset.has_value() && offset.value() != 0};
+    }
+
     input.seekg(static_cast<std::streamoff>(start));
-    std::string logs(static_cast<std::size_t>(size - start), '\0');
-    input.read(logs.data(), static_cast<std::streamsize>(logs.size()));
-    logs.resize(static_cast<std::size_t>(input.gcount()));
-    return LogChunk{std::move(logs), size, reset};
+
+    std::string logs(
+        static_cast<std::size_t>(size - start),
+        '\0');
+
+    input.read(
+        logs.data(),
+        static_cast<std::streamsize>(logs.size()));
+
+    logs.resize(
+        static_cast<std::size_t>(input.gcount()));
+
+    return LogChunk{
+        std::move(logs),
+        size,
+        reset};
   }
-  bool ControlServer::clear_logs(const SoftwareId &id) const noexcept
+
+  bool ControlServer::clear_logs(
+      const SoftwareId &id) const noexcept
   {
-    if (!host_service_.software(id)) return false;
-    std::ofstream output(NativeDataDirectory::path() / "logs" / (id.value() + ".log"), std::ios::trunc);
+    if (!host_service_.software(id))
+    {
+      return false;
+    }
+
+    std::ofstream output(
+        NativeDataDirectory::path() / "logs" / (id.value() + ".log"),
+        std::ios::trunc);
+
     return static_cast<bool>(output);
   }
 
-  bool ControlServer::link_project(const SoftwareId &id, ProjectIdentity identity, std::string root)
-  { return host_service_.link_project(id, std::move(identity), std::move(root)); }
+  bool ControlServer::link_project(
+      const SoftwareId &id,
+      ProjectIdentity identity,
+      std::string root)
+  {
+    return host_service_.link_project(
+        id,
+        std::move(identity),
+        std::move(root));
+  }
 
-  bool ControlServer::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::optional<AccessPoint> access_point, std::string name)
-  { return host_service_.synchronize_software(id, std::move(process_spec), access_point, std::move(name)); }
-  bool ControlServer::synchronize_software(const SoftwareId &id, ProcessSpec process_spec, std::vector<AccessPoint> access_points, std::string name)
-  { return host_service_.synchronize_software(id, std::move(process_spec), std::move(access_points), std::move(name)); }
+  bool ControlServer::synchronize_software(
+      const SoftwareId &id,
+      ProcessSpec process_spec,
+      std::optional<AccessPoint> access_point,
+      std::string name)
+  {
+    return host_service_.synchronize_software(
+        id,
+        std::move(process_spec),
+        access_point,
+        std::move(name));
+  }
 
-  std::optional<AccessPoint> ControlServer::access_point(const SoftwareId &id) const noexcept
+  bool ControlServer::synchronize_software(
+      const SoftwareId &id,
+      ProcessSpec process_spec,
+      std::vector<AccessPoint> access_points,
+      std::string name)
+  {
+    return host_service_.synchronize_software(
+        id,
+        std::move(process_spec),
+        std::move(access_points),
+        std::move(name));
+  }
+
+  std::optional<AccessPoint> ControlServer::access_point(
+      const SoftwareId &id) const noexcept
   {
     return host_service_.access_point(id);
   }
 
-  LocalGatewayTarget ControlServer::local_gateway_target(std::string_view host) const
-  { return host_service_.resolve(host); }
-  LocalReachabilityState ControlServer::local_reachability_state() const noexcept
-  { return host_service_.local_reachability_state(); }
+  LocalGatewayTarget ControlServer::local_gateway_target(
+      std::string_view host) const
+  {
+    return host_service_.resolve(host);
+  }
 
-  SoftwareOperationResult ControlServer::start_software(const SoftwareId &id)
+  LocalReachabilityState ControlServer::local_reachability_state() const noexcept
+  {
+    return host_service_.local_reachability_state();
+  }
+
+  SoftwareOperationResult ControlServer::start_software(
+      const SoftwareId &id)
   {
     return host_service_.start_software(id);
   }
 
-  SoftwareOperationResult ControlServer::stop_software(const SoftwareId &id)
+  SoftwareOperationResult ControlServer::stop_software(
+      const SoftwareId &id)
   {
     return host_service_.stop_software(id);
   }
 
-  SoftwareOperationResult ControlServer::restart_software(const SoftwareId &id)
+  SoftwareOperationResult ControlServer::restart_software(
+      const SoftwareId &id)
   {
     return host_service_.restart_software(id);
   }
@@ -162,8 +277,20 @@ namespace softadastra
   {
     return host_service_.network_capability();
   }
-  ManagedNetworkStatus ControlServer::managed_network_status() const { return host_service_.managed_network_status(); }
-  ManagedNetworkStartResult ControlServer::start_managed_network() { return host_service_.start_managed_network(); }
-  bool ControlServer::stop_managed_network() { return host_service_.stop_managed_network(); }
+
+  ManagedNetworkStatus ControlServer::managed_network_status() const
+  {
+    return host_service_.managed_network_status();
+  }
+
+  ManagedNetworkStartResult ControlServer::start_managed_network()
+  {
+    return host_service_.start_managed_network();
+  }
+
+  bool ControlServer::stop_managed_network()
+  {
+    return host_service_.stop_managed_network();
+  }
 
 } // namespace softadastra

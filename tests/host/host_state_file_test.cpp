@@ -27,9 +27,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-state-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                       std::chrono::steady_clock::now()
+                                                           .time_since_epoch()
+                                                           .count()));
     const auto path = directory / "host-state";
 
     softadastra::HostState state;
@@ -69,9 +69,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-state-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                       std::chrono::steady_clock::now()
+                                                           .time_since_epoch()
+                                                           .count()));
     const auto path = directory / "host-state";
     const auto application_directory = directory / "application";
     const auto database = application_directory / "application.db";
@@ -93,8 +93,8 @@ namespace
         std::istreambuf_iterator<char>());
 
     EXPECT_EQ(content,
-        "softadastra-registrations 7\n1\n7\nexample\n0\n\n0\n16\n/usr/bin/example\n"
-        "0\n0\n2\n6\n--port\n4\n8080\n0\n\n");
+              "softadastra-registrations 7\n1\n7\nexample\n0\n\n0\n16\n/usr/bin/example\n"
+              "0\n0\n2\n6\n--port\n4\n8080\n0\n\n");
     EXPECT_EQ(content.find(database.string()), std::string::npos);
     EXPECT_EQ(content.find("business-data-must-not-be-persisted"), std::string::npos);
     EXPECT_EQ(content.find(output.string()), std::string::npos);
@@ -106,9 +106,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-state-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                       std::chrono::steady_clock::now()
+                                                           .time_since_epoch()
+                                                           .count()));
     const auto path = directory / "host-state";
     softadastra::HostState source;
 
@@ -140,9 +140,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-state-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                       std::chrono::steady_clock::now()
+                                                           .time_since_epoch()
+                                                           .count()));
     const auto path = directory / "host-state";
     std::filesystem::create_directories(directory);
     std::ofstream output(path);
@@ -162,9 +162,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-state-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                       std::chrono::steady_clock::now()
+                                                           .time_since_epoch()
+                                                           .count()));
     const auto path = directory / "host-state";
     const std::vector<std::string> invalid_content{
         "",
@@ -195,9 +195,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-state-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                       std::chrono::steady_clock::now()
+                                                           .time_since_epoch()
+                                                           .count()));
     const auto path = directory / "host-state";
     std::filesystem::create_directories(directory);
     std::ofstream output(path);

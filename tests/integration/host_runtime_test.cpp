@@ -175,7 +175,6 @@ namespace
     EXPECT_EQ(
         client.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
-
   }
 
   TEST(HostRuntimeTest, DetectsSuccessfulNaturalExit)
@@ -654,9 +653,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-host-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                      std::chrono::steady_clock::now()
+                                                          .time_since_epoch()
+                                                          .count()));
     const auto path = directory / "state";
     const softadastra::SoftwareId first("first");
     const softadastra::SoftwareId second("second");
@@ -694,9 +693,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-reboot-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                        std::chrono::steady_clock::now()
+                                                            .time_since_epoch()
+                                                            .count()));
     const auto path = directory / "host-state";
     const softadastra::SoftwareId running("running-before-reboot");
     const softadastra::SoftwareId stopped("stopped-before-reboot");
@@ -737,14 +736,10 @@ namespace
           std::chrono::seconds(1));
       std::atomic_bool completed{false};
       std::thread thread([&loop, &completed]()
-                         {
-                           completed = loop.run();
-                         });
+                         { completed = loop.run(); });
 
       EXPECT_TRUE(wait_until([&loop]()
-                             {
-                               return loop.is_running();
-                             }));
+                             { return loop.is_running(); }));
       loop.request_stop();
       thread.join();
       EXPECT_TRUE(completed);
@@ -760,14 +755,10 @@ namespace
         std::chrono::seconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&loop]()
-                           {
-                             return loop.is_running();
-                           }));
+                           { return loop.is_running(); }));
     EXPECT_EQ(host.state().software_count(), 2U);
     const auto running_state = service.software_state(running);
     const auto stopped_state = service.software_state(stopped);
@@ -815,9 +806,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-supervision-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                             std::chrono::steady_clock::now()
+                                                                 .time_since_epoch()
+                                                                 .count()));
     const softadastra::SoftwareId long_running("long-running");
     const softadastra::SoftwareId successful("successful-exit");
     const softadastra::SoftwareId failed("failed-exit");
@@ -884,9 +875,7 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     loop.request_stop();
@@ -934,9 +923,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-disappeared-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                             std::chrono::steady_clock::now()
+                                                                 .time_since_epoch()
+                                                                 .count()));
     const auto pid_file = directory / "process-id";
     const softadastra::SoftwareId id("externally-terminated");
     std::filesystem::create_directories(directory);
@@ -961,14 +950,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     const bool pid_available = wait_until([&pid_file]()
-                                          {
-                                            return std::filesystem::exists(pid_file);
-                                          });
+                                          { return std::filesystem::exists(pid_file); });
     EXPECT_TRUE(pid_available);
     int process_id = 0;
 

@@ -13,26 +13,44 @@
  */
 
 #include "host/HostState.hpp"
+
 #include <algorithm>
 #include <utility>
 
 namespace softadastra
 {
-  bool HostState::add_software(SoftwareEntry entry)
+  bool HostState::add_software(
+      SoftwareEntry entry)
   {
-    if (find_software(entry.id()) != nullptr || (!entry.name().empty() && find_software_by_name(entry.name()) != nullptr))
+    if (find_software(entry.id()) != nullptr ||
+        (!entry.name().empty() &&
+         find_software_by_name(entry.name()) != nullptr))
     {
       return false;
     }
 
-    software_.push_back(std::move(entry));
+    software_.push_back(
+        std::move(entry));
+
     return true;
   }
 
-  bool HostState::remove_software(const SoftwareId &id)
+  bool HostState::remove_software(
+      const SoftwareId &id)
   {
-    const auto previous = software_.size();
-    software_.erase(std::remove_if(software_.begin(), software_.end(), [&id](const SoftwareEntry &entry) { return entry.id() == id; }), software_.end());
+    const auto previous =
+        software_.size();
+
+    software_.erase(
+        std::remove_if(
+            software_.begin(),
+            software_.end(),
+            [&id](const SoftwareEntry &entry)
+            {
+              return entry.id() == id;
+            }),
+        software_.end());
+
     return software_.size() != previous;
   }
 
@@ -63,22 +81,62 @@ namespace softadastra
 
     return nullptr;
   }
-  SoftwareEntry *HostState::find_software_by_name(const std::string &name) noexcept { for(auto &entry:software_) if(entry.name()==name) return &entry; return nullptr; }
-  const SoftwareEntry *HostState::find_software_by_name(const std::string &name) const noexcept { for(const auto &entry:software_) if(entry.name()==name) return &entry; return nullptr; }
 
-  SoftwareEntry *HostState::find_software(const ProjectIdentity &identity) noexcept
+  SoftwareEntry *HostState::find_software_by_name(
+      const std::string &name) noexcept
   {
     for (auto &entry : software_)
-      if (entry.project_identity().has_value() && entry.project_identity().value() == identity)
+    {
+      if (entry.name() == name)
+      {
         return &entry;
+      }
+    }
+
     return nullptr;
   }
 
-  const SoftwareEntry *HostState::find_software(const ProjectIdentity &identity) const noexcept
+  const SoftwareEntry *HostState::find_software_by_name(
+      const std::string &name) const noexcept
   {
     for (const auto &entry : software_)
-      if (entry.project_identity().has_value() && entry.project_identity().value() == identity)
+    {
+      if (entry.name() == name)
+      {
         return &entry;
+      }
+    }
+
+    return nullptr;
+  }
+
+  SoftwareEntry *HostState::find_software(
+      const ProjectIdentity &identity) noexcept
+  {
+    for (auto &entry : software_)
+    {
+      if (entry.project_identity().has_value() &&
+          entry.project_identity().value() == identity)
+      {
+        return &entry;
+      }
+    }
+
+    return nullptr;
+  }
+
+  const SoftwareEntry *HostState::find_software(
+      const ProjectIdentity &identity) const noexcept
+  {
+    for (const auto &entry : software_)
+    {
+      if (entry.project_identity().has_value() &&
+          entry.project_identity().value() == identity)
+      {
+        return &entry;
+      }
+    }
+
     return nullptr;
   }
 
@@ -92,7 +150,8 @@ namespace softadastra
     return software_.empty();
   }
 
-  const std::vector<SoftwareEntry> &HostState::software() const noexcept
+  const std::vector<SoftwareEntry> &
+  HostState::software() const noexcept
   {
     return software_;
   }

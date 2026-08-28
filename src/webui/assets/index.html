@@ -1,42 +1,352 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Softadastra</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <main>
-    <header class="page-header">
-      <div><h1>Softadastra</h1><p>This computer · Host running</p></div>
-      <button id="refresh-button" class="secondary" type="button">Refresh</button>
-    </header>
-    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
-    <section><div class="section-heading"><div><h2>Applications</h2><p class="hint">Applications managed by Softadastra on this computer.</p></div><button id="add-application-button" type="button">Add application</button></div><div id="applications" class="applications loading">Loading applications…</div></section>
-    <section id="add-application-panel" hidden>
-      <div class="section-heading"><h2>Add application</h2><button id="close-add-button" class="secondary" type="button">Cancel</button></div>
-      <p class="hint">Choose an application on this computer and Softadastra will run and manage it for you.</p>
-      <button id="choose-project-folder-button" type="button">Choose project folder</button>
-      <form id="add-application-form">
-        <input name="project_directory" type="hidden">
-        <div id="selected-project" class="selected-project" hidden><strong id="project-name"></strong><span id="project-directory"></span></div>
-        <div id="application-configuration" hidden>
-          <label>Name<input name="name" required autocomplete="off"></label>
-          <label>Command<input name="command" required autocomplete="off" placeholder="npm run start"></label>
-          <fieldset><legend>Access endpoints</legend><div class="endpoints"></div><button id="add-endpoint-button" class="secondary" type="button">+ Add endpoint</button></fieldset>
-          <div class="form-actions"><button type="submit">Add to Softadastra</button></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Manage applications running on this Softadastra Host."
+    />
+
+    <title>Softadastra</title>
+
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">S</div>
+
+          <div>
+            <strong>Softadastra</strong>
+            <span>Host</span>
+          </div>
         </div>
-      </form>
-    </section>
-    <section id="details-panel" hidden></section>
-    <section id="host-summary"><div class="section-heading"><div><h2>Host</h2><p id="host-status" class="hint">Loading host status…</p></div><button id="host-details-button" class="secondary" type="button">View details</button></div><div id="host" class="details" hidden></div></section>
-    <section id="logs-panel" hidden>
-      <div class="section-heading"><div><h2 id="logs-title">Logs</h2><p id="logs-status" class="hint">● Live</p></div><div class="actions"><button id="pause-logs-button" class="secondary" type="button">Pause</button><button id="clear-logs-button" class="secondary" type="button">Clear logs</button><button id="close-logs-button" class="secondary" type="button">Close</button></div></div>
-      <pre id="logs-output">Loading logs…</pre>
-      <button id="jump-to-latest-button" class="secondary" type="button" hidden>Jump to latest</button>
-    </section>
-  </main>
-  <script src="/app.js" defer></script>
-</body>
+
+        <nav class="navigation" aria-label="Main navigation">
+          <a class="navigation-item active" href="#applications-section">
+            <span class="navigation-icon">▦</span>
+            Applications
+          </a>
+
+          <a class="navigation-item" href="#host-section">
+            <span class="navigation-icon">⌂</span>
+            Host
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span class="status-dot"></span>
+          <span id="sidebar-host-status">Checking Host...</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">This computer</p>
+            <h1>Applications</h1>
+            <p class="topbar-description">
+              Run and manage software on this Softadastra Host.
+            </p>
+          </div>
+
+          <div class="topbar-actions">
+            <button
+              id="refresh-button"
+              class="button button-secondary"
+              type="button"
+            >
+              Refresh
+            </button>
+
+            <button
+              id="add-application-button"
+              class="button button-primary"
+              type="button"
+            >
+              Add application
+            </button>
+          </div>
+        </header>
+
+        <div
+          id="message"
+          class="message"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></div>
+
+        <section class="overview" aria-label="Host overview">
+          <article class="metric-card">
+            <span class="metric-label">Host</span>
+            <strong id="metric-host-state" class="metric-value"
+              >Checking</strong
+            >
+            <span id="metric-host-detail" class="metric-detail">
+              Connecting to Host
+            </span>
+          </article>
+
+          <article class="metric-card">
+            <span class="metric-label">Applications</span>
+            <strong id="metric-applications" class="metric-value">0</strong>
+            <span class="metric-detail">Registered on this Host</span>
+          </article>
+
+          <article class="metric-card">
+            <span class="metric-label">Running</span>
+            <strong id="metric-running" class="metric-value">0</strong>
+            <span class="metric-detail">Currently active</span>
+          </article>
+        </section>
+
+        <section id="applications-section" class="content-section">
+          <div class="section-heading">
+            <div>
+              <h2>Applications</h2>
+              <p>
+                Software registered and managed by Softadastra on this computer.
+              </p>
+            </div>
+          </div>
+
+          <div id="applications" class="applications loading">
+            <div class="loading-state">
+              <span class="spinner"></span>
+              Loading applications...
+            </div>
+          </div>
+        </section>
+
+        <section id="host-section" class="content-section">
+          <div class="section-heading">
+            <div>
+              <h2>Host</h2>
+              <p id="host-status">Loading Host status...</p>
+            </div>
+
+            <button
+              id="host-details-button"
+              class="button button-secondary button-small"
+              type="button"
+            >
+              View details
+            </button>
+          </div>
+
+          <div id="host" class="host-details" hidden>
+            <div class="host-property">
+              <span>Hostname</span>
+              <strong id="host-name">Unavailable</strong>
+            </div>
+
+            <div class="host-property">
+              <span>Local IPv4</span>
+              <strong id="host-ip">Unavailable</strong>
+            </div>
+
+            <div class="host-property">
+              <span>Network</span>
+              <strong id="host-connectivity">Unavailable</strong>
+            </div>
+
+            <div class="host-property">
+              <span>Remote</span>
+              <strong id="host-remote">Unavailable</strong>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="add-application-panel" class="overlay" hidden>
+      <section
+        class="panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-application-title"
+      >
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">Application</p>
+            <h2 id="add-application-title">Add application</h2>
+            <p>
+              Select an existing project and tell Softadastra how to run it.
+            </p>
+          </div>
+
+          <button
+            id="close-add-button"
+            class="icon-button"
+            type="button"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="panel-body">
+          <div class="folder-picker">
+            <div>
+              <strong>Project folder</strong>
+              <p>Select the directory containing your application.</p>
+            </div>
+
+            <button
+              id="choose-project-folder-button"
+              class="button button-secondary"
+              type="button"
+            >
+              Choose folder
+            </button>
+          </div>
+
+          <form id="add-application-form">
+            <input name="project_directory" type="hidden" />
+
+            <div id="selected-project" class="selected-project" hidden>
+              <div class="selected-project-icon">⌂</div>
+
+              <div>
+                <strong id="project-name"></strong>
+                <span id="project-directory"></span>
+              </div>
+            </div>
+
+            <div id="application-configuration" hidden>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Name</span>
+
+                  <input
+                    name="name"
+                    required
+                    autocomplete="off"
+                    placeholder="My application"
+                  />
+                </label>
+
+                <label class="field field-full">
+                  <span>Command</span>
+
+                  <input
+                    name="command"
+                    required
+                    autocomplete="off"
+                    placeholder="npm run start"
+                  />
+
+                  <small>
+                    The command Softadastra should execute from the project
+                    directory.
+                  </small>
+                </label>
+              </div>
+
+              <fieldset class="endpoint-fieldset">
+                <div class="fieldset-heading">
+                  <div>
+                    <legend>Access endpoints</legend>
+                    <p>Declare ports exposed by your application.</p>
+                  </div>
+
+                  <button
+                    id="add-endpoint-button"
+                    class="button button-secondary button-small"
+                    type="button"
+                  >
+                    Add endpoint
+                  </button>
+                </div>
+
+                <div class="endpoints"></div>
+              </fieldset>
+
+              <div class="form-actions">
+                <button
+                  id="cancel-add-button"
+                  class="button button-secondary"
+                  type="button"
+                >
+                  Cancel
+                </button>
+
+                <button class="button button-primary" type="submit">
+                  Add to Softadastra
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div id="details-overlay" class="overlay" hidden>
+      <section
+        id="details-panel"
+        class="panel"
+        role="dialog"
+        aria-modal="true"
+        hidden
+      ></section>
+    </div>
+
+    <div id="logs-overlay" class="overlay" hidden>
+      <section id="logs-panel" class="panel panel-large" hidden>
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">Application output</p>
+            <h2 id="logs-title">Logs</h2>
+            <p id="logs-status">Live</p>
+          </div>
+
+          <div class="panel-header-actions">
+            <button
+              id="pause-logs-button"
+              class="button button-secondary button-small"
+              type="button"
+            >
+              Pause
+            </button>
+
+            <button
+              id="clear-logs-button"
+              class="button button-secondary button-small"
+              type="button"
+            >
+              Clear
+            </button>
+
+            <button
+              id="close-logs-button"
+              class="icon-button"
+              type="button"
+              aria-label="Close logs"
+            >
+              ×
+            </button>
+          </div>
+        </header>
+
+        <div class="logs-container">
+          <pre id="logs-output">Loading logs...</pre>
+
+          <button
+            id="jump-to-latest-button"
+            class="button button-secondary jump-latest"
+            type="button"
+            hidden
+          >
+            Jump to latest
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
 </html>

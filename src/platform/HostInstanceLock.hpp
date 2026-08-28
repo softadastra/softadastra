@@ -16,31 +16,61 @@
 #define SOFTADASTRA_PLATFORM_HOST_INSTANCE_LOCK_HPP
 
 #include <filesystem>
+
 #if defined(_WIN32)
+
 #include <windows.h>
+
 #endif
 
 namespace softadastra
 {
   /**
-   * @brief Holds the advisory runtime lock for one Host data directory.
+   * @brief Holds the runtime lock for one Host data directory.
+   *
+   * HostInstanceLock prevents multiple Host instances from acquiring the
+   * same data directory simultaneously.
    */
   class HostInstanceLock
   {
   public:
+    /**
+     * @brief Creates an unlocked Host instance lock.
+     */
     HostInstanceLock() = default;
+
+    /**
+     * @brief Releases the acquired Host instance lock.
+     */
     ~HostInstanceLock();
+
     HostInstanceLock(const HostInstanceLock &) = delete;
     HostInstanceLock &operator=(const HostInstanceLock &) = delete;
 
     /**
-     * @brief Acquires the non-stale exclusive lock for a data directory.
+     * @brief Acquires the exclusive lock for a Host data directory.
+     *
+     * @param directory Host data directory to lock.
+     *
+     * @return true if the lock was acquired or is already held by this
+     *         instance, otherwise false.
      */
-    [[nodiscard]] bool acquire(const std::filesystem::path &directory) noexcept;
-    [[nodiscard]] static bool is_held(const std::filesystem::path &directory) noexcept;
+    [[nodiscard]] bool acquire(
+        const std::filesystem::path &directory) noexcept;
+
+    /**
+     * @brief Checks whether the Host data directory is currently locked.
+     *
+     * @param directory Host data directory to inspect.
+     *
+     * @return true if the lock is already held, otherwise false.
+     */
+    [[nodiscard]] static bool is_held(
+        const std::filesystem::path &directory) noexcept;
 
   private:
     int descriptor_{-1};
+
 #if defined(_WIN32)
     HANDLE mutex_{nullptr};
 #endif

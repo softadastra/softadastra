@@ -20,15 +20,55 @@
 
 namespace softadastra
 {
-  enum class LocalGatewayLookup { NotFound, Unavailable, Http };
-  struct LocalGatewayTarget { LocalGatewayLookup result{LocalGatewayLookup::NotFound}; std::uint16_t port{}; };
+  /**
+   * @brief Describes the result of a local gateway target lookup.
+   */
+  enum class LocalGatewayLookup
+  {
+    NotFound,
+    Unavailable,
+    Http
+  };
 
+  /**
+   * @brief Represents the result of resolving a local gateway target.
+   */
+  struct LocalGatewayTarget
+  {
+    /**
+     * @brief Result of the target lookup.
+     */
+    LocalGatewayLookup result{
+        LocalGatewayLookup::NotFound};
+
+    /**
+     * @brief Port exposed by the resolved target.
+     */
+    std::uint16_t port{};
+  };
+
+  /**
+   * @brief Provides the interface for resolving local gateway targets.
+   */
   class LocalGatewayTargetResolver
   {
   public:
+    /**
+     * @brief Destroys the local gateway target resolver.
+     */
     virtual ~LocalGatewayTargetResolver() = default;
-    [[nodiscard]] virtual LocalGatewayTarget resolve(std::string_view host) const = 0;
-  };
-}
 
-#endif
+    /**
+     * @brief Resolves a local host name to a gateway target.
+     *
+     * @param host Host name to resolve.
+     *
+     * @return Resolved local gateway target.
+     */
+    [[nodiscard]] virtual LocalGatewayTarget resolve(
+        std::string_view host) const = 0;
+  };
+
+} // namespace softadastra
+
+#endif // SOFTADASTRA_HOST_LOCAL_GATEWAY_TARGET_RESOLVER_HPP

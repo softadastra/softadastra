@@ -21,19 +21,30 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace softadastra
 {
   class RemoteAccessConfig;
   class RemoteReachability;
+
   /**
    * @brief Serves Host control operations through a local platform channel.
+   *
+   * LocalControlServer exposes a ControlServer through a platform-specific
+   * local endpoint and processes requests using the shared Host control
+   * protocol.
    */
   class LocalControlServer
   {
   public:
     /**
      * @brief Creates a local control server for a Host control surface.
+     *
+     * @param server Control server that handles Host operations.
+     * @param path Filesystem path identifying the local control endpoint.
+     * @param remote_config Optional remote access configuration.
+     * @param remote_reachability Optional remote reachability service.
      */
     LocalControlServer(
         ControlServer &server,
@@ -41,6 +52,9 @@ namespace softadastra
         RemoteAccessConfig *remote_config = nullptr,
         RemoteReachability *remote_reachability = nullptr) noexcept;
 
+    /**
+     * @brief Destroys the local control server.
+     */
     ~LocalControlServer();
 
     LocalControlServer(const LocalControlServer &) = delete;
@@ -48,11 +62,15 @@ namespace softadastra
 
     /**
      * @brief Opens the local control endpoint.
+     *
+     * @return true if the endpoint was opened successfully, otherwise false.
      */
     [[nodiscard]] bool start();
 
     /**
-     * @brief Serves all currently pending local control requests.
+     * @brief Processes all currently pending local control requests.
+     *
+     * @return true if pending requests were processed successfully, otherwise false.
      */
     [[nodiscard]] bool process_pending();
 
@@ -60,18 +78,38 @@ namespace softadastra
      * @brief Closes the local control endpoint.
      */
     void stop() noexcept;
-    void set_shutdown_handler(std::function<void()> handler) { shutdown_handler_ = std::move(handler); }
 
-    /** Executes the shared Host control protocol. */
-    [[nodiscard]] static std::string handle(ControlServer &server, std::string_view request);
+    /**
+     * @brief Sets the callback invoked when a shutdown request is received.
+     *
+     * @param handler Callback to invoke for a shutdown request.
+     */
+    void set_shutdown_handler(std::function<void()> handler)
+    {
+      shutdown_handler_ = std::move(handler);
+    }
+
+    /**
+     * @brief Executes a request using the shared Host control protocol.
+     *
+     * @param server Control server that handles the request.
+     * @param request Protocol request to execute.
+     *
+     * @return Protocol response produced by the control server.
+     */
+    [[nodiscard]] static std::string handle(
+        ControlServer &server,
+        std::string_view request);
 
   private:
     ControlServer &server_;
     std::filesystem::path path_;
     int descriptor_{-1};
+
 #if defined(_WIN32)
     void *pipe_{nullptr};
 #endif
+
     RemoteAccessConfig *remote_config_;
     RemoteReachability *remote_reachability_;
     std::function<void()> shutdown_handler_;

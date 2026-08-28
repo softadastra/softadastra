@@ -80,8 +80,8 @@ namespace
     using EnableAutoStart = bool (softadastra::NativeService::*)();
 
     EXPECT_TRUE((std::is_same_v<
-                decltype(&softadastra::NativeService::enable_auto_start),
-                EnableAutoStart>));
+                 decltype(&softadastra::NativeService::enable_auto_start),
+                 EnableAutoStart>));
   }
 #endif
 

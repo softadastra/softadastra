@@ -129,7 +129,9 @@ namespace
     }
 
     [[nodiscard]] const std::optional<softadastra::ProcessSpec> &last_spec() const noexcept
-    { return last_spec_; }
+    {
+      return last_spec_;
+    }
 
   private:
     bool launch_fails_{false};
@@ -261,8 +263,12 @@ namespace
 
   TEST(ControlClientTest, SynchronizesRenamedSoftwareName)
   {
-    TestPlatform platform; TestProcessLauncher launcher; softadastra::Host host(platform);
-    softadastra::HostService host_service(host, launcher); softadastra::ControlServer server(host_service); softadastra::ControlClient client(server);
+    TestPlatform platform;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService host_service(host, launcher);
+    softadastra::ControlServer server(host_service);
+    softadastra::ControlClient client(server);
     const softadastra::SoftwareId id("stable-id");
     ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("app"), std::nullopt, std::nullopt, "phone-test"));
     ASSERT_TRUE(client.synchronize_software(id, softadastra::ProcessSpec("app"), std::nullopt, "phone-api"));

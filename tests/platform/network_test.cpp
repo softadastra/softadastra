@@ -95,8 +95,7 @@ TEST(NetworkTest, SupportsUseThroughNetworkInterface)
 
 TEST(NetworkTest, AssociatesPrimaryIpv4WithItsReportedInterface)
 {
-  const AddressNetwork network({
-      {softadastra::LocalAddressFamily::IPv4, "wlp108s0", "10.56.116.55"}});
+  const AddressNetwork network({{softadastra::LocalAddressFamily::IPv4, "wlp108s0", "10.56.116.55"}});
 
   const auto capability = network.network_capability();
 
@@ -109,8 +108,7 @@ TEST(NetworkTest, AssociatesPrimaryIpv4WithItsReportedInterface)
 
 TEST(NetworkTest, DoesNotReportLoopbackAsLocalNetwork)
 {
-  const AddressNetwork network({
-      {softadastra::LocalAddressFamily::IPv4, "lo", "127.0.0.1"}});
+  const AddressNetwork network({{softadastra::LocalAddressFamily::IPv4, "lo", "127.0.0.1"}});
 
   const auto capability = network.network_capability();
 
@@ -122,13 +120,17 @@ TEST(NetworkTest, DoesNotReportLoopbackAsLocalNetwork)
 TEST(NetworkTest, NamesAllInterfaceTypes)
 {
   EXPECT_STREQ(softadastra::network_interface_type_name(
-                   softadastra::NetworkInterfaceType::Wifi), "wifi");
+                   softadastra::NetworkInterfaceType::Wifi),
+               "wifi");
   EXPECT_STREQ(softadastra::network_interface_type_name(
-                   softadastra::NetworkInterfaceType::Ethernet), "ethernet");
+                   softadastra::NetworkInterfaceType::Ethernet),
+               "ethernet");
   EXPECT_STREQ(softadastra::network_interface_type_name(
-                   softadastra::NetworkInterfaceType::Other), "other");
+                   softadastra::NetworkInterfaceType::Other),
+               "other");
   EXPECT_STREQ(softadastra::network_interface_type_name(
-                   softadastra::NetworkInterfaceType::Unknown), "unknown");
+                   softadastra::NetworkInterfaceType::Unknown),
+               "unknown");
 }
 
 TEST(NetworkTest, UnsupportedPlatformFallbackDoesNotClaimManagedNetwork)

@@ -1,35 +1,37 @@
-# Softadastra Box, premier profil
+# Softadastra Box, Initial Profile
 
-Une Box est un Host Linux dédié. Elle n'introduit aucune architecture différente.
+A Box is a dedicated Linux Host. It does not introduce a different architecture.
 
-## Besoins matériels
+## Hardware Requirements
 
-Minimum : CPU x86_64 2 coeurs, 4 Go RAM, SSD 64 Go, Ethernet gigabit, alimentation stable et refroidissement passif ou adapté au fonctionnement continu.
+Minimum: x86_64 CPU with 2 cores, 4 GB RAM, 64 GB SSD, Gigabit Ethernet, stable power supply, and passive cooling or cooling suitable for continuous operation.
 
-Recommandé : CPU x86_64 4 coeurs, 8 Go RAM, SSD NVMe 128 Go ou plus, Ethernet gigabit, Wi-Fi 5 ou plus, deux ports USB, alimentation externe de qualité, boîtier ventilé passif ou actif mesuré, et firmware permettant le redémarrage après retour secteur.
+Recommended: x86_64 CPU with 4 cores, 8 GB RAM, 128 GB or larger NVMe SSD, Gigabit Ethernet, Wi-Fi 5 or newer, two USB ports, a high-quality external power supply, properly sized passive or active cooling, and firmware that supports automatic restart after power is restored.
 
-Le CPU, la RAM et le stockage sont des capacités du Host, pas des exigences d'un fabricant. Le premier prototype vise un mini-PC x86_64 compatible Debian ou Ubuntu LTS, avec SSD remplaçable et Ethernet ; aucun modèle n'est validé physiquement par ce dépôt.
+CPU, RAM, and storage are Host capacities, not manufacturer-specific requirements. The first prototype targets an x86_64 mini PC compatible with Debian or Ubuntu LTS, with replaceable SSD storage and Ethernet. No specific hardware model has been physically validated by this repository.
 
-## Image système
+## System Image
 
-Utiliser une installation minimale Debian 12 ou Ubuntu 24.04 LTS x86_64 : système à jour, `systemd`, SSD local, réseau administré par la distribution. Installer ensuite le binaire construit et exécuter `box/install.sh` en root. Le script crée l'utilisateur et les répertoires Host, installe l'unité systemd, active puis démarre le Host. Il ne télécharge rien et ne dépend pas d'Internet après installation.
+Use a minimal Debian 12 or Ubuntu 24.04 LTS x86_64 installation with an up-to-date system, `systemd`, local SSD storage, and networking managed by the distribution.
 
-Le script refuse d'écraser un binaire ou une unité existants. Une mise à jour est donc une opération explicite distincte.
+Then install the built binary and run `box/install.sh` as root. The script creates the Host user and directories, installs the systemd unit, enables it, and starts the Host. It downloads nothing and does not depend on Internet access after installation.
 
-## Première mise sous tension
+The script refuses to overwrite an existing binary or systemd unit. An update is therefore a separate, explicit operation.
 
-1. Vérifier dans le firmware le redémarrage après coupure secteur.
-2. Installer Linux minimal sur SSD et appliquer les mises à jour initiales.
-3. Copier le binaire `softadastra` sur la Box et lancer `sudo box/install.sh ./softadastra`.
-4. Vérifier `systemctl status softadastra` puis `softadastra access` et `softadastra connectivity`.
-5. Enregistrer un logiciel tiers et vérifier son démarrage, arrêt et restauration.
+## First Boot
 
-## Validation matérielle à effectuer
+1. Verify in the firmware that automatic restart after power loss is enabled.
+2. Install a minimal Linux system on the SSD and apply the initial updates.
+3. Copy the `softadastra` binary to the Box and run `sudo box/install.sh ./softadastra`.
+4. Verify `systemctl status softadastra`, then run `softadastra access` and `softadastra connectivity`.
+5. Register third-party software and verify its start, stop, and restoration behavior.
 
-- Fonctionnement continu, température et consommation mesurés sur le matériel réel.
-- Coupure et retour Ethernet/Wi-Fi sans perte du contrôle local.
-- Coupure secteur puis retour, avec redémarrage firmware activé.
-- Plusieurs reboot et vérification des registrations restaurées.
-- Processus long, serveur local, arguments, écriture de fichiers et crash réels.
+## Hardware Validation
 
-Le prototype physique reste non construit tant qu'une machine réelle n'a pas été assemblée, installée et testée.
+- Measure continuous operation, temperature, and power consumption on the actual hardware.
+- Verify Ethernet and Wi-Fi loss and recovery without losing local control.
+- Test power loss and restoration with firmware restart enabled.
+- Perform multiple reboots and verify that registrations are restored.
+- Test real long-running processes, local servers, command-line arguments, file writes, and crashes.
+
+The physical prototype remains unbuilt until an actual machine has been assembled, installed, and tested.

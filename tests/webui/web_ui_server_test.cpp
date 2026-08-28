@@ -33,10 +33,10 @@ namespace
     acceptor.listen(asio::socket_base::max_listen_connections, error);
     ASSERT_FALSE(error);
     const auto port = acceptor.local_endpoint().port();
-    std::thread server([&] {
+    std::thread server([&]
+                       {
       asio::ip::tcp::socket socket(context);
-      acceptor.accept(socket, error);
-    });
+      acceptor.accept(socket, error); });
     asio::io_context client_context;
     asio::ip::tcp::socket client(client_context);
     client.connect({asio::ip::make_address("127.0.0.1"), port}, error);
@@ -57,7 +57,8 @@ namespace
     {
       const auto count = socket.read_some(asio::buffer(buffer), error);
       response.append(buffer.data(), count);
-      if (error) break;
+      if (error)
+        break;
     }
     return response;
   }
@@ -81,14 +82,12 @@ namespace
     softadastra::ControlClient client(server);
     const auto project = std::filesystem::temp_directory_path() /
                          ("softadastra-web-ui-project-" + std::to_string(
-                              std::chrono::steady_clock::now().time_since_epoch().count()));
+                                                              std::chrono::steady_clock::now().time_since_epoch().count()));
     ASSERT_TRUE(std::filesystem::create_directories(project));
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
-        project, {softadastra::ProjectIdentity("web-project"), "Pico", command,
-                  softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081), {}}));
-    softadastra::WebUiServer ui(client, [project] {
-      return softadastra::DirectoryChooserResult{softadastra::DirectoryChooserStatus::Selected, project};
-    });
+        project, {softadastra::ProjectIdentity("web-project"), "Pico", command, softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081), {}}));
+    softadastra::WebUiServer ui(client, [project]
+                                { return softadastra::DirectoryChooserResult{softadastra::DirectoryChooserStatus::Selected, project}; });
     ASSERT_TRUE(ui.start());
     ASSERT_NE(ui.port(), 0);
 
@@ -172,15 +171,24 @@ namespace
     EXPECT_NE(running_update_response.find("Stop the application before editing its configuration."), std::string::npos);
     const auto log_path = softadastra::NativeDataDirectory::path() / "logs" / "stable-id.log";
     std::filesystem::create_directories(log_path.parent_path());
-    { std::ofstream output(log_path, std::ios::trunc | std::ios::binary); output << "first\n"; }
+    {
+      std::ofstream output(log_path, std::ios::trunc | std::ios::binary);
+      output << "first\n";
+    }
     const auto initial_logs_response = get(ui.port(), "GET /api/software/cloud/logs HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(initial_logs_response.find("\"logs\":\"first\\n\""), std::string::npos);
     EXPECT_NE(initial_logs_response.find("\"offset\":6"), std::string::npos);
-    { std::ofstream output(log_path, std::ios::app | std::ios::binary); output << "second\n"; }
+    {
+      std::ofstream output(log_path, std::ios::app | std::ios::binary);
+      output << "second\n";
+    }
     const auto appended_logs_response = get(ui.port(), "GET /api/software/cloud/logs?offset=6 HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(appended_logs_response.find("\"logs\":\"second\\n\""), std::string::npos);
     EXPECT_NE(appended_logs_response.find("\"offset\":13"), std::string::npos);
-    { std::ofstream output(log_path, std::ios::trunc | std::ios::binary); output << "new\n"; }
+    {
+      std::ofstream output(log_path, std::ios::trunc | std::ios::binary);
+      output << "new\n";
+    }
     const auto truncated_logs_response = get(ui.port(), "GET /api/software/cloud/logs?offset=13 HTTP/1.1\r\nHost: localhost\r\n\r\n");
     EXPECT_NE(truncated_logs_response.find("\"logs\":\"new\\n\""), std::string::npos);
     EXPECT_NE(truncated_logs_response.find("\"reset\":true"), std::string::npos);

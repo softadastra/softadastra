@@ -23,23 +23,27 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
 #include <vix/error/ErrorCode.hpp>
 #include <vix/process/Command.hpp>
 #include <vix/process/Spawn.hpp>
 
 #if defined(__linux__)
 
-#include <pthread.h>
-#include <signal.h>
-#include <fcntl.h>
 #include <cerrno>
 #include <cstring>
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #endif
+
 #if defined(_WIN32)
+
 #include <windows.h>
+
 #endif
 
 namespace softadastra
@@ -47,8 +51,37 @@ namespace softadastra
   namespace
   {
 #if defined(_WIN32)
+
     std::wstring wide(const std::string &value)
-    { if (value.empty()) return {}; const int size=::MultiByteToWideChar(CP_UTF8,0,value.data(),static_cast<int>(value.size()),nullptr,0); std::wstring result(size,L'\0'); ::MultiByteToWideChar(CP_UTF8,0,value.data(),static_cast<int>(value.size()),result.data(),size); return result; }
+    {
+      if (value.empty())
+      {
+        return {};
+      }
+
+      const int size = ::MultiByteToWideChar(
+          CP_UTF8,
+          0,
+          value.data(),
+          static_cast<int>(value.size()),
+          nullptr,
+          0);
+
+      std::wstring result(
+          size,
+          L'\0');
+
+      ::MultiByteToWideChar(
+          CP_UTF8,
+          0,
+          value.data(),
+          static_cast<int>(value.size()),
+          result.data(),
+          size);
+
+      return result;
+    }
+
     std::wstring quote(const std::string &value)
     {
       const std::wstring argument = wide(value);
@@ -85,9 +118,12 @@ namespace softadastra
 
       result.append(backslashes * 2, L'\\');
       result += L'\"';
+
       return result;
     }
+
 #endif
+
     bool executable_exists(const std::string &executable)
     {
       const std::filesystem::path path(executable);
@@ -97,7 +133,8 @@ namespace softadastra
         return std::filesystem::exists(path);
       }
 
-      const auto environment_path = environment_value("PATH");
+      const auto environment_path =
+          environment_value("PATH");
 
       if (!environment_path)
       {
@@ -105,17 +142,24 @@ namespace softadastra
       }
 
 #if defined(_WIN32)
+
       constexpr char separator = ';';
+
 #else
+
       constexpr char separator = ':';
+
 #endif
 
       std::string_view directories(*environment_path);
 
       while (!directories.empty())
       {
-        const auto position = directories.find(separator);
-        const auto directory = directories.substr(0, position);
+        const auto position =
+            directories.find(separator);
+
+        const auto directory =
+            directories.substr(0, position);
 
         if (std::filesystem::exists(
                 std::filesystem::path(directory) / path))
@@ -150,57 +194,214 @@ namespace softadastra
     }
 
 #if defined(__linux__)
+
     if (spec.output_file().has_value())
     {
       const pid_t pid = ::fork();
-      if (pid < 0) return ProcessLaunchError::LaunchFailed;
+
+      if (pid < 0)
+      {
+        return ProcessLaunchError::LaunchFailed;
+      }
+
       if (pid == 0)
       {
         ::setsid();
+
         // The Host blocks its own termination signals so its main loop can
-        // handle them synchronously.  Managed software must not inherit that
+        // handle them synchronously. Managed software must not inherit that
         // mask: NativeProcess::stop() terminates its process group with
         // SIGTERM.
         sigset_t signals;
         sigemptyset(&signals);
         sigaddset(&signals, SIGINT);
         sigaddset(&signals, SIGTERM);
-        static_cast<void>(pthread_sigmask(SIG_UNBLOCK, &signals, nullptr));
-        const int log = ::open(spec.output_file()->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
-        if (log < 0) _exit(126);
-        ::dup2(log, STDOUT_FILENO); ::dup2(log, STDERR_FILENO); if (log > STDERR_FILENO) ::close(log);
-        if (spec.working_directory().has_value() && ::chdir(spec.working_directory()->c_str()) != 0) { ::dprintf(STDERR_FILENO, "softadastra: cannot use working directory: %s\n", std::strerror(errno)); _exit(126); }
-        std::vector<char *> args; args.push_back(const_cast<char *>(spec.executable().c_str())); for (const auto &argument : spec.arguments()) args.push_back(const_cast<char *>(argument.c_str())); args.push_back(nullptr);
-        ::execvp(args[0], args.data()); ::dprintf(STDERR_FILENO, "softadastra: cannot start command: %s\n", std::strerror(errno)); _exit(127);
+
+        static_cast<void>(
+            pthread_sigmask(
+                SIG_UNBLOCK,
+                &signals,
+                nullptr));
+
+        const int log = ::open(
+            spec.output_file()->c_str(),
+            O_WRONLY | O_CREAT | O_APPEND,
+            0644);
+
+        if (log < 0)
+        {
+          _exit(126);
+        }
+
+        ::dup2(log, STDOUT_FILENO);
+        ::dup2(log, STDERR_FILENO);
+
+        if (log > STDERR_FILENO)
+        {
+          ::close(log);
+        }
+
+        if (spec.working_directory().has_value() &&
+            ::chdir(spec.working_directory()->c_str()) != 0)
+        {
+          ::dprintf(
+              STDERR_FILENO,
+              "softadastra: cannot use working directory: %s\n",
+              std::strerror(errno));
+
+          _exit(126);
+        }
+
+        std::vector<char *> args;
+
+        args.push_back(
+            const_cast<char *>(spec.executable().c_str()));
+
+        for (const auto &argument : spec.arguments())
+        {
+          args.push_back(
+              const_cast<char *>(argument.c_str()));
+        }
+
+        args.push_back(nullptr);
+
+        ::execvp(args[0], args.data());
+
+        ::dprintf(
+            STDERR_FILENO,
+            "softadastra: cannot start command: %s\n",
+            std::strerror(errno));
+
+        _exit(127);
       }
+
       return std::make_unique<NativeProcess>(pid);
     }
+
 #endif
+
 #if defined(_WIN32)
-    std::wstring command = quote(spec.executable());
-    for (const auto &argument : spec.arguments()) command += L" " + quote(argument);
-    STARTUPINFOW startup{}; startup.cb=sizeof(startup); PROCESS_INFORMATION information{};
-    HANDLE log=nullptr;
+
+    std::wstring command =
+        quote(spec.executable());
+
+    for (const auto &argument : spec.arguments())
+    {
+      command += L" " + quote(argument);
+    }
+
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+
+    PROCESS_INFORMATION information{};
+
+    HANDLE log = nullptr;
+
     if (spec.output_file())
     {
-      log=::CreateFileW(wide(*spec.output_file()).c_str(), FILE_APPEND_DATA, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-      if (log==INVALID_HANDLE_VALUE) return ProcessLaunchError::LaunchFailed;
-      startup.dwFlags|=STARTF_USESTDHANDLES; startup.hStdOutput=log; startup.hStdError=log; startup.hStdInput=::GetStdHandle(STD_INPUT_HANDLE);
+      log = ::CreateFileW(
+          wide(*spec.output_file()).c_str(),
+          FILE_APPEND_DATA,
+          FILE_SHARE_READ | FILE_SHARE_WRITE,
+          nullptr,
+          OPEN_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL,
+          nullptr);
+
+      if (log == INVALID_HANDLE_VALUE)
+      {
+        return ProcessLaunchError::LaunchFailed;
+      }
+
+      startup.dwFlags |= STARTF_USESTDHANDLES;
+      startup.hStdOutput = log;
+      startup.hStdError = log;
+      startup.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE);
     }
-    std::wstring cwd = spec.working_directory() ? wide(*spec.working_directory()) : std::wstring{};
-    if (!::CreateProcessW(nullptr, command.data(), nullptr, nullptr, log != nullptr, CREATE_NEW_PROCESS_GROUP, nullptr, cwd.empty()?nullptr:cwd.c_str(), &startup, &information))
-    { if(log) ::CloseHandle(log); const auto error=::GetLastError(); return error==ERROR_FILE_NOT_FOUND?ProcessLaunchError::ExecutableNotFound:(error==ERROR_ACCESS_DENIED?ProcessLaunchError::PermissionDenied:ProcessLaunchError::LaunchFailed); }
-    if(log) ::CloseHandle(log); ::CloseHandle(information.hThread);
-    HANDLE job=::CreateJobObjectW(nullptr,nullptr);
-    if(job!=nullptr) { JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{}; limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE; static_cast<void>(::SetInformationJobObject(job,JobObjectExtendedLimitInformation,&limits,sizeof(limits))); if(!::AssignProcessToJobObject(job,information.hProcess)){::CloseHandle(job);job=nullptr;} }
-    return std::make_unique<NativeProcess>(information.hProcess, job, information.dwProcessId);
+
+    std::wstring cwd =
+        spec.working_directory()
+            ? wide(*spec.working_directory())
+            : std::wstring{};
+
+    if (!::CreateProcessW(
+            nullptr,
+            command.data(),
+            nullptr,
+            nullptr,
+            log != nullptr,
+            CREATE_NEW_PROCESS_GROUP,
+            nullptr,
+            cwd.empty() ? nullptr : cwd.c_str(),
+            &startup,
+            &information))
+    {
+      if (log)
+      {
+        ::CloseHandle(log);
+      }
+
+      const auto error = ::GetLastError();
+
+      return error == ERROR_FILE_NOT_FOUND
+                 ? ProcessLaunchError::ExecutableNotFound
+             : error == ERROR_ACCESS_DENIED
+                 ? ProcessLaunchError::PermissionDenied
+                 : ProcessLaunchError::LaunchFailed;
+    }
+
+    if (log)
+    {
+      ::CloseHandle(log);
+    }
+
+    ::CloseHandle(information.hThread);
+
+    HANDLE job =
+        ::CreateJobObjectW(
+            nullptr,
+            nullptr);
+
+    if (job != nullptr)
+    {
+      JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+
+      limits.BasicLimitInformation.LimitFlags =
+          JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+      static_cast<void>(
+          ::SetInformationJobObject(
+              job,
+              JobObjectExtendedLimitInformation,
+              &limits,
+              sizeof(limits)));
+
+      if (!::AssignProcessToJobObject(
+              job,
+              information.hProcess))
+      {
+        ::CloseHandle(job);
+        job = nullptr;
+      }
+    }
+
+    return std::make_unique<NativeProcess>(
+        information.hProcess,
+        job,
+        information.dwProcessId);
+
 #else
 
     vix::process::Command command(spec.executable());
 
     command.args(spec.arguments());
+
     if (spec.working_directory().has_value())
-      command.cwd(spec.working_directory().value());
+    {
+      command.cwd(
+          spec.working_directory().value());
+    }
+
     command.search_in_path(true);
     command.detach(true);
 
@@ -210,21 +411,29 @@ namespace softadastra
     sigemptyset(&signals);
     sigaddset(&signals, SIGINT);
     sigaddset(&signals, SIGTERM);
+
     sigset_t previous_signals;
-    const bool reset_signals = pthread_sigmask(
-                                   SIG_UNBLOCK,
-                                   &signals,
-                                   &previous_signals) == 0;
+
+    const bool reset_signals =
+        pthread_sigmask(
+            SIG_UNBLOCK,
+            &signals,
+            &previous_signals) == 0;
 
 #endif
 
-    auto result = vix::process::spawn(std::move(command));
+    auto result =
+        vix::process::spawn(
+            std::move(command));
 
 #if defined(__linux__)
 
     if (reset_signals)
     {
-      pthread_sigmask(SIG_SETMASK, &previous_signals, nullptr);
+      pthread_sigmask(
+          SIG_SETMASK,
+          &previous_signals,
+          nullptr);
     }
 
 #endif
@@ -244,7 +453,8 @@ namespace softadastra
       }
     }
 
-    vix::process::Child child = std::move(result.value());
+    vix::process::Child child =
+        std::move(result.value());
 
     if (!child.valid())
     {
@@ -253,6 +463,7 @@ namespace softadastra
 
     return std::make_unique<NativeProcess>(
         std::move(child));
+
 #endif
   }
 

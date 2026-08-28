@@ -34,7 +34,10 @@ namespace
         softadastra::box_state(
             first.profile(), true,
             {softadastra::ManagedNetworkCapability::Unavailable,
-             softadastra::ManagedNetworkState::Stopped, {}, {}, {}}),
+             softadastra::ManagedNetworkState::Stopped,
+             {},
+             {},
+             {}}),
         softadastra::BoxState::Degraded);
     EXPECT_EQ(
         softadastra::box_state(first.profile(), false, {}),
@@ -43,7 +46,10 @@ namespace
         softadastra::box_state(
             first.profile(), true,
             {softadastra::ManagedNetworkCapability::Available,
-             softadastra::ManagedNetworkState::Stopped, {}, {}, {}}),
+             softadastra::ManagedNetworkState::Stopped,
+             {},
+             {},
+             {}}),
         softadastra::BoxState::Degraded);
 
     softadastra::HostProfileStore restored(path);

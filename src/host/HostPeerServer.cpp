@@ -14,18 +14,20 @@
 
 #include "host/HostPeerServer.hpp"
 
-#include <openssl/ssl.h>
-
 #include <array>
 #include <chrono>
 #include <csignal>
 #include <utility>
 
+#include <openssl/ssl.h>
+
 #if defined(__linux__)
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
 #endif
 
 namespace softadastra
@@ -51,11 +53,14 @@ namespace softadastra
 
       if (request == "infrastructure\n")
       {
-        return "infrastructure " + infrastructure_info + "\n";
+        return "infrastructure " +
+               infrastructure_info +
+               "\n";
       }
 
       return "invalid\n";
     }
+
   } // namespace
 
   HostPeerServer::HostPeerServer(
@@ -80,6 +85,7 @@ namespace softadastra
   bool HostPeerServer::start()
   {
 #if defined(__linux__)
+
     std::signal(SIGPIPE, SIG_IGN);
 
     if (running_)
@@ -87,20 +93,31 @@ namespace softadastra
       return false;
     }
 
-    const auto certificate = certificate_directory_ / "host-peer-cert.pem";
-    const auto key = certificate_directory_ / "host-peer-key.pem";
+    const auto certificate =
+        certificate_directory_ / "host-peer-cert.pem";
 
-    if (!identity_.write_tls_certificate(certificate, key))
+    const auto key =
+        certificate_directory_ / "host-peer-key.pem";
+
+    if (!identity_.write_tls_certificate(
+            certificate,
+            key))
     {
       return false;
     }
 
     running_ = true;
-    thread_ = std::thread(&HostPeerServer::run, this);
+    thread_ =
+        std::thread(
+            &HostPeerServer::run,
+            this);
 
-    for (int attempt = 0; attempt < 100 && running_ && !listening_; ++attempt)
+    for (int attempt = 0;
+         attempt < 100 && running_ && !listening_;
+         ++attempt)
     {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(1));
     }
 
     if (!listening_)
@@ -110,24 +127,36 @@ namespace softadastra
     }
 
     return true;
+
 #else
+
     return false;
+
 #endif
   }
 
   void HostPeerServer::stop() noexcept
   {
     running_ = false;
-    const int descriptor = descriptor_.exchange(-1);
+
+    const int descriptor =
+        descriptor_.exchange(-1);
 
 #if defined(__linux__)
+
     if (descriptor >= 0)
     {
-      ::shutdown(descriptor, SHUT_RDWR);
+      ::shutdown(
+          descriptor,
+          SHUT_RDWR);
+
       ::close(descriptor);
     }
+
 #else
+
     static_cast<void>(descriptor);
+
 #endif
 
     if (thread_.joinable())
@@ -151,7 +180,9 @@ namespace softadastra
   void HostPeerServer::run() noexcept
   {
 #if defined(__linux__)
-    SSL_CTX *context = SSL_CTX_new(TLS_server_method());
+
+    SSL_CTX *context =
+        SSL_CTX_new(TLS_server_method());
 
     if (context == nullptr)
     {
@@ -159,24 +190,49 @@ namespace softadastra
       return;
     }
 
-    SSL_CTX_set_min_proto_version(context, TLS1_3_VERSION);
-    SSL_CTX_set_max_proto_version(context, TLS1_3_VERSION);
-    const auto certificate = certificate_directory_ / "host-peer-cert.pem";
-    const auto key = certificate_directory_ / "host-peer-key.pem";
+    SSL_CTX_set_min_proto_version(
+        context,
+        TLS1_3_VERSION);
 
-    if (SSL_CTX_use_certificate_file(context, certificate.c_str(), SSL_FILETYPE_PEM) != 1 ||
-        SSL_CTX_use_PrivateKey_file(context, key.c_str(), SSL_FILETYPE_PEM) != 1)
+    SSL_CTX_set_max_proto_version(
+        context,
+        TLS1_3_VERSION);
+
+    const auto certificate =
+        certificate_directory_ / "host-peer-cert.pem";
+
+    const auto key =
+        certificate_directory_ / "host-peer-key.pem";
+
+    if (SSL_CTX_use_certificate_file(
+            context,
+            certificate.c_str(),
+            SSL_FILETYPE_PEM) != 1 ||
+        SSL_CTX_use_PrivateKey_file(
+            context,
+            key.c_str(),
+            SSL_FILETYPE_PEM) != 1)
     {
       SSL_CTX_free(context);
       running_ = false;
       return;
     }
 
-    const int descriptor = ::socket(AF_INET, SOCK_STREAM, 0);
+    const int descriptor =
+        ::socket(
+            AF_INET,
+            SOCK_STREAM,
+            0);
+
     int reuse = 1;
 
     if (descriptor < 0 ||
-        ::setsockopt(descriptor, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) != 0)
+        ::setsockopt(
+            descriptor,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            &reuse,
+            sizeof(reuse)) != 0)
     {
       if (descriptor >= 0)
       {
@@ -185,6 +241,7 @@ namespace softadastra
 
       SSL_CTX_free(context);
       running_ = false;
+
       return;
     }
 
@@ -192,18 +249,28 @@ namespace softadastra
     address.sin_family = AF_INET;
     address.sin_port = htons(port_);
 
-    if (::inet_pton(AF_INET, address_.c_str(), &address.sin_addr) != 1 ||
-        ::bind(descriptor, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) != 0 ||
-        ::listen(descriptor, 16) != 0)
+    if (::inet_pton(
+            AF_INET,
+            address_.c_str(),
+            &address.sin_addr) != 1 ||
+        ::bind(
+            descriptor,
+            reinterpret_cast<const sockaddr *>(&address),
+            sizeof(address)) != 0 ||
+        ::listen(
+            descriptor,
+            16) != 0)
     {
       ::close(descriptor);
       SSL_CTX_free(context);
       running_ = false;
+
       return;
     }
 
     sockaddr_in bound_address{};
-    socklen_t bound_address_size = sizeof(bound_address);
+    socklen_t bound_address_size =
+        sizeof(bound_address);
 
     if (::getsockname(
             descriptor,
@@ -213,40 +280,63 @@ namespace softadastra
       ::close(descriptor);
       SSL_CTX_free(context);
       running_ = false;
+
       return;
     }
 
-    port_ = ntohs(bound_address.sin_port);
+    port_ =
+        ntohs(bound_address.sin_port);
+
     descriptor_ = descriptor;
     listening_ = true;
 
     while (running_)
     {
-      const int client = ::accept(descriptor, nullptr, nullptr);
+      const int client =
+          ::accept(
+              descriptor,
+              nullptr,
+              nullptr);
 
       if (client < 0)
       {
         continue;
       }
 
-      SSL *ssl = SSL_new(context);
+      SSL *ssl =
+          SSL_new(context);
 
       if (ssl != nullptr)
       {
-        SSL_set_fd(ssl, client);
+        SSL_set_fd(
+            ssl,
+            client);
 
         if (SSL_accept(ssl) == 1)
         {
           std::array<char, maximum_request_size> request{};
-          const int size = SSL_read(ssl, request.data(), static_cast<int>(request.size()));
+
+          const int size =
+              SSL_read(
+                  ssl,
+                  request.data(),
+                  static_cast<int>(request.size()));
 
           if (size > 0)
           {
-            const std::string response = response_for(
-                identity_, infrastructure_info_,
-                std::string(request.data(), static_cast<std::size_t>(size)));
-            static_cast<void>(SSL_write(
-                ssl, response.data(), static_cast<int>(response.size())));
+            const std::string response =
+                response_for(
+                    identity_,
+                    infrastructure_info_,
+                    std::string(
+                        request.data(),
+                        static_cast<std::size_t>(size)));
+
+            static_cast<void>(
+                SSL_write(
+                    ssl,
+                    response.data(),
+                    static_cast<int>(response.size())));
           }
         }
 
@@ -262,7 +352,9 @@ namespace softadastra
     }
 
     listening_ = false;
+
     SSL_CTX_free(context);
+
 #endif
   }
 

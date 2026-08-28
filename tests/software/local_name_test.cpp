@@ -26,7 +26,9 @@ TEST(LocalNameTest, AcceptsEligibleDnsLabels)
 TEST(LocalNameTest, RejectsIneligibleSoftwareNamesWithoutNormalization)
 {
   const std::vector<std::string> names{
-      "", "My API", "API", "api_test", "foo.bar", "\xC3\xA9" "cole", "-api",
+      "", "My API", "API", "api_test", "foo.bar", "\xC3\xA9"
+                                                  "cole",
+      "-api",
       "api-", std::string(64, 'a')};
   for (const std::string &name : names)
   {

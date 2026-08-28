@@ -23,8 +23,11 @@
 #include <unistd.h>
 
 #endif
+
 #if defined(_WIN32)
+
 #include <windows.h>
+
 #endif
 
 namespace softadastra
@@ -32,19 +35,29 @@ namespace softadastra
   HostInstanceLock::~HostInstanceLock()
   {
 #if defined(__linux__)
+
     if (descriptor_ >= 0)
     {
       static_cast<void>(::close(descriptor_));
     }
+
 #endif
+
 #if defined(_WIN32)
-    if (mutex_ != nullptr) ::CloseHandle(mutex_);
+
+    if (mutex_ != nullptr)
+    {
+      ::CloseHandle(mutex_);
+    }
+
 #endif
   }
 
-  bool HostInstanceLock::acquire(const std::filesystem::path &directory) noexcept
+  bool HostInstanceLock::acquire(
+      const std::filesystem::path &directory) noexcept
   {
 #if defined(__linux__)
+
     if (descriptor_ >= 0)
     {
       return true;
@@ -67,24 +80,58 @@ namespace softadastra
     }
 
     descriptor_ = descriptor;
+
     return true;
+
 #else
+
 #if defined(_WIN32)
-    if (mutex_ != nullptr) return true;
-    const std::wstring name = L"Local\\SoftadastraHost-" + std::to_wstring(std::hash<std::wstring>{}(directory.wstring()));
-    mutex_ = ::CreateMutexW(nullptr, TRUE, name.c_str());
-    if (mutex_ == nullptr) return false;
-    if (::GetLastError() == ERROR_ALREADY_EXISTS) { ::CloseHandle(mutex_); mutex_ = nullptr; return false; }
+
+    if (mutex_ != nullptr)
+    {
+      return true;
+    }
+
+    const std::wstring name =
+        L"Local\\SoftadastraHost-" +
+        std::to_wstring(
+            std::hash<std::wstring>{}(directory.wstring()));
+
+    mutex_ = ::CreateMutexW(
+        nullptr,
+        TRUE,
+        name.c_str());
+
+    if (mutex_ == nullptr)
+    {
+      return false;
+    }
+
+    if (::GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+      ::CloseHandle(mutex_);
+      mutex_ = nullptr;
+
+      return false;
+    }
+
     return true;
+
 #else
-    static_cast<void>(directory); return false;
+
+    static_cast<void>(directory);
+
+    return false;
+
 #endif
 #endif
   }
 
-  bool HostInstanceLock::is_held(const std::filesystem::path &directory) noexcept
+  bool HostInstanceLock::is_held(
+      const std::filesystem::path &directory) noexcept
   {
     HostInstanceLock probe;
+
     return !probe.acquire(directory);
   }
 

@@ -64,9 +64,50 @@ TEST(AccessUrlTest, EncodesKnownUrlAsReferenceCodewords)
 {
   constexpr std::string_view url = "http://192.168.1.6:8080";
   constexpr std::array<std::uint8_t, 44> expected = {
-      65, 118, 135, 71, 71, 3, 162, 242, 243, 19, 147, 34, 227, 19, 99,
-      130, 227, 18, 227, 99, 163, 131, 3, 131, 0, 236, 17, 236, 196, 202,
-      242, 167, 180, 36, 142, 160, 149, 253, 52, 109, 57, 137, 181, 178,
+      65,
+      118,
+      135,
+      71,
+      71,
+      3,
+      162,
+      242,
+      243,
+      19,
+      147,
+      34,
+      227,
+      19,
+      99,
+      130,
+      227,
+      18,
+      227,
+      99,
+      163,
+      131,
+      3,
+      131,
+      0,
+      236,
+      17,
+      236,
+      196,
+      202,
+      242,
+      167,
+      180,
+      36,
+      142,
+      160,
+      149,
+      253,
+      52,
+      109,
+      57,
+      137,
+      181,
+      178,
   };
 
   const auto encoded = softadastra::internal::generate(url);
@@ -76,11 +117,11 @@ TEST(AccessUrlTest, EncodesKnownUrlAsReferenceCodewords)
   std::uint16_t format = 0;
   for (int bit = 0; bit < 15; ++bit)
   {
-    const auto [row, col] = bit < 6 ? std::pair{8, bit}
-                          : bit == 6 ? std::pair{8, 7}
-                          : bit == 7 ? std::pair{8, 8}
-                          : bit == 8 ? std::pair{7, 8}
-                                     : std::pair{14 - bit, 8};
+    const auto [row, col] = bit < 6    ? std::pair{8, bit}
+                            : bit == 6 ? std::pair{8, 7}
+                            : bit == 7 ? std::pair{8, 8}
+                            : bit == 8 ? std::pair{7, 8}
+                                       : std::pair{14 - bit, 8};
     if (encoded.module(row, col))
       format |= static_cast<std::uint16_t>(1U << bit);
   }
@@ -96,15 +137,24 @@ TEST(AccessUrlTest, EncodesKnownUrlAsReferenceCodewords)
   {
     switch (mask)
     {
-    case 0: return (row + col) % 2 == 0;
-    case 1: return row % 2 == 0;
-    case 2: return col % 3 == 0;
-    case 3: return (row + col) % 3 == 0;
-    case 4: return (row / 2 + col / 3) % 2 == 0;
-    case 5: return (row * col) % 2 + (row * col) % 3 == 0;
-    case 6: return ((row * col) % 2 + (row * col) % 3) % 2 == 0;
-    case 7: return ((row + col) % 2 + (row * col) % 3) % 2 == 0;
-    default: return false;
+    case 0:
+      return (row + col) % 2 == 0;
+    case 1:
+      return row % 2 == 0;
+    case 2:
+      return col % 3 == 0;
+    case 3:
+      return (row + col) % 3 == 0;
+    case 4:
+      return (row / 2 + col / 3) % 2 == 0;
+    case 5:
+      return (row * col) % 2 + (row * col) % 3 == 0;
+    case 6:
+      return ((row * col) % 2 + (row * col) % 3) % 2 == 0;
+    case 7:
+      return ((row + col) % 2 + (row * col) % 3) % 2 == 0;
+    default:
+      return false;
     }
   };
 

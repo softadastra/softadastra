@@ -84,13 +84,15 @@ namespace
   {
     const auto http = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080);
     const auto websocket = softadastra::AccessPoint::create(softadastra::AccessProtocol::Ws, 9090);
-    ASSERT_TRUE(http); ASSERT_TRUE(websocket);
+    ASSERT_TRUE(http);
+    ASSERT_TRUE(websocket);
     const std::vector<softadastra::SoftwareEntry> entries{softadastra::SoftwareEntry(
         softadastra::SoftwareId("cloud"), softadastra::ProcessSpec("/bin/sh", {"-lc", "vix run"}, "/project"),
         std::nullopt, {*http, *websocket}, "vix run", "Cloud")};
     const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(
         softadastra::SoftwareRegistrationFormat::serialize(entries));
-    ASSERT_TRUE(restored); ASSERT_EQ(restored->size(), 1U);
+    ASSERT_TRUE(restored);
+    ASSERT_EQ(restored->size(), 1U);
     EXPECT_EQ(restored->front().declared_command(), "vix run");
     ASSERT_EQ(restored->front().access_points().size(), 2U);
     EXPECT_EQ(restored->front().access_points()[1].protocol(), softadastra::AccessProtocol::Ws);
@@ -105,7 +107,8 @@ namespace
     auto serialized = softadastra::SoftwareRegistrationFormat::serialize(entries);
     serialized.replace(0, std::string("softadastra-registrations 7\n").size(), "softadastra-registrations 6\n");
     const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(serialized);
-    ASSERT_TRUE(restored); ASSERT_EQ(restored->front().access_points().size(), 1U);
+    ASSERT_TRUE(restored);
+    ASSERT_EQ(restored->front().access_points().size(), 1U);
     EXPECT_EQ(restored->front().access_points().front().port(), 8080);
   }
 
@@ -117,12 +120,16 @@ namespace
   TEST(SoftwareRegistrationFormatTest, RejectsInvalidRegistrations)
   {
     EXPECT_FALSE(softadastra::SoftwareRegistrationFormat::deserialize(
-        "softadastra-registrations 1\n1\n0\n\n1\na\n0\n").has_value());
+                     "softadastra-registrations 1\n1\n0\n\n1\na\n0\n")
+                     .has_value());
     EXPECT_FALSE(softadastra::SoftwareRegistrationFormat::deserialize(
-        "softadastra-registrations 1\n2\n1\na\n1\nx\n0\n1\na\n1\ny\n0\n").has_value());
+                     "softadastra-registrations 1\n2\n1\na\n1\nx\n0\n1\na\n1\ny\n0\n")
+                     .has_value());
     EXPECT_FALSE(softadastra::SoftwareRegistrationFormat::deserialize(
-        "softadastra-registrations 1\n18446744073709551615\n").has_value());
+                     "softadastra-registrations 1\n18446744073709551615\n")
+                     .has_value());
     EXPECT_FALSE(softadastra::SoftwareRegistrationFormat::deserialize(
-        "softadastra-registrations 1\n1\n1\na\n1\nx\n18446744073709551615\n").has_value());
+                     "softadastra-registrations 1\n1\n1\na\n1\nx\n18446744073709551615\n")
+                     .has_value());
   }
 } // namespace

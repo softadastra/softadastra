@@ -817,8 +817,8 @@ namespace softadastra
 
 #if defined(__linux__)
     capability.managed_network_capability = wifi_hotspot_supported()
-                                               ? ManagedNetworkCapability::Available
-                                               : ManagedNetworkCapability::Unavailable;
+                                                ? ManagedNetworkCapability::Available
+                                                : ManagedNetworkCapability::Unavailable;
 #endif
 
     if (capability.state == NetworkState::Unavailable)

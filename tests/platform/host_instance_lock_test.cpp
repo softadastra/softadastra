@@ -33,9 +33,9 @@ namespace
   {
     const auto directory = std::filesystem::temp_directory_path() /
                            ("softadastra-host-lock-" + std::to_string(
-                               std::chrono::steady_clock::now()
-                                   .time_since_epoch()
-                                   .count()));
+                                                           std::chrono::steady_clock::now()
+                                                               .time_since_epoch()
+                                                               .count()));
     std::filesystem::create_directories(directory);
 
     {

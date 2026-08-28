@@ -13,7 +13,6 @@
  */
 
 #include "platform/QrCode.hpp"
-
 #include "internal/QrEncoder.hpp"
 
 #include <cstdio>

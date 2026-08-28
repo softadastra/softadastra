@@ -9,7 +9,7 @@ TEST(ProjectIdentityTest, FindsIdentityFromProjectSubdirectoryAfterMove)
 {
   const auto base = std::filesystem::temp_directory_path() /
                     ("softadastra-project-" + std::to_string(
-                        std::chrono::steady_clock::now().time_since_epoch().count()));
+                                                  std::chrono::steady_clock::now().time_since_epoch().count()));
   const auto source = base / "source";
   const auto destination = base / "destination";
   std::filesystem::create_directories(source / "src" / "nested");

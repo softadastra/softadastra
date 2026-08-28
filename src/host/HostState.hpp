@@ -15,11 +15,12 @@
 #ifndef SOFTADASTRA_HOST_HOST_STATE_HPP
 #define SOFTADASTRA_HOST_HOST_STATE_HPP
 
+#include "software/ProjectIdentity.hpp"
 #include "software/SoftwareEntry.hpp"
 #include "software/SoftwareId.hpp"
-#include "software/ProjectIdentity.hpp"
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace softadastra
@@ -41,16 +42,25 @@ namespace softadastra
     /**
      * @brief Adds a software entry to the Host state.
      *
-     * A Host cannot contain more than one software entry with the same
-     * SoftwareId.
+     * Software identifiers must be unique. Non-empty software names must also
+     * be unique within the Host state.
      *
      * @param entry Software entry to add.
      *
-     * @return true if the entry was added, otherwise false if an entry with the
-     *         same identifier already exists.
+     * @return true if the entry was added successfully, otherwise false.
      */
-    bool add_software(SoftwareEntry entry);
-    bool remove_software(const SoftwareId &id);
+    bool add_software(
+        SoftwareEntry entry);
+
+    /**
+     * @brief Removes a software entry by identifier.
+     *
+     * @param id Identifier of the software to remove.
+     *
+     * @return true if a matching entry was removed, otherwise false.
+     */
+    bool remove_software(
+        const SoftwareId &id);
 
     /**
      * @brief Finds a software entry by identifier.
@@ -72,11 +82,48 @@ namespace softadastra
      */
     [[nodiscard]] const SoftwareEntry *find_software(
         const SoftwareId &id) const noexcept;
-    [[nodiscard]] SoftwareEntry *find_software_by_name(const std::string &name) noexcept;
-    [[nodiscard]] const SoftwareEntry *find_software_by_name(const std::string &name) const noexcept;
 
-    [[nodiscard]] SoftwareEntry *find_software(const ProjectIdentity &identity) noexcept;
-    [[nodiscard]] const SoftwareEntry *find_software(const ProjectIdentity &identity) const noexcept;
+    /**
+     * @brief Finds a software entry by name.
+     *
+     * @param name Software name to find.
+     *
+     * @return Pointer to the matching entry, or nullptr if no entry exists.
+     */
+    [[nodiscard]] SoftwareEntry *find_software_by_name(
+        const std::string &name) noexcept;
+
+    /**
+     * @brief Finds a software entry by name.
+     *
+     * @param name Software name to find.
+     *
+     * @return Constant pointer to the matching entry, or nullptr if no entry
+     *         exists.
+     */
+    [[nodiscard]] const SoftwareEntry *find_software_by_name(
+        const std::string &name) const noexcept;
+
+    /**
+     * @brief Finds a software entry by project identity.
+     *
+     * @param identity Project identity to find.
+     *
+     * @return Pointer to the matching entry, or nullptr if no entry exists.
+     */
+    [[nodiscard]] SoftwareEntry *find_software(
+        const ProjectIdentity &identity) noexcept;
+
+    /**
+     * @brief Finds a software entry by project identity.
+     *
+     * @param identity Project identity to find.
+     *
+     * @return Constant pointer to the matching entry, or nullptr if no entry
+     *         exists.
+     */
+    [[nodiscard]] const SoftwareEntry *find_software(
+        const ProjectIdentity &identity) const noexcept;
 
     /**
      * @brief Returns the number of software entries known to the Host.
@@ -93,9 +140,12 @@ namespace softadastra
     [[nodiscard]] bool empty() const noexcept;
 
     /**
-     * @brief Returns registered software infrastructure metadata.
+     * @brief Returns all software entries stored by the Host.
+     *
+     * @return Constant reference to the registered software entries.
      */
-    [[nodiscard]] const std::vector<SoftwareEntry> &software() const noexcept;
+    [[nodiscard]] const std::vector<SoftwareEntry> &
+    software() const noexcept;
 
   private:
     std::vector<SoftwareEntry> software_;

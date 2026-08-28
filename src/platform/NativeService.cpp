@@ -193,11 +193,12 @@ namespace softadastra
            "\n"
            "[Service]\n"
            "Type=simple\n"
-           "ExecStart=" + escape_systemd_argument(executable.string()) + " host\n"
-           "Restart=on-failure\n"
-           "\n"
-           "[Install]\n"
-           "WantedBy=multi-user.target\n";
+           "ExecStart=" +
+           escape_systemd_argument(executable.string()) + " host\n"
+                                                          "Restart=on-failure\n"
+                                                          "\n"
+                                                          "[Install]\n"
+                                                          "WantedBy=multi-user.target\n";
   }
 
   bool NativeService::install(const std::filesystem::path &executable)

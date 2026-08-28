@@ -6,15 +6,26 @@
 
 namespace
 {
-  struct ProcessState { bool running{true}; int stops{}; };
+  struct ProcessState
+  {
+    bool running{true};
+    int stops{};
+  };
   class TestProcess final : public softadastra::Process
   {
   public:
     explicit TestProcess(std::shared_ptr<ProcessState> value) : value_(std::move(value)) {}
-    bool stop() override { value_->running = false; ++value_->stops; return true; }
+    bool stop() override
+    {
+      value_->running = false;
+      ++value_->stops;
+      return true;
+    }
     [[nodiscard]] bool is_running() const noexcept override { return value_->running; }
     [[nodiscard]] std::optional<int> exit_code() noexcept override { return value_->running ? std::nullopt : std::optional<int>(0); }
-  private: std::shared_ptr<ProcessState> value_;
+
+  private:
+    std::shared_ptr<ProcessState> value_;
   };
 
   class Launcher final : public softadastra::ProcessLauncher
@@ -23,11 +34,14 @@ namespace
     [[nodiscard]] softadastra::ProcessLaunchResult launch(const softadastra::ProcessSpec &spec) override
     {
       last = spec;
-      if (!succeeds) return nullptr;
+      if (!succeeds)
+        return nullptr;
       state = std::make_shared<ProcessState>();
       return std::make_unique<TestProcess>(state);
     }
-    bool succeeds{true}; softadastra::ProcessSpec last{""}; std::shared_ptr<ProcessState> state;
+    bool succeeds{true};
+    softadastra::ProcessSpec last{""};
+    std::shared_ptr<ProcessState> state;
   };
 
   TEST(LocalGatewayProcessEndpointTest, LaunchesOnlyTheDedicatedGatewayAndStopsIt)
@@ -46,7 +60,8 @@ namespace
 
   TEST(LocalGatewayProcessEndpointTest, ReportsLaunchFailure)
   {
-    Launcher launcher; launcher.succeeds = false;
+    Launcher launcher;
+    launcher.succeeds = false;
     softadastra::LocalGatewayProcessEndpoint endpoint(launcher, "gateway", "control.sock");
     EXPECT_FALSE(endpoint.start("10.42.0.1", 18080));
   }

@@ -29,10 +29,7 @@ namespace
 
   softadastra::NetworkCapability no_local_network()
   {
-    return {softadastra::NetworkState::Unavailable, {}, {},
-            softadastra::NetworkInterfaceType::Unknown,
-            softadastra::LocalNetworkState::Unavailable,
-            softadastra::ManagedNetworkCapability::Available};
+    return {softadastra::NetworkState::Unavailable, {}, {}, softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
   }
 
   TEST(LocalAccessTest, ResolvesHttpFromCurrentPrimaryIpv4WhenManagedNetworkIsStopped)

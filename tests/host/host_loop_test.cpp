@@ -234,8 +234,10 @@ namespace
   void run_until_started(softadastra::HostLoop &loop, std::function<void()> check)
   {
     std::atomic_bool completed{false};
-    std::thread thread([&loop, &completed]() { completed = loop.run(); });
-    EXPECT_TRUE(wait_until([&loop]() { return loop.is_running(); }));
+    std::thread thread([&loop, &completed]()
+                       { completed = loop.run(); });
+    EXPECT_TRUE(wait_until([&loop]()
+                           { return loop.is_running(); }));
     check();
     loop.request_stop();
     thread.join();
@@ -253,7 +255,8 @@ namespace
     softadastra::HostProfileStore profile(directory / "host-profile");
     ASSERT_TRUE(profile.load("host"));
     softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
-    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 0); });
+    run_until_started(loop, [&platform]()
+                      { EXPECT_EQ(platform.managed_.start_calls, 0); });
     std::filesystem::remove_all(directory);
   }
 
@@ -268,7 +271,8 @@ namespace
     softadastra::HostProfileStore profile(directory / "host-profile");
     ASSERT_TRUE(profile.provision_box("host"));
     softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
-    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 1); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Running); });
+    run_until_started(loop, [&platform]()
+                      { EXPECT_EQ(platform.managed_.start_calls, 1); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Running); });
     std::filesystem::remove_all(directory);
   }
 
@@ -284,7 +288,8 @@ namespace
     softadastra::HostProfileStore profile(directory / "host-profile");
     ASSERT_TRUE(profile.provision_box("host"));
     softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
-    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 0); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Running); });
+    run_until_started(loop, [&platform]()
+                      { EXPECT_EQ(platform.managed_.start_calls, 0); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Running); });
     std::filesystem::remove_all(directory);
   }
 
@@ -300,7 +305,8 @@ namespace
     softadastra::HostProfileStore profile(directory / "host-profile");
     ASSERT_TRUE(profile.provision_box("host"));
     softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
-    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 0); EXPECT_EQ(platform.managed_.status().capability, softadastra::ManagedNetworkCapability::Unavailable); });
+    run_until_started(loop, [&platform]()
+                      { EXPECT_EQ(platform.managed_.start_calls, 0); EXPECT_EQ(platform.managed_.status().capability, softadastra::ManagedNetworkCapability::Unavailable); });
     std::filesystem::remove_all(directory);
   }
 
@@ -316,7 +322,8 @@ namespace
     softadastra::HostProfileStore profile(directory / "host-profile");
     ASSERT_TRUE(profile.provision_box("host"));
     softadastra::HostLoop loop(service, state_file, std::chrono::milliseconds(1), nullptr, &profile);
-    run_until_started(loop, [&platform]() { EXPECT_EQ(platform.managed_.start_calls, 1); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Stopped); });
+    run_until_started(loop, [&platform]()
+                      { EXPECT_EQ(platform.managed_.start_calls, 1); EXPECT_EQ(platform.managed_.status().state, softadastra::ManagedNetworkState::Stopped); });
     std::filesystem::remove_all(directory);
   }
 
@@ -335,14 +342,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&loop]()
-                           {
-                             return loop.is_running();
-                           }));
+                           { return loop.is_running(); }));
     loop.request_stop();
     thread.join();
 
@@ -375,14 +378,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&loop]()
-                           {
-                             return loop.is_running();
-                           }));
+                           { return loop.is_running(); }));
     EXPECT_EQ(host.state().software_count(), 1U);
     const auto *entry = host.state().find_software(
         softadastra::SoftwareId("example"));
@@ -421,14 +420,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&refresh_count]()
-                           {
-                             return refresh_count >= 3U;
-                           }));
+                           { return refresh_count >= 3U; }));
     loop.request_stop();
     thread.join();
 
@@ -459,14 +454,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&loop]()
-                           {
-                             return loop.is_running();
-                           }));
+                           { return loop.is_running(); }));
     loop.request_stop();
     thread.join();
 
@@ -509,14 +500,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{false};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&loop]()
-                           {
-                             return loop.is_running();
-                           }));
+                           { return loop.is_running(); }));
     loop.request_stop();
     thread.join();
 
@@ -552,14 +539,10 @@ namespace
         std::chrono::milliseconds(1));
     std::atomic_bool completed{true};
     std::thread thread([&loop, &completed]()
-                       {
-                         completed = loop.run();
-                       });
+                       { completed = loop.run(); });
 
     EXPECT_TRUE(wait_until([&loop]()
-                           {
-                             return loop.is_running();
-                           }));
+                           { return loop.is_running(); }));
     loop.request_stop();
     thread.join();
 

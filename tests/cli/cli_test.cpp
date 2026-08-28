@@ -22,23 +22,37 @@ namespace
   {
   public:
     explicit Process(bool running = true) : running_(running) {}
-    bool stop() override { running_ = false; return true; }
+    bool stop() override
+    {
+      running_ = false;
+      return true;
+    }
     [[nodiscard]] bool is_running() const noexcept override { return running_; }
     [[nodiscard]] std::optional<int> exit_code() noexcept override { return std::nullopt; }
-  private: bool running_{true};
+
+  private:
+    bool running_{true};
   };
 
   class Launcher final : public softadastra::ProcessLauncher
   {
   public:
     [[nodiscard]] softadastra::ProcessLaunchResult launch(const softadastra::ProcessSpec &spec) override
-    { last_spec = spec; return std::make_unique<Process>(process_running); }
+    {
+      last_spec = spec;
+      return std::make_unique<Process>(process_running);
+    }
     std::optional<softadastra::ProcessSpec> last_spec;
     bool process_running{true};
   };
 
   class Service final : public softadastra::Service
-  { public: bool start() override { return true; } bool stop() override { return true; } [[nodiscard]] bool is_running() const noexcept override { return true; } };
+  {
+  public:
+    bool start() override { return true; }
+    bool stop() override { return true; }
+    [[nodiscard]] bool is_running() const noexcept override { return true; }
+  };
 
   class Network final : public softadastra::Network
   {
@@ -78,7 +92,10 @@ namespace
 
     softadastra::ManagedNetworkStatus current{
         softadastra::ManagedNetworkCapability::Unavailable,
-        softadastra::ManagedNetworkState::Stopped, {}, {}, {}};
+        softadastra::ManagedNetworkState::Stopped,
+        {},
+        {},
+        {}};
     softadastra::ManagedNetworkStartResult start_result{
         softadastra::ManagedNetworkStartResult::Unavailable};
     int start_calls{0};
@@ -95,7 +112,10 @@ namespace
     [[nodiscard]] const softadastra::Network &network() const noexcept override { return network_; }
     [[nodiscard]] softadastra::ManagedNetwork &managed_network() noexcept override { return managed_network_; }
     [[nodiscard]] const softadastra::ManagedNetwork &managed_network() const noexcept override { return managed_network_; }
-    Launcher launcher; Service service_; Network network_; ManagedNetwork managed_network_;
+    Launcher launcher;
+    Service service_;
+    Network network_;
+    ManagedNetwork managed_network_;
   };
 
   std::string shell_executable()
@@ -177,8 +197,14 @@ namespace
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-name-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher); softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
     const char *arguments[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, arguments), 0);
     std::filesystem::current_path(previous);
@@ -256,32 +282,49 @@ namespace
     std::filesystem::create_directories(root);
     const softadastra::ProjectConfig config{softadastra::ProjectIdentity("toml-stable-id"), "pico", "./build/app", std::nullopt, {}};
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, config));
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("legacy-pico"), softadastra::ProcessSpec("--access")));
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
     const char *args[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
     EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("./build/app"), std::string::npos);
     EXPECT_TRUE(client.software(softadastra::SoftwareId("toml-stable-id")).has_value());
-    std::filesystem::current_path(previous); std::filesystem::remove_all(root);
+    std::filesystem::current_path(previous);
+    std::filesystem::remove_all(root);
   }
 
   TEST(CliTest, ListsAndShowsInfoForRegisteredSoftware)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("api"), softadastra::ProcessSpec("api", {}, "/project/api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8000)));
-    const char *run_args[] = {"softadastra", "run", "api"}; EXPECT_EQ(cli.run(3, run_args), 0);
-    const char *list_args[] = {"softadastra", "list", "--running"}; EXPECT_EQ(cli.run(3, list_args), 0);
-    const char *info_args[] = {"softadastra", "info", "api"}; EXPECT_EQ(cli.run(3, info_args), 0);
+    const char *run_args[] = {"softadastra", "run", "api"};
+    EXPECT_EQ(cli.run(3, run_args), 0);
+    const char *list_args[] = {"softadastra", "list", "--running"};
+    EXPECT_EQ(cli.run(3, list_args), 0);
+    const char *info_args[] = {"softadastra", "info", "api"};
+    EXPECT_EQ(cli.run(3, info_args), 0);
   }
 
   TEST(CliTest, HelpFlagsAreNeverSoftwareNames)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     const char *top_help[] = {"softadastra", "--help"};
     const char *access_help[] = {"softadastra", "access", "-h"};
     const char *run_help[] = {"softadastra", "help", "run"};
@@ -292,8 +335,11 @@ namespace
 
   TEST(CliTest, ShowsNetworkCapabilityAndNetworkHelp)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
     softadastra::Cli cli(client);
     const char *info[] = {"softadastra", "network", "info"};
     const char *short_help[] = {"softadastra", "network", "-h"};
@@ -312,23 +358,34 @@ namespace
 
   TEST(CliTest, ReportsUnavailableManagedNetworkWithoutChangingState)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     const char *start[] = {"softadastra", "network", "start"};
     const char *status[] = {"softadastra", "network", "status"};
     const char *stop[] = {"softadastra", "network", "stop"};
-    testing::internal::CaptureStderr(); EXPECT_EQ(cli.run(3, start), 1);
+    testing::internal::CaptureStderr();
+    EXPECT_EQ(cli.run(3, start), 1);
     EXPECT_NE(testing::internal::GetCapturedStderr().find("Managed network is unavailable"), std::string::npos);
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, status), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, status), 0);
     EXPECT_NE(testing::internal::GetCapturedStdout().find("Managed network: stopped"), std::string::npos);
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, stop), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, stop), 0);
     EXPECT_NE(testing::internal::GetCapturedStdout().find("is not running"), std::string::npos);
   }
 
   TEST(CliTest, ResolvesLocalAccessFromCurrentNetworkAndSoftwareState)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("api"), softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.start_software(softadastra::SoftwareId("api")));
     const char *access_api[] = {"softadastra", "access", "api"};
@@ -379,8 +436,12 @@ namespace
 
   TEST(CliTest, ExplainsUnavailableNetworkAndSupportsHttpsAccess)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("secure"), softadastra::ProcessSpec("secure"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Https, 8443)));
     ASSERT_TRUE(client.start_software(softadastra::SoftwareId("secure")));
     const char *access_secure[] = {"softadastra", "access", "secure"};
@@ -405,8 +466,12 @@ namespace
 
   TEST(CliTest, StartsManagedNetworkOnlyAsFallbackForRunningAccess)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     const auto id = softadastra::SoftwareId("api");
     ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.start_software(id));
@@ -414,50 +479,75 @@ namespace
     platform.managed_network_.current = {softadastra::ManagedNetworkCapability::Available, softadastra::ManagedNetworkState::Stopped, "wlan1", "10.42.0.1", "Softadastra-test"};
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Started;
     const char *access[] = {"softadastra", "access", "api"};
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access), 0);
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_EQ(platform.managed_network_.start_calls, 1);
     EXPECT_NE(output.find("Network:       managed"), std::string::npos);
     EXPECT_NE(output.find("http://10.42.0.1:8080"), std::string::npos);
     EXPECT_NE(output.find("Scan with your phone."), std::string::npos);
 
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access), 0);
     static_cast<void>(testing::internal::GetCapturedStdout());
     EXPECT_EQ(platform.managed_network_.start_calls, 1);
   }
 
   TEST(CliTest, DoesNotStartManagedNetworkForExistingStoppedFailedOrMissingAccess)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
-    const auto api = softadastra::SoftwareId("api"); const auto worker = softadastra::SoftwareId("worker");
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
+    const auto api = softadastra::SoftwareId("api");
+    const auto worker = softadastra::SoftwareId("worker");
     ASSERT_TRUE(client.register_software(api, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.register_software(worker, softadastra::ProcessSpec("worker")));
     platform.managed_network_.current.capability = softadastra::ManagedNetworkCapability::Available;
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Started;
-    const char *access_api[] = {"softadastra", "access", "api"}; const char *access_worker[] = {"softadastra", "access", "worker"};
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access_api), 1); static_cast<void>(testing::internal::GetCapturedStdout());
-    testing::internal::CaptureStderr(); EXPECT_EQ(cli.run(3, access_worker), 1); static_cast<void>(testing::internal::GetCapturedStderr());
+    const char *access_api[] = {"softadastra", "access", "api"};
+    const char *access_worker[] = {"softadastra", "access", "worker"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 1);
+    static_cast<void>(testing::internal::GetCapturedStdout());
+    testing::internal::CaptureStderr();
+    EXPECT_EQ(cli.run(3, access_worker), 1);
+    static_cast<void>(testing::internal::GetCapturedStderr());
     EXPECT_EQ(platform.managed_network_.start_calls, 0);
 
-    ASSERT_TRUE(client.start_software(api)); ASSERT_TRUE(client.stop_software(api));
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access_api), 1); static_cast<void>(testing::internal::GetCapturedStdout());
+    ASSERT_TRUE(client.start_software(api));
+    ASSERT_TRUE(client.stop_software(api));
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 1);
+    static_cast<void>(testing::internal::GetCapturedStdout());
     EXPECT_EQ(platform.managed_network_.start_calls, 0);
-    platform.launcher.process_running = false; EXPECT_FALSE(client.start_software(api));
-    testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access_api), 1); static_cast<void>(testing::internal::GetCapturedStdout());
+    platform.launcher.process_running = false;
+    EXPECT_FALSE(client.start_software(api));
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access_api), 1);
+    static_cast<void>(testing::internal::GetCapturedStdout());
     EXPECT_EQ(platform.managed_network_.start_calls, 0);
   }
 
   TEST(CliTest, ReportsManagedNetworkStartFailureWithoutUrlOrQr)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     const auto id = softadastra::SoftwareId("api");
-    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080))); ASSERT_TRUE(client.start_software(id));
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
+    ASSERT_TRUE(client.start_software(id));
     platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
     platform.managed_network_.current.capability = softadastra::ManagedNetworkCapability::Available;
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Failed;
-    const char *access[] = {"softadastra", "access", "api"}; testing::internal::CaptureStdout(); EXPECT_EQ(cli.run(3, access), 1);
+    const char *access[] = {"softadastra", "access", "api"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, access), 1);
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_EQ(platform.managed_network_.start_calls, 1);
     EXPECT_NE(output.find("Unable to start a local Softadastra network."), std::string::npos);
@@ -467,8 +557,12 @@ namespace
 
   TEST(CliTest, ExplainsMissingAccessPoint)
   {
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("worker"), softadastra::ProcessSpec("worker")));
     const char *access_worker[] = {"softadastra", "access", "worker"};
     testing::internal::CaptureStderr();
@@ -483,19 +577,41 @@ namespace
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-target-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("project-app"), "app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080), {}}));
-    Platform platform; softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server); softadastra::Cli cli(client);
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("project-app"), softadastra::ProcessSpec("--access"), std::nullopt, softadastra::ProjectIdentity("project-app")));
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
-    const char *start_project[] = {"softadastra", "run"}; const char *stop_project[] = {"softadastra", "stop"};
-    const char *restart_project[] = {"softadastra", "restart"}; const char *status_project[] = {"softadastra", "status"};
-    const char *info_project[] = {"softadastra", "info"}; const char *access_project[] = {"softadastra", "access"};
-    const char *start_named[] = {"softadastra", "start", "project-app"}; const char *stop_named[] = {"softadastra", "stop", "project-app"};
-    const char *restart_named[] = {"softadastra", "restart", "project-app"}; const char *status_named[] = {"softadastra", "status", "project-app"};
-    const char *info_named[] = {"softadastra", "info", "project-app"}; const char *access_named[] = {"softadastra", "access", "project-app"};
-    EXPECT_EQ(cli.run(2, start_project), 0); EXPECT_EQ(cli.run(2, status_project), 0); EXPECT_EQ(cli.run(2, info_project), 0); EXPECT_EQ(cli.run(2, access_project), 0); EXPECT_EQ(cli.run(2, stop_project), 0); EXPECT_EQ(cli.run(2, restart_project), 0);
-    EXPECT_EQ(cli.run(3, start_named), 0); EXPECT_EQ(cli.run(3, status_named), 0); EXPECT_EQ(cli.run(3, info_named), 0); EXPECT_EQ(cli.run(3, access_named), 0); EXPECT_EQ(cli.run(3, stop_named), 0); EXPECT_EQ(cli.run(3, restart_named), 0);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const char *start_project[] = {"softadastra", "run"};
+    const char *stop_project[] = {"softadastra", "stop"};
+    const char *restart_project[] = {"softadastra", "restart"};
+    const char *status_project[] = {"softadastra", "status"};
+    const char *info_project[] = {"softadastra", "info"};
+    const char *access_project[] = {"softadastra", "access"};
+    const char *start_named[] = {"softadastra", "start", "project-app"};
+    const char *stop_named[] = {"softadastra", "stop", "project-app"};
+    const char *restart_named[] = {"softadastra", "restart", "project-app"};
+    const char *status_named[] = {"softadastra", "status", "project-app"};
+    const char *info_named[] = {"softadastra", "info", "project-app"};
+    const char *access_named[] = {"softadastra", "access", "project-app"};
+    EXPECT_EQ(cli.run(2, start_project), 0);
+    EXPECT_EQ(cli.run(2, status_project), 0);
+    EXPECT_EQ(cli.run(2, info_project), 0);
+    EXPECT_EQ(cli.run(2, access_project), 0);
+    EXPECT_EQ(cli.run(2, stop_project), 0);
+    EXPECT_EQ(cli.run(2, restart_project), 0);
+    EXPECT_EQ(cli.run(3, start_named), 0);
+    EXPECT_EQ(cli.run(3, status_named), 0);
+    EXPECT_EQ(cli.run(3, info_named), 0);
+    EXPECT_EQ(cli.run(3, access_named), 0);
+    EXPECT_EQ(cli.run(3, stop_named), 0);
+    EXPECT_EQ(cli.run(3, restart_named), 0);
     EXPECT_EQ(client.software(softadastra::SoftwareId("project-app"))->process_spec().arguments(), shell_arguments("sleep 30"));
-    std::filesystem::current_path(previous); std::filesystem::remove_all(root);
+    std::filesystem::current_path(previous);
+    std::filesystem::remove_all(root);
   }
 }

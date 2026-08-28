@@ -681,20 +681,27 @@ namespace
 
   TEST(SoftwareManagerTest, EnforcesUniqueNamesAndKeepsFailedRenameAtomic)
   {
-    softadastra::HostState state; TestProcessLauncher launcher; softadastra::SoftwareManager manager(state, launcher);
+    softadastra::HostState state;
+    TestProcessLauncher launcher;
+    softadastra::SoftwareManager manager(state, launcher);
     const softadastra::SoftwareId api("A"), worker("B");
-    const auto http8000=softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8000);
-    const auto http9000=softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 9000);
+    const auto http8000 = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8000);
+    const auto http9000 = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 9000);
     ASSERT_TRUE(manager.register_software(api, softadastra::ProcessSpec("command-A", {}, "/project/A"), http8000, std::nullopt, "api"));
     ASSERT_TRUE(manager.register_software(worker, softadastra::ProcessSpec("command-B"), std::nullopt, std::nullopt, "worker"));
     EXPECT_FALSE(manager.register_software(softadastra::SoftwareId("C"), softadastra::ProcessSpec("other"), std::nullopt, std::nullopt, "api"));
     EXPECT_FALSE(manager.synchronize(api, softadastra::ProcessSpec("command-new", {}, "/project/new"), http9000, "worker"));
-    const auto entry=manager.find_by_name("api"); ASSERT_TRUE(entry.has_value());
-    EXPECT_EQ(entry->process_spec().executable(), "command-A"); EXPECT_EQ(entry->process_spec().working_directory(), "/project/A");
-    ASSERT_TRUE(entry->access_point().has_value()); EXPECT_EQ(entry->access_point()->port(), 8000);
-    EXPECT_FALSE(manager.find_by_name("").has_value()); EXPECT_FALSE(manager.find_by_name("unknown").has_value());
+    const auto entry = manager.find_by_name("api");
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->process_spec().executable(), "command-A");
+    EXPECT_EQ(entry->process_spec().working_directory(), "/project/A");
+    ASSERT_TRUE(entry->access_point().has_value());
+    EXPECT_EQ(entry->access_point()->port(), 8000);
+    EXPECT_FALSE(manager.find_by_name("").has_value());
+    EXPECT_FALSE(manager.find_by_name("unknown").has_value());
     EXPECT_TRUE(manager.synchronize(api, softadastra::ProcessSpec("command-A", {}, "/project/A"), http8000, "backend"));
-    EXPECT_FALSE(manager.find_by_name("api").has_value()); EXPECT_EQ(manager.find_by_name("backend")->id(), api);
+    EXPECT_FALSE(manager.find_by_name("api").has_value());
+    EXPECT_EQ(manager.find_by_name("backend")->id(), api);
   }
 
 } // namespace

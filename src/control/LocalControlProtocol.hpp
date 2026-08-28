@@ -23,30 +23,50 @@
 namespace softadastra
 {
   /**
-   * @brief Encodes fields used by the local Host control protocol.
+   * @brief Provides encoding and parsing utilities for the local Host control protocol.
+   *
+   * LocalControlProtocol defines the field-level transformations used to
+   * construct and interpret messages exchanged through the local control
+   * interface.
    */
   class LocalControlProtocol
   {
   public:
     /**
      * @brief Encodes a string as a whitespace-safe hexadecimal field.
+     *
+     * @param value String value to encode.
+     *
+     * @return Hexadecimal representation of the supplied value.
      */
     [[nodiscard]] static std::string encode(std::string_view value);
 
     /**
      * @brief Decodes a hexadecimal protocol field.
+     *
+     * @param value Encoded field to decode.
+     *
+     * @return Decoded string, or std::nullopt if the field is invalid.
      */
     [[nodiscard]] static std::optional<std::string> decode(
         std::string_view value);
 
     /**
      * @brief Splits a protocol message into whitespace-separated fields.
+     *
+     * @param message Protocol message to split.
+     *
+     * @return Fields contained in the message.
      */
     [[nodiscard]] static std::vector<std::string> fields(
         std::string_view message);
 
     /**
      * @brief Parses an integer protocol field.
+     *
+     * @param value Field containing the integer representation.
+     *
+     * @return Parsed integer, or std::nullopt if the field is invalid.
      */
     [[nodiscard]] static std::optional<int> integer(
         std::string_view value);
