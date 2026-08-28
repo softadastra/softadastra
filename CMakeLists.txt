@@ -41,14 +41,27 @@ option(
 find_package(Vix CONFIG QUIET)
 if(NOT Vix_FOUND)
   include(FetchContent)
+
+  # Vix is a dependency here: retain only the process API Softadastra uses.
+  # These official Vix options must be set before FetchContent makes Vix
+  # available, otherwise its module tests inherit VIX_BUILD_TESTS=ON.
   set(VIX_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(VIX_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
   set(VIX_SDK_PROFILE default CACHE STRING "" FORCE)
+  set(VIX_ENABLE_CLI OFF CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_UI OFF CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_TEMPLATE OFF CACHE BOOL "" FORCE)
   set(VIX_ENABLE_NOTE OFF CACHE BOOL "" FORCE)
-  set(VIX_ENABLE_TESTS_MODULE ON CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_TESTS_MODULE OFF CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_THREADPOOL OFF CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_TIME OFF CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_PROCESS ON CACHE BOOL "" FORCE)
+  set(VIX_ENABLE_ASYNC ON CACHE BOOL "" FORCE)
   FetchContent_Declare(
     vix
     GIT_REPOSITORY https://github.com/vixcpp/vix.git
-    GIT_TAG v2.7.8
+    GIT_TAG v2.8.5
     GIT_SHALLOW TRUE
   )
   FetchContent_MakeAvailable(vix)
@@ -126,7 +139,7 @@ target_include_directories(
 target_link_libraries(
   softadastra_internal
   PUBLIC
-    vix::vix
+    vix::process
     OpenSSL::Crypto
     OpenSSL::SSL
 )
