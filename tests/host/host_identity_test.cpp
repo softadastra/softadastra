@@ -127,10 +127,16 @@ namespace
     ASSERT_TRUE(identity.load_or_create());
     ASSERT_TRUE(identity.write_tls_certificate(certificate_path, private_key_path));
 
-    FILE *certificate_file = std::fopen(certificate_path.c_str(), "rb");
-    ASSERT_NE(certificate_file, nullptr);
-    X509 *certificate = PEM_read_X509(certificate_file, nullptr, nullptr, nullptr);
-    std::fclose(certificate_file);
+    std::ifstream certificate_input(certificate_path, std::ios::binary);
+    ASSERT_TRUE(certificate_input);
+    const std::string certificate_pem(
+        (std::istreambuf_iterator<char>(certificate_input)), {});
+    BIO *certificate_bio = BIO_new_mem_buf(
+        certificate_pem.data(), static_cast<int>(certificate_pem.size()));
+    ASSERT_NE(certificate_bio, nullptr);
+    X509 *certificate = PEM_read_bio_X509(
+        certificate_bio, nullptr, nullptr, nullptr);
+    BIO_free(certificate_bio);
     ASSERT_NE(certificate, nullptr);
     EVP_PKEY *public_key = X509_get_pubkey(certificate);
     ASSERT_NE(public_key, nullptr);

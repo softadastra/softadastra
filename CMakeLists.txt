@@ -253,16 +253,18 @@ include(CPack)
 if(SOFTADASTRA_BUILD_TESTS)
   include(CTest)
 
-  add_test(
-    NAME softadastra_box_install_test
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/box/install_test.sh
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(
+      NAME softadastra_box_install_test
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/box/install_test.sh
+    )
 
-  set_tests_properties(
-    softadastra_box_install_test
-    PROPERTIES
-      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
+    set_tests_properties(
+      softadastra_box_install_test
+      PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+  endif()
 
   find_package(GTest CONFIG QUIET)
 
@@ -523,10 +525,19 @@ if(SOFTADASTRA_BUILD_TESTS)
     tests/host/host_peer_trust_test.cpp
   )
 
-  softadastra_add_test(
-    softadastra_host_peer_transport_test
-    tests/host/host_peer_transport_test.cpp
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    softadastra_add_test(
+      softadastra_host_peer_transport_test
+      tests/host/host_peer_transport_test.cpp
+    )
+  endif()
+
+  if(WIN32)
+    softadastra_add_test(
+      softadastra_host_peer_transport_windows_test
+      tests/host/host_peer_transport_windows_test.cpp
+    )
+  endif()
 
   softadastra_add_test(
     softadastra_remote_access_config_test
@@ -580,14 +591,23 @@ if(SOFTADASTRA_BUILD_TESTS)
     tests/integration/host_runtime_test.cpp
   )
 
-  softadastra_add_test(
-    softadastra_local_control_test
-    tests/integration/local_control_test.cpp
-  )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    softadastra_add_test(
+      softadastra_local_control_test
+      tests/integration/local_control_test.cpp
+    )
 
-  target_compile_definitions(
-    softadastra_local_control_test
-    PRIVATE
+    target_compile_definitions(
+      softadastra_local_control_test
+      PRIVATE
       SOFTADASTRA_EXECUTABLE="$<TARGET_FILE:softadastra>"
-  )
+    )
+  endif()
+
+  if(WIN32)
+    softadastra_add_test(
+      softadastra_local_control_windows_test
+      tests/control/local_control_windows_test.cpp
+    )
+  endif()
 endif()

@@ -128,7 +128,9 @@ TEST(AccessUrlTest, EncodesKnownUrlAsReferenceCodewords)
           continue;
 
         const bool value = encoded.module(row, col) ^ is_masked(row, col);
-        byte = static_cast<std::uint8_t>((byte << 1U) | value);
+        byte = static_cast<std::uint8_t>(
+            (static_cast<unsigned int>(byte) << 1U) |
+            (value ? 1U : 0U));
         if (++bit_count == 8)
         {
           actual.push_back(byte);

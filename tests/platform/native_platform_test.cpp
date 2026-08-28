@@ -55,9 +55,9 @@ namespace
             softadastra::NativePlatform>));
   }
 
-  TEST(NativePlatformTest, ReportsLinuxHostSupport)
+  TEST(NativePlatformTest, ReportsSupportedHostPlatforms)
   {
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
     EXPECT_TRUE(softadastra::NativePlatform::host_supported());
 #else
     EXPECT_FALSE(softadastra::NativePlatform::host_supported());
