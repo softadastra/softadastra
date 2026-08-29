@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vMAJOR.MINOR.PATCH tag to release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Linux x86_64 package
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Validate tag
+        run: '[[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - name: Verify package version
+        run: grep -F "set(CPACK_PACKAGE_VERSION \"${TAG#v}\")" CMakeLists.txt
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libssl-dev
+      - name: Configure
+        run: cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build-release --parallel
+      - name: Test Softadastra
+        run: ctest --test-dir build-release --output-on-failure
+      - name: Create DEB package
+        run: cpack --config build-release/CPackConfig.cmake -G DEB
+      - name: Verify and stage package
+        run: |
+          shopt -s nullglob
+          packages=(build-release/*.deb)
+          test "${#packages[@]}" -eq 1
+          mkdir dist
+          mv "${packages[0]}" "dist/softadastra-${TAG}-linux-x86_64.deb"
+      - name: Smoke test the installed DEB payload
+        run: |
+          package="dist/softadastra-${TAG}-linux-x86_64.deb"
+          dpkg-deb --info "$package"
+          smoke_root=$(mktemp -d)
+          trap 'rm -rf "$smoke_root"' EXIT
+          dpkg-deb --extract "$package" "$smoke_root"
+          installed="$smoke_root/usr/bin/softadastra"
+          test -x "$installed"
+          ldd "$installed"
+          ! ldd "$installed" | grep -F 'not found'
+          env -i PATH=/usr/bin:/bin HOME="$smoke_root/home" "$installed" --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x86_64
+          if-no-files-found: error
+          path: dist/softadastra-${{ env.TAG }}-linux-x86_64.deb
+
+  windows:
+    name: Windows x86_64 package
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Validate tag
+        shell: pwsh
+        run: if ($env:TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Tag must be vMAJOR.MINOR.PATCH.' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - name: Verify package version
+        shell: pwsh
+        run: if (-not (Select-String -Path CMakeLists.txt -SimpleMatch "set(CPACK_PACKAGE_VERSION `"$($env:TAG.Substring(1))`"")) { throw 'Tag and CPack package version differ.' }
+      - name: Enable MSVC x64
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Install build dependencies
+        shell: pwsh
+        run: vcpkg install openssl:x64-windows
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Build
+        shell: pwsh
+        run: cmake --build build-release --parallel
+      - name: Test Softadastra
+        shell: pwsh
+        run: ctest --test-dir build-release --output-on-failure
+      - name: Create ZIP package
+        shell: pwsh
+        run: cpack --config build-release/CPackConfig.cmake -G ZIP
+      - name: Verify and stage package
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem build-release -Filter '*.zip' -File)
+          if ($packages.Count -ne 1) { throw "Expected exactly one ZIP package, found $($packages.Count)." }
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Move-Item $packages[0].FullName "dist/softadastra-$env:TAG-windows-x86_64.zip"
+      - name: Smoke test the packaged Windows application
+        shell: pwsh
+        run: |
+          $package = "dist/softadastra-$env:TAG-windows-x86_64.zip"
+          $smokeRoot = Join-Path $env:RUNNER_TEMP 'softadastra-package-smoke'
+          Expand-Archive -Path $package -DestinationPath $smokeRoot -Force
+          $binaries = @(Get-ChildItem $smokeRoot -Recurse -Filter softadastra.exe -File)
+          if ($binaries.Count -ne 1) { throw 'The ZIP must contain exactly one softadastra.exe.' }
+          $binary = $binaries[0]
+          $runtimeDlls = @(Get-ChildItem $binary.Directory -Filter '*.dll' -File)
+          if (-not ($runtimeDlls.Name -match '^libcrypto.*\.dll$')) { throw 'OpenSSL crypto runtime DLL is missing from the ZIP.' }
+          if (-not ($runtimeDlls.Name -match '^libssl.*\.dll$')) { throw 'OpenSSL SSL runtime DLL is missing from the ZIP.' }
+          & $binary.FullName --help
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged softadastra.exe --help failed.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x86_64
+          if-no-files-found: error
+          path: dist/softadastra-${{ env.TAG }}-windows-x86_64.zip
+
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [linux, windows]
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Assemble and verify release files
+        run: |
+          mkdir dist
+          mapfile -t packages < <(find artifacts -type f -printf '%f\n' | sort)
+          test "${#packages[@]}" -eq 2
+          test "$(printf '%s\n' "${packages[@]}" | uniq | wc -l)" -eq "${#packages[@]}"
+          test -f "artifacts/release-linux-x86_64/softadastra-${TAG}-linux-x86_64.deb"
+          test -f "artifacts/release-windows-x86_64/softadastra-${TAG}-windows-x86_64.zip"
+          cp artifacts/release-linux-x86_64/* dist/
+          cp artifacts/release-windows-x86_64/* dist/
+          (cd dist && sha256sum softadastra-* > SHA256SUMS)
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ env.TAG }}
+          files: dist/*
+          fail_on_unmatched_files: true

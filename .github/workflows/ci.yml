@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   linux:
@@ -20,72 +23,43 @@ jobs:
             cxx: clang++
     steps:
       - uses: actions/checkout@v4
-      - name: Install C++ dependencies
+      - name: Check whitespace
+        run: git diff --check
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes libspdlog-dev nlohmann-json3-dev
+          sudo apt-get install --yes ninja-build libssl-dev
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: cmake -S . -B build-ci -G Ninja -DSOFTADASTRA_BUILD_TESTS=ON
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON
       - name: Build
         run: cmake --build build-ci --parallel
-      - name: Run main Linux suites
-        run: |
-          ./build-ci/softadastra_local_gateway_test
-          ./build-ci/softadastra_local_dns_test
-          ./build-ci/softadastra_local_reachability_test
-          ./build-ci/softadastra_web_ui_server_test
-          ./build-ci/softadastra_remote_reachability_test
-          ./build-ci/softadastra_control_client_test
-          ./build-ci/softadastra_control_server_test
-          ./build-ci/softadastra_host_service_test
-      - name: Upload Linux binaries
-        if: matrix.compiler == 'GCC'
-        uses: actions/upload-artifact@v4
-        with:
-          name: softadastra-linux
-          if-no-files-found: error
-          path: |
-            build-ci/softadastra
-            build-ci/softadastra-gateway
+      - name: Test Softadastra
+        run: ctest --test-dir build-ci --output-on-failure
 
   windows:
-    name: Windows (MSVC)
+    name: Windows (MSVC x64)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Enable MSVC
+      - name: Check whitespace
+        shell: bash
+        run: git diff --check
+      - name: Enable MSVC x64
         uses: ilammy/msvc-dev-cmd@v1
-      - name: Install C++ dependencies
+        with:
+          arch: x64
+      - name: Install build dependencies
         shell: pwsh
-        run: vcpkg install spdlog:x64-windows nlohmann-json:x64-windows
+        run: vcpkg install openssl:x64-windows
       - name: Configure
         shell: pwsh
-        run: cmake -S . -B build-ci -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-      - name: Build softadastra and Windows core
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Build
         shell: pwsh
         run: cmake --build build-ci --parallel
-      - name: Run Windows-compatible tests
+      - name: Test Softadastra
         shell: pwsh
-        run: |
-          ./build-ci/softadastra_process_launcher_test.exe
-          ./build-ci/softadastra_native_process_test.exe
-          ./build-ci/softadastra_native_process_launcher_test.exe
-          ./build-ci/softadastra_host_instance_lock_test.exe
-          ./build-ci/softadastra_native_data_directory_test.exe
-          ./build-ci/softadastra_native_network_test.exe
-          ./build-ci/softadastra_native_platform_test.exe
-          ./build-ci/softadastra_control_client_test.exe
-          ./build-ci/softadastra_control_server_test.exe
-          ./build-ci/softadastra_host_service_test.exe
-          ./build-ci/softadastra_web_ui_server_test.exe
-          ./build-ci/softadastra_remote_reachability_test.exe
-          ./build-ci/softadastra_cli_test.exe
-      - name: Upload Windows binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: softadastra-windows
-          if-no-files-found: error
-          path: build-ci/softadastra.exe
+        run: ctest --test-dir build-ci --output-on-failure

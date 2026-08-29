@@ -1,0 +1,113 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sanitizers:
+    name: Linux sanitizers (Clang)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build clang libssl-dev
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: cmake -S . -B build-sanitizers -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON -DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address,undefined'
+      - name: Build
+        run: cmake --build build-sanitizers --parallel
+      - name: Test Softadastra
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitizers --output-on-failure
+
+  clang-tidy:
+    name: clang-tidy (Softadastra sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build clang-tidy libssl-dev
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: cmake -S . -B build-tidy -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Analyze Softadastra source and tests only
+        run: find src tests -name '*.cpp' -print0 | xargs -0 -r clang-tidy -p build-tidy --header-filter="^${GITHUB_WORKSPACE}/(src|tests)/"
+
+  valgrind:
+    name: Valgrind (representative Linux tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libssl-dev valgrind
+      - name: Configure
+        run: cmake -S . -B build-valgrind -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON
+      - name: Build representative tests
+        run: cmake --build build-valgrind --parallel --target softadastra_host_state_file_test softadastra_software_manager_test softadastra_cli_test
+      - name: Run representative tests under Valgrind
+        run: |
+          valgrind --error-exitcode=1 --leak-check=full --track-origins=yes ./build-valgrind/softadastra_host_state_file_test
+          valgrind --error-exitcode=1 --leak-check=full --track-origins=yes ./build-valgrind/softadastra_software_manager_test
+          valgrind --error-exitcode=1 --leak-check=full --track-origins=yes ./build-valgrind/softadastra_cli_test
+
+  warnings:
+    name: Warnings (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC
+            os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - name: Clang
+            os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+          - name: MSVC x64
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libssl-dev
+      - name: Enable MSVC x64
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Install Windows build dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: vcpkg install openssl:x64-windows
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: cmake -S . -B build-warnings -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake -S . -B build-warnings -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSOFTADASTRA_BUILD_TESTS=ON -DSOFTADASTRA_WARNINGS_AS_ERRORS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Build Softadastra with warnings as errors
+        run: cmake --build build-warnings --parallel

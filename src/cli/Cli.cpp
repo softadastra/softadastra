@@ -146,6 +146,43 @@ namespace
     }
   }
 
+  void launch_output_hint(
+      const SoftwareId &id)
+  {
+    const auto path =
+        NativeDataDirectory::path() /
+        "logs" /
+        (id.value() + ".log");
+    std::ifstream input(path);
+
+    if (!input)
+    {
+      return;
+    }
+
+    std::string line;
+    std::string last;
+
+    while (std::getline(input, line))
+    {
+      if (!line.empty())
+      {
+        last = line;
+      }
+    }
+
+    if (!last.empty())
+    {
+      std::cerr
+          << "\n\nProcess output:\n"
+          << "  "
+          << last
+          << "\n\nFull output:\n"
+          << "  softadastra logs "
+          << id.value();
+    }
+  }
+
   void unknown_software(
       const std::string &name)
   {
@@ -1191,7 +1228,7 @@ namespace softadastra
           std::cout
               << std::left
               << std::setw(12)
-              << entry.id().value()
+              << entry.name()
               << std::setw(11)
               << state_name(entry.state())
               << std::setw(13)
@@ -1749,6 +1786,8 @@ namespace softadastra
               << "  ";
 
           operation_error(result);
+
+          launch_output_hint(target->id);
 
           std::cerr << '\n';
 

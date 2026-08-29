@@ -38,6 +38,12 @@ option(
   ON
 )
 
+option(
+  SOFTADASTRA_WARNINGS_AS_ERRORS
+  "Treat warnings as errors for Softadastra targets"
+  OFF
+)
+
 find_package(Vix CONFIG QUIET)
 if(NOT Vix_FOUND)
   include(FetchContent)
@@ -173,6 +179,9 @@ if(MSVC)
       /W4
       /permissive-
   )
+  if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+    target_compile_options(softadastra_internal PRIVATE /WX)
+  endif()
 else()
   target_compile_options(
     softadastra_internal
@@ -183,6 +192,9 @@ else()
       -Wconversion
       -Wsign-conversion
   )
+  if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+    target_compile_options(softadastra_internal PRIVATE -Werror)
+  endif()
 endif()
 
 add_executable(
@@ -203,6 +215,9 @@ if(MSVC)
       /W4
       /permissive-
   )
+  if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+    target_compile_options(softadastra PRIVATE /WX)
+  endif()
 else()
   target_compile_options(
     softadastra
@@ -213,6 +228,9 @@ else()
       -Wconversion
       -Wsign-conversion
   )
+  if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+    target_compile_options(softadastra PRIVATE -Werror)
+  endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -229,8 +247,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
   if(MSVC)
     target_compile_options(softadastra-gateway PRIVATE /W4 /permissive-)
+    if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+      target_compile_options(softadastra-gateway PRIVATE /WX)
+    endif()
   else()
     target_compile_options(softadastra-gateway PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
+    if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+      target_compile_options(softadastra-gateway PRIVATE -Werror)
+    endif()
   endif()
 endif()
 
@@ -275,6 +299,31 @@ include(CPack)
 
 if(SOFTADASTRA_BUILD_TESTS)
   include(CTest)
+
+  add_executable(
+    softadastra_test_app
+    tests/fixtures/test_app.cpp
+  )
+
+  if(MSVC)
+    target_compile_options(softadastra_test_app PRIVATE /W4 /permissive-)
+    if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+      target_compile_options(softadastra_test_app PRIVATE /WX)
+    endif()
+  else()
+    target_compile_options(
+      softadastra_test_app
+      PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wconversion
+        -Wsign-conversion
+    )
+    if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+      target_compile_options(softadastra_test_app PRIVATE -Werror)
+    endif()
+  endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_test(
@@ -333,6 +382,9 @@ if(SOFTADASTRA_BUILD_TESTS)
           /W4
           /permissive-
       )
+      if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+        target_compile_options(${target} PRIVATE /WX)
+      endif()
     else()
       target_compile_options(
         ${target}
@@ -343,9 +395,13 @@ if(SOFTADASTRA_BUILD_TESTS)
           -Wconversion
           -Wsign-conversion
       )
+      if(SOFTADASTRA_WARNINGS_AS_ERRORS)
+        target_compile_options(${target} PRIVATE -Werror)
+      endif()
     endif()
 
-    if(target STREQUAL "softadastra_local_control_test")
+    if(target STREQUAL "softadastra_local_control_test" OR
+       target STREQUAL "softadastra_cli_e2e_test")
       gtest_discover_tests(${target} PROPERTIES RUN_SERIAL TRUE)
     else()
       gtest_discover_tests(${target})
@@ -633,4 +689,20 @@ if(SOFTADASTRA_BUILD_TESTS)
       tests/control/local_control_windows_test.cpp
     )
   endif()
+
+  softadastra_add_test(
+    softadastra_cli_e2e_test
+    tests/e2e/cli_e2e_test.cpp
+  )
+  add_dependencies(
+    softadastra_cli_e2e_test
+    softadastra
+    softadastra_test_app
+  )
+  target_compile_definitions(
+    softadastra_cli_e2e_test
+    PRIVATE
+      SOFTADASTRA_E2E_BINARY="$<TARGET_FILE:softadastra>"
+      SOFTADASTRA_E2E_TEST_APP="$<TARGET_FILE:softadastra_test_app>"
+  )
 endif()
