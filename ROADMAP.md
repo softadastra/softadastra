@@ -1,438 +1,286 @@
 # Softadastra Roadmap
 
-This roadmap describes the product capabilities Softadastra is building toward.
+Softadastra is being built in layers.
 
-It is intentionally organized around observable Host capabilities rather than internal classes, files, or implementation details.
+The order matters. Each stage should make the Host more useful without forcing hosted software to adopt a new application architecture.
 
-The roadmap may evolve as real usage reveals better solutions, but the foundational direction remains:
+The roadmap describes product capabilities, not individual implementation tasks.
 
-```text
-Machine + Softadastra = Host
-```
+## 0.1 - Host foundation
 
-Softadastra should grow by solving real Host problems, not by accumulating infrastructure subsystems without a demonstrated need.
+Build a Host that can run existing software reliably on Linux and Windows.
 
-## Phase 1: Host Foundation
+### Host
 
-### Goal
+- [x] Start and stop the Softadastra Host
+- [x] Report Host status and information
+- [x] Persist Host operational state
+- [x] Restore supervised software after Host restart
 
-Turn a supported machine into a functioning Softadastra Host.
+### Software lifecycle
 
-```text
-supported machine
-       +
-Softadastra
-       =
-working Host
-```
+- [x] Initialize a project with `softadastra.toml`
+- [x] Register software
+- [x] Run software from the current project
+- [x] Start registered software
+- [x] Stop software
+- [x] Restart software
+- [x] Remove software from the Host
+- [x] List registered software
+- [x] Report software status and information
+- [x] Capture software logs
+- [x] Clear logs
+- [x] Follow logs
+- [x] Report useful launch failures
 
-The first foundation must establish the minimum infrastructure required for the Host model to exist in practice.
+### Access
 
-### Capabilities
+- [x] Declare an application access point
+- [x] Support multiple access points
+- [x] Preserve compatibility with the original single-access format
+- [x] Report how hosted software can be reached
 
-- establish the Host model;
-- provide real platform integration;
-- execute real processes on a supported machine;
-- maintain Host-owned infrastructure state;
-- provide local Host control;
-- expose clear lifecycle state;
-- detect basic execution failures;
-- provide clear diagnostics;
-- provide a usable command-line interface.
+### Local control
 
-### Completion criteria
+- [x] Local Host control on Linux
+- [x] Local Host control on Windows
+- [x] Unix-local transport on Linux
+- [x] Named Pipe transport on Windows
+- [x] Stable local endpoint identity between processes
 
-A supported machine can run Softadastra as a real Host rather than only as an in-memory model or test environment.
+### User interface
 
-The Host can be controlled locally and can report meaningful infrastructure state.
+- [x] Command-line interface
+- [x] Local Web interface
+- [x] Application inventory
+- [x] Application lifecycle controls
+- [x] Project configuration editing
+- [x] Log access
 
----
+### Reliability
 
-## Phase 2: Software Hosting
+- [x] Unit tests
+- [x] Integration tests
+- [x] CLI end-to-end tests
+- [x] Linux GCC CI
+- [x] Linux Clang CI
+- [x] Windows MSVC CI
+- [x] Sanitizer validation
+- [x] Static analysis
+- [x] Strict warnings for Softadastra code
 
-### Goal
+### Distribution
 
-Run real existing software without requiring a Softadastra SDK or application framework.
+- [ ] Validate the complete Linux package
+- [ ] Validate the complete Windows package
+- [ ] Validate installation from a clean machine
+- [ ] Make first-time installation extremely simple
+- [ ] Publish the first stable `0.1.x` release
 
-```text
-existing software
-       |
-       v
-    register
-       |
-       v
-     start
-       |
-       v
-     status
-       |
-       v
-      stop
-```
+## 0.2 - Local reachability
 
-Softadastra must treat hosted software as externally owned software rather than as a Softadastra application type.
+Make software running on a Host easy to reach from the local machine and local network.
 
-### Capabilities
+The application should not need to know how the Host provides that reachability.
 
-- register software with a Host;
-- describe only the infrastructure information required to launch it;
-- associate software with its execution lifecycle;
-- start software;
-- stop software;
-- inspect software lifecycle state;
-- detect process termination;
-- report startup and runtime failures;
-- manage more than one software entry;
-- preserve Host-owned software metadata.
+### Existing networks
 
-### Constraints
+- [ ] Reliable discovery of usable local interfaces
+- [ ] Stable local application addresses
+- [ ] Clear access information for users on the same network
+- [ ] Reliable behavior when network interfaces change
 
-Software hosting must not require:
+### Managed local networking
 
-- a Softadastra SDK;
-- a specific programming language;
-- a specific framework;
-- a specific database;
-- HTTP;
-- WebSocket;
-- a proprietary Softadastra application protocol.
+Primarily for Linux Hosts and dedicated machines.
 
-### Completion criteria
+- [ ] Managed local network lifecycle
+- [ ] Local DNS
+- [ ] Local gateway
+- [ ] Dedicated Host network
+- [ ] Safe coexistence with an existing network
+- [ ] Recovery after network interruption
 
-A real third-party or user-owned program can be registered, started, inspected, stopped, and managed by a Host without being redesigned around Softadastra.
+A personal computer should not lose its normal connectivity simply because Softadastra is installed.
 
----
+## 0.3 - Softadastra Box
 
-## Phase 3: Local Access
-
-### Goal
-
-Make software hosted on a nearby Host simple to reach from local devices.
-
-```text
-phone
-   \
-laptop ---> Host ---> software
-   /
-tablet
-```
-
-Users should not need to understand unnecessary network infrastructure simply to access software running near them.
-
-### Capabilities
-
-Depending on the capabilities of the machine and network environment, this phase may include:
-
-- local Host addressing;
-- local reachability;
-- local Host discovery;
-- use of existing Wi-Fi networks;
-- use of Ethernet networks;
-- local naming where appropriate;
-- clear connectivity diagnostics;
-- simplified access information;
-- Host-provided local connectivity where supported.
-
-### Constraints
-
-Local access must remain an infrastructure concern.
-
-Softadastra must not classify hosted software by application protocol merely to provide local connectivity.
-
-### Completion criteria
-
-A user on a supported local network can discover or obtain a simple way to reach software running on the Host without manually configuring unnecessary infrastructure details.
-
----
-
-## Phase 4: Host Persistence
-
-### Goal
-
-Make the Host persistent infrastructure rather than a terminal-bound process.
-
-```text
-terminal closes
-     |
-     v
-Host continues
-```
-
-```text
-machine restarts
-     |
-     v
-Host returns
-```
-
-```text
-software exits unexpectedly
-     |
-     v
-Host detects it
-```
-
-### Capabilities
-
-- run Softadastra independently of an interactive terminal;
-- integrate with supported operating-system service mechanisms;
-- restore Host operation after machine restart;
-- maintain Host-owned state across restarts;
-- detect software process termination;
-- expose meaningful failure state;
-- support controlled Host shutdown;
-- provide basic recovery behavior where justified.
-
-### Completion criteria
-
-Closing the terminal does not stop the Host.
-
-After a supported machine restart, the Host can return to an operational state with its infrastructure metadata intact.
-
----
-
-## Phase 5: Remote Access
-
-### Goal
-
-Extend a Host beyond the local network without making local operation dependent on continuous Internet access.
-
-```text
-local users
-    |
-    v
-   Host
-    ^
-    |
- Internet
-    |
-remote user
-```
-
-### Capabilities
-
-This phase may include:
-
-- secure remote Host access;
-- remote administration;
-- Host identity;
-- authenticated Host control;
-- encrypted connectivity;
-- remote reachability through changing network environments;
-- optional relay infrastructure when direct connectivity is unavailable;
-- clear distinction between local and remote availability.
-
-### Principle
-
-```text
-Local = foundation
-Internet = extension
-```
-
-Loss of Internet access should not unnecessarily prevent local Host operation.
-
-### Completion criteria
-
-An authorized remote user can securely reach or administer a Host when Internet connectivity is available, while local capabilities remain independent where possible.
-
----
-
-## Phase 6: Softadastra Box
-
-### Goal
-
-Provide the Host model as a dedicated physical product.
+Turn a dedicated machine into a Host that can operate continuously with minimal administration.
 
 ```text
 dedicated machine
        +
-Softadastra
-       =
-Softadastra Box
-       =
-Host
+   Softadastra
+       ↓
+      Box
 ```
 
-The first Box does not require custom silicon or custom hardware manufacturing.
+The Box remains a Host. Applications should not need a separate Box-specific architecture.
 
-It can begin with existing hardware that provides the capabilities required for a dependable dedicated Host.
+### Provisioning
 
-### Early Box direction
+- [ ] Define the first reference hardware profile
+- [ ] Provision a compatible machine automatically
+- [ ] Configure Host startup
+- [ ] Configure local networking
+- [ ] Recover after power loss
+- [ ] Restore hosted software automatically
 
-An initial Box may combine:
+### System image
+
+- [ ] Define the minimal Linux system
+- [ ] Build a reproducible installation image
+- [ ] Make installation possible from removable media
+- [ ] Reduce installation to a small number of user decisions
+
+### Hardware validation
+
+- [ ] Test real mini-PC hardware
+- [ ] Record hardware-specific limitations
+- [ ] Define certification requirements
+- [ ] Publish the first list of validated machines
+
+A machine must not be called certified until it has been physically tested.
+
+## 0.4 - Secure remote reachability
+
+Allow an owner to reach a Host from outside the local network without making Internet connectivity necessary for local operation.
 
 ```text
-mini-PC
-+
-storage
-+
-network connectivity
-+
-supported operating environment
-+
-Softadastra
+Software
+   ↓
+Host
+   ├── local access
+   └── secure remote access
 ```
+
+### Identity
+
+- [ ] Stable Host identity
+- [ ] Host credentials
+- [ ] Identity verification
+- [ ] Credential rotation and recovery
+
+### Transport
+
+- [ ] Authenticated encrypted communication
+- [ ] Secure outbound remote connection
+- [ ] Remote application access
+- [ ] Remote Host management
+- [ ] Clear behavior when Internet connectivity disappears
+
+Remote access must not be presented as safe for public Internet use until authentication, encryption, authorization, and recovery have been validated together.
+
+## 0.5 - Multiple executions
+
+Allow one Software entry to contain more than one supervised execution when real applications require it.
+
+The model should remain generic.
+
+For example:
+
+```toml
+[[execution]]
+name = "server"
+command = "vix run"
+
+[[execution]]
+name = "web"
+directory = "frontend"
+command = "npm run preview"
+```
+
+Softadastra should not introduce semantic categories such as `frontend`, `backend`, `database`, or `worker`.
+
+They are executions.
 
 ### Capabilities
 
-A dedicated Box should progressively improve:
+- [ ] Multiple executions per Software
+- [ ] Independent execution lifecycle
+- [ ] Working directory per execution
+- [ ] Logs per execution
+- [ ] Application-level lifecycle
+- [ ] Failure propagation rules
+- [ ] Startup and shutdown ordering when required
 
-- installation simplicity;
-- startup behavior;
-- local connectivity;
-- continuous operation;
-- storage reliability;
-- update handling;
-- diagnostics;
-- low-maintenance operation;
-- physical deployment;
-- energy efficiency;
-- security;
-- serviceability.
+This stage should only begin when real applications demonstrate that the single-command model is no longer sufficient.
 
-### Software independence
+## 0.6 - Resource control
 
-A Softadastra Box must remain able to host compatible software that:
+Allow Hosts and hosted software to express and enforce resource limits without introducing infrastructure-specific application configuration.
 
-- belongs to the customer;
-- comes from another software company;
-- was developed by an independent developer;
-- already existed before Softadastra.
-
-The Box must not become a closed platform restricted to Softadastra-developed applications.
-
-### Completion criteria
-
-A user or organization can deploy a dedicated Softadastra Host with substantially less infrastructure setup than a general-purpose machine.
-
-### First Box implementation status
-
-- [x] Define minimum and recommended hardware needs
-- [x] Define a vendor-neutral x86_64 mini-PC profile
-- [x] Prepare reproducible Debian/Ubuntu provisioning
-- [x] Install the Host through a systemd unit
-- [x] Enable Host startup at boot
-- [x] Provide local status, access and connectivity commands
-- [x] Exercise lifecycle, network availability and reboot restoration in tests
-- [x] Exercise independent third-party process categories in tests
-- [ ] Build the first physical prototype
-
----
-
-## Phase 7: Host-to-Host
-
-### Goal
-
-Allow multiple Hosts to communicate and compose without replacing the Host abstraction with a larger speculative computing model.
+The intended concepts are small:
 
 ```text
-Host A <-> Host B <-> Host C
+ResourceBudget
+ResourcePolicy
 ```
 
-This phase should begin only when real Host usage demonstrates problems that require communication between Hosts.
+### Host resources
 
-### Possible capabilities
+- [ ] CPU capacity
+- [ ] Memory capacity
+- [ ] Process capacity
+- [ ] Host-wide resource accounting
 
-Real use cases may eventually justify:
+### Software resources
 
-- Host identity;
-- secure Host-to-Host connections;
-- Host discovery;
-- direct communication;
-- relays;
-- local Host networks;
-- regional Host networks;
-- connectivity across unreliable networks;
-- resilient communication paths;
-- controlled sharing of Host capabilities.
+- [ ] Per-application budgets
+- [ ] Per-execution budgets where necessary
+- [ ] Resource usage reporting
+- [ ] Resource enforcement
 
-### Constraints
+### Policies
 
-Softadastra must not pre-build:
+- [ ] Balanced policy
+- [ ] Dedicated policy
+- [ ] Custom policy
 
-- a global distributed scheduler;
-- a universal distributed store;
-- a global orchestration fabric;
-- a speculative worldwide mesh;
-- another fundamental runtime abstraction;
+Platform-specific enforcement may use mechanisms such as Linux cgroups or Windows Job Objects, but those mechanisms should remain behind the same Softadastra model.
 
-unless real Host requirements prove that such a capability is necessary.
+## 0.7 - Host-to-Host
 
-### Completion criteria
+Allow multiple Hosts to communicate and cooperate without turning the individual Host into a different product.
 
-Two or more Hosts can securely communicate to solve a demonstrated infrastructure problem while remaining independently useful Hosts.
+Host-to-Host should only be expanded when concrete product needs require it.
 
-### Phase 10 implementation status
+Possible capabilities include:
 
-- [x] Reuse persistent Host identity as public peer identity
-- [x] Implement TLS 1.3 direct Host-to-Host connection
-- [x] Implement explicit-address peer reachability
-- [x] Implement non-sensitive peer communication
-- [x] Test three independent Hosts on a LAN
-- [x] Test peer loss and reconnection
-- [x] Study NAT honestly
-- [x] Study relay necessity without implementing one
-- [x] Study regional independent-Host use
-- [x] Keep the architecture free of global coordination
+- [ ] Host discovery
+- [ ] Trusted Host relationships
+- [ ] Authenticated Host communication
+- [ ] Software reachability between Hosts
+- [ ] Coordination between Hosts
+- [ ] Operation across intermittently connected networks
 
----
+The architecture for this work is documented separately in `docs/host-to-host.md`.
 
-## Beyond the initial roadmap
+## Later
 
-Long-term Softadastra development may expand into new machine types, connectivity environments, hardware generations, and Host compositions.
+Some ideas may become useful after the previous foundations are proven:
 
-Those developments should continue to satisfy the same architectural test:
+- fleet management
+- automatic software distribution
+- Host migration
+- coordinated recovery
+- resource placement across several Hosts
+- larger Softadastra networks
 
-```text
-Does this solve a real Host problem?
-             |
-        +----+----+
-        |         |
-       yes        no
-        |         |
-        v         v
-consider it    do not add it
-```
+These are directions, not commitments.
 
-Before introducing a major capability, Softadastra should ask:
+They should not be implemented merely because they are technically possible.
 
-1. Does it solve a real problem at the Host infrastructure boundary?
-2. Can the existing Host model represent it?
-3. Does it force hosted software to adopt a Softadastra architecture?
-4. Is it required by current usage or only technically interesting?
-5. Can the infrastructure complexity be hidden safely from the user?
-6. Are we hiding a genuine incompatibility behind unnecessary abstraction?
+## Development rule
 
-## Roadmap principle
+The roadmap should grow from real requirements.
 
-The roadmap is not a commitment to build every possible infrastructure technology.
+When a new problem appears, the first question is not:
 
-It defines a direction of increasing Host usefulness:
+> Which new subsystem should Softadastra add?
 
-```text
-Host foundation
-      |
-      v
-real software hosting
-      |
-      v
-local access
-      |
-      v
-persistent Host
-      |
-      v
-remote access
-      |
-      v
-dedicated Box
-      |
-      v
-Host-to-Host
-```
+The first question is:
 
-Each phase should make the existing Host more useful.
+> Can the problem be represented using the concepts that already exist?
 
-A new phase should not require redefining what Softadastra is.
-
-For the foundational mission and design guardrails, see [MISSION.md](MISSION.md).
+Softadastra should remain a small set of concepts capable of supporting increasingly useful systems.
