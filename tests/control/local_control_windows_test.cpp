@@ -25,6 +25,8 @@
 
 #endif
 
+#if defined(_WIN32)
+
 namespace
 {
   TEST(LocalControlWindowsTest, ServesTheSharedProtocolOverNamedPipes)
@@ -88,3 +90,5 @@ namespace
     std::filesystem::remove_all(directory);
   }
 } // namespace
+
+#endif

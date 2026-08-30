@@ -62,11 +62,9 @@ namespace
 
     void TearDown() override
     {
-      static_cast<void>(run("host stop"));
-
       bool stopped = false;
 
-      for (int attempt = 0; attempt < 50; ++attempt)
+      for (int attempt = 0; attempt < 500; ++attempt)
       {
         static_cast<void>(run("host status"));
 
@@ -74,6 +72,11 @@ namespace
         {
           stopped = true;
           break;
+        }
+
+        if (last_output_.find("Host: running") != std::string::npos)
+        {
+          static_cast<void>(run("host stop"));
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(20));

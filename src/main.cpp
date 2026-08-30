@@ -67,6 +67,8 @@
 
 namespace
 {
+  constexpr int host_start_attempts = 500;
+
 #if defined(__linux__)
 
   void open_browser(
@@ -751,7 +753,7 @@ int main(
       }
 
       for (int attempt = 0;
-           attempt < 100 &&
+           attempt < host_start_attempts &&
            !control_client.host_available();
            ++attempt)
       {
@@ -1232,7 +1234,7 @@ int main(
         }
 
         for (int index = 0;
-             index < 100 &&
+             index < host_start_attempts &&
              !control_client.host_available();
              ++index)
         {
@@ -1306,7 +1308,7 @@ int main(
     }
 
     for (int attempt = 0;
-         attempt < 100;
+         attempt < host_start_attempts;
          ++attempt)
     {
       if (control_client.host_available())
