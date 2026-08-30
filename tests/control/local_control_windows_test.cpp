@@ -19,6 +19,12 @@
 #include <filesystem>
 #include <thread>
 
+#if defined(_WIN32)
+
+#include <windows.h>
+
+#endif
+
 namespace
 {
   TEST(LocalControlWindowsTest, ServesTheSharedProtocolOverNamedPipes)
