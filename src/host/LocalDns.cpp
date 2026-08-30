@@ -37,8 +37,12 @@ namespace
       const std::string &value,
       std::size_t position)
   {
-    return (static_cast<unsigned char>(value[position]) << 8) |
-           static_cast<unsigned char>(value[position + 1]);
+    return static_cast<std::uint16_t>(
+        (static_cast<std::uint16_t>(
+             static_cast<unsigned char>(value[position]))
+         << 8) |
+        static_cast<std::uint16_t>(
+            static_cast<unsigned char>(value[position + 1])));
   }
 
   void write16(

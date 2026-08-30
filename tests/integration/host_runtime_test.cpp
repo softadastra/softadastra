@@ -457,7 +457,7 @@ namespace
         "cmd.exe",
         {
             "/C",
-            "ping -n 2 127.0.0.1 >NUL & exit 0",
+            "exit 0",
         });
     const softadastra::ProcessSpec running_spec(
         "ping.exe",
@@ -470,7 +470,7 @@ namespace
         "cmd.exe",
         {
             "/C",
-            "ping -n 2 127.0.0.1 >NUL & exit 7",
+            "exit 7",
         });
 
 #else
@@ -665,12 +665,26 @@ namespace
       softadastra::Host host(platform);
       softadastra::HostService service(host, platform.process_launcher());
 
-      ASSERT_TRUE(service.register_software(
-          first,
-          softadastra::ProcessSpec("sleep", {"30"})));
-      ASSERT_TRUE(service.register_software(
-          second,
-          softadastra::ProcessSpec("sleep", {"30"})));
+#if defined(_WIN32)
+
+      const softadastra::ProcessSpec spec(
+          "ping.exe",
+          {
+              "-n",
+              "30",
+              "127.0.0.1",
+          });
+
+#else
+
+      const softadastra::ProcessSpec spec(
+          "sleep",
+          {"30"});
+
+#endif
+
+      ASSERT_TRUE(service.register_software(first, spec));
+      ASSERT_TRUE(service.register_software(second, spec));
       ASSERT_TRUE(softadastra::HostStateFile(path).save(host.state()));
     }
 
@@ -678,12 +692,14 @@ namespace
     softadastra::Host host(platform);
     ASSERT_TRUE(softadastra::HostStateFile(path).load(host.state()));
     softadastra::HostService service(host, platform.process_launcher());
-    RunningSoftwareCleanup cleanup(*new softadastra::ControlClient(
-        *new softadastra::ControlServer(service)));
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    RunningSoftwareCleanup cleanup(client);
 
     EXPECT_EQ(service.software_state(first).value(), softadastra::SoftwareState::Stopped);
     EXPECT_EQ(service.software_state(second).value(), softadastra::SoftwareState::Stopped);
     ASSERT_TRUE(service.start_software(first));
+    cleanup.track(first);
     EXPECT_EQ(service.software_state(first).value(), softadastra::SoftwareState::Running);
     EXPECT_TRUE(service.stop_software(first));
     std::filesystem::remove_all(directory);

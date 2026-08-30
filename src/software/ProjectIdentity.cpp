@@ -79,8 +79,10 @@ namespace softadastra
   {
     std::error_code error;
 
+    // Keep the caller's path spelling (notably Windows short paths) in the
+    // returned project root while still making relative paths usable.
     auto current =
-        std::filesystem::weakly_canonical(
+        std::filesystem::absolute(
             directory,
             error);
 

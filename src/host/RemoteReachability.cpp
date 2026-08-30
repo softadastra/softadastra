@@ -150,8 +150,12 @@ namespace
   std::uint16_t u16(
       const char *value)
   {
-    return (static_cast<unsigned char>(value[0]) << 8) |
-           static_cast<unsigned char>(value[1]);
+    return static_cast<std::uint16_t>(
+        (static_cast<std::uint16_t>(
+             static_cast<unsigned char>(value[0]))
+         << 8) |
+        static_cast<std::uint16_t>(
+            static_cast<unsigned char>(value[1])));
   }
 
   std::uint32_t u32(
@@ -465,7 +469,11 @@ namespace
       if (::connect(
               fd,
               item->ai_addr,
+#if defined(_WIN32)
+              static_cast<int>(item->ai_addrlen)) == 0)
+#else
               item->ai_addrlen) == 0)
+#endif
       {
         break;
       }

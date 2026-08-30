@@ -21,9 +21,11 @@ namespace
         softadastra::BoxState::NotProvisioned);
     ASSERT_TRUE(first.provision_box("host-id"));
     EXPECT_EQ(first.profile(), softadastra::HostProfile::Box);
+#if !defined(_WIN32)
     EXPECT_EQ(
         std::filesystem::status(path).permissions() & std::filesystem::perms::all,
         std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+#endif
     EXPECT_EQ(
         softadastra::box_state(
             first.profile(), true,

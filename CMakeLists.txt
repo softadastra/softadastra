@@ -32,6 +32,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Source files contain UTF-8 terminal glyphs.  MSVC otherwise interprets them
+# using the active Windows code page, which corrupts the QR renderer.
+if(MSVC)
+  add_compile_options(/utf-8)
+endif()
+
 option(
   SOFTADASTRA_BUILD_TESTS
   "Build Softadastra tests"
@@ -143,6 +149,11 @@ target_include_directories(
 )
 
 if(WIN32)
+  target_sources(
+    softadastra_internal
+    PRIVATE
+      src/host/OpenSslApplink.cpp
+  )
   target_compile_definitions(
     softadastra_internal
     PUBLIC

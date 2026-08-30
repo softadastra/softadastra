@@ -69,8 +69,16 @@ namespace
 
   TEST(ProcessSpecTest, PreservesAbsoluteAndPathExecutables)
   {
+#if defined(_WIN32)
+    EXPECT_EQ(
+        softadastra::ProcessSpec::normalize_executable(
+            "C:\\Windows\\System32\\cmd.exe"),
+        "C:\\Windows\\System32\\cmd.exe");
+    EXPECT_EQ(softadastra::ProcessSpec::normalize_executable("cmd.exe"), "cmd.exe");
+#else
     EXPECT_EQ(softadastra::ProcessSpec::normalize_executable("/usr/bin/python3"), "/usr/bin/python3");
     EXPECT_EQ(softadastra::ProcessSpec::normalize_executable("python3"), "python3");
+#endif
     EXPECT_FALSE(softadastra::ProcessSpec::normalize_executable("./missing-program").has_value());
   }
 
