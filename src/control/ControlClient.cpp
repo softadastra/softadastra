@@ -17,8 +17,8 @@
 #include "control/LocalControlProtocol.hpp"
 
 #include <array>
+#include <cstdint>
 #include <cstring>
-#include <functional>
 #include <utility>
 
 #if defined(__linux__)
@@ -40,8 +40,16 @@ namespace softadastra
   {
     std::wstring pipe_name(const std::filesystem::path &path)
     {
+      std::uint64_t hash = 1469598103934665603ULL;
+
+      for (const wchar_t character : path.wstring())
+      {
+        hash ^= static_cast<std::uint16_t>(character);
+        hash *= 1099511628211ULL;
+      }
+
       return L"\\\\.\\pipe\\Softadastra-" +
-             std::to_wstring(std::hash<std::wstring>{}(path.wstring()));
+             std::to_wstring(hash);
     }
   } // namespace
 #endif
