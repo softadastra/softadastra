@@ -18,7 +18,12 @@ namespace
     v.push_back(static_cast<char>(high));
     v.push_back(static_cast<char>(low));
   }
-  std::uint16_t get16(const std::string &v, std::size_t p) { return (static_cast<unsigned char>(v[p]) << 8) | static_cast<unsigned char>(v[p + 1]); }
+  std::uint16_t get16(const std::string &v, std::size_t p)
+  {
+    return static_cast<std::uint16_t>(
+        (static_cast<std::uint16_t>(static_cast<unsigned char>(v[p])) << 8) |
+        static_cast<std::uint16_t>(static_cast<unsigned char>(v[p + 1])));
+  }
   std::string query(std::uint16_t id, const std::string &name, std::uint16_t type = 1)
   {
     std::string q;

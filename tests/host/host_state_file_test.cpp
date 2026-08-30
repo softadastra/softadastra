@@ -47,6 +47,7 @@ namespace
 
     EXPECT_NE(content.find("example"), std::string::npos);
     EXPECT_NE(content.find("/usr/bin/example"), std::string::npos);
+    input.close();
     std::filesystem::remove_all(directory);
   }
 
@@ -99,6 +100,7 @@ namespace
     EXPECT_EQ(content.find("business-data-must-not-be-persisted"), std::string::npos);
     EXPECT_EQ(content.find(output.string()), std::string::npos);
     EXPECT_EQ(content.find("process-output-must-not-be-persisted"), std::string::npos);
+    input.close();
     std::filesystem::remove_all(directory);
   }
 

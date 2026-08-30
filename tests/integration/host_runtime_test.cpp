@@ -45,7 +45,13 @@ namespace
       softadastra::ControlClient &client,
       const softadastra::SoftwareId &id)
   {
-    for (int attempt = 0; attempt < 100; ++attempt)
+#if defined(_WIN32)
+    constexpr int attempts = 150;
+#else
+    constexpr int attempts = 100;
+#endif
+
+    for (int attempt = 0; attempt < attempts; ++attempt)
     {
       client.refresh();
 
@@ -457,7 +463,7 @@ namespace
         "cmd.exe",
         {
             "/C",
-            "exit 0",
+            "ping -n 2 127.0.0.1 >NUL & exit 0",
         });
     const softadastra::ProcessSpec running_spec(
         "ping.exe",
@@ -470,7 +476,7 @@ namespace
         "cmd.exe",
         {
             "/C",
-            "exit 7",
+            "ping -n 2 127.0.0.1 >NUL & exit 7",
         });
 
 #else
@@ -893,7 +899,11 @@ namespace
     std::thread thread([&loop, &completed]()
                        { completed = loop.run(); });
 
+#if defined(_WIN32)
+    std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+#else
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
+#endif
     loop.request_stop();
     thread.join();
 

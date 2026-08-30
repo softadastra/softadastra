@@ -15,10 +15,11 @@
 #include "host/HostIdentity.hpp"
 
 #include <array>
-#include <cstdio>
 #include <fstream>
 #include <utility>
 
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
@@ -28,30 +29,23 @@ namespace softadastra
 {
   namespace
   {
-    FILE *open_binary_file(
+    bool write_bio(
         const std::filesystem::path &path,
-        const char *mode)
+        BIO *bio)
     {
-#if defined(_WIN32)
+      BUF_MEM *memory = nullptr;
+      BIO_get_mem_ptr(bio, &memory);
 
-      static_cast<void>(mode);
+      if (memory == nullptr)
+      {
+        return false;
+      }
 
-      FILE *file = nullptr;
-
-      return _wfopen_s(
-                 &file,
-                 path.c_str(),
-                 L"wb") == 0
-                 ? file
-                 : nullptr;
-
-#else
-
-      return std::fopen(
-          path.c_str(),
-          mode);
-
-#endif
+      std::ofstream output(path, std::ios::binary | std::ios::trunc);
+      output.write(
+          memory->data,
+          static_cast<std::streamsize>(memory->length));
+      return static_cast<bool>(output);
     }
 
     std::string hexadecimal(
@@ -420,42 +414,36 @@ namespace softadastra
           error);
     }
 
-    FILE *certificate_file =
-        valid && !error
-            ? open_binary_file(
-                  certificate_path,
-                  "wb")
-            : nullptr;
+    BIO *certificate_file =
+        valid && !error ? BIO_new(BIO_s_mem()) : nullptr;
 
-    FILE *key_file =
-        certificate_file != nullptr
-            ? open_binary_file(
-                  private_key_path,
-                  "wb")
-            : nullptr;
+    BIO *key_file =
+        certificate_file != nullptr ? BIO_new(BIO_s_mem()) : nullptr;
 
     const bool written =
         key_file != nullptr &&
-        PEM_write_X509(
+        PEM_write_bio_X509(
             certificate_file,
             certificate) == 1 &&
-        PEM_write_PrivateKey(
+        PEM_write_bio_PrivateKey(
             key_file,
             key,
             nullptr,
             nullptr,
             0,
             nullptr,
-            nullptr) == 1;
+            nullptr) == 1 &&
+        write_bio(certificate_path, certificate_file) &&
+        write_bio(private_key_path, key_file);
 
     if (certificate_file != nullptr)
     {
-      std::fclose(certificate_file);
+      BIO_free(certificate_file);
     }
 
     if (key_file != nullptr)
     {
-      std::fclose(key_file);
+      BIO_free(key_file);
     }
 
     EVP_PKEY_free(key);

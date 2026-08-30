@@ -57,7 +57,7 @@ namespace softadastra
   /**
    * @brief Provides the local DNS endpoint used for software name resolution.
    */
-  class LocalDns : public LocalDnsEndpoint
+  class LocalDns final : public LocalDnsEndpoint
   {
   public:
     /**

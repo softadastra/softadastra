@@ -149,11 +149,6 @@ target_include_directories(
 )
 
 if(WIN32)
-  target_sources(
-    softadastra_internal
-    PRIVATE
-      src/host/OpenSslApplink.cpp
-  )
   target_compile_definitions(
     softadastra_internal
     PUBLIC

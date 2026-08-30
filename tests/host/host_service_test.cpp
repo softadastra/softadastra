@@ -534,7 +534,7 @@ namespace
   TEST(HostServiceTest, StopsRunningManagedNetworkDuringShutdown)
   {
     TestPlatform platform;
-    platform.managed_network().start();
+    static_cast<void>(platform.managed_network().start());
     auto &managed = static_cast<TestManagedNetwork &>(platform.managed_network());
     managed.state = softadastra::ManagedNetworkState::Running;
     TestProcessLauncher launcher;
