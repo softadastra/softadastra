@@ -1,0 +1,6 @@
+20a08d09481c11f80da0e5df877c5989  usr/bin/softadastra
+2585e8ce8a37f5fc9f3333736061ef4d  usr/bin/softadastra-gateway
+701d63ddc413d360e0b4797561a9505f  usr/lib/systemd/system/softadastra.service
+847bf86de7ccf0410f499e6984566943  usr/libexec/softadastra-firewall-modify
+847bf86de7ccf0410f499e6984566943  usr/libexec/softadastra-firewall-status
+0b7cd834fbb426703bbf075e07e72ae2  usr/share/polkit-1/actions/com.softadastra.firewall.policy

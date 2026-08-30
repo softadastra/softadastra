@@ -139,6 +139,8 @@ softadastra remove
 
 softadastra logs
 softadastra access
+softadastra access allow
+softadastra access deny
 
 softadastra connectivity
 softadastra network

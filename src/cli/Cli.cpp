@@ -25,11 +25,13 @@
 #include "software/SoftwareState.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -326,6 +328,8 @@ namespace
         << "  status [name]\n"
         << "  info [name]\n"
         << "  access [name]\n"
+        << "  access allow\n"
+        << "  access deny\n"
         << "  logs [name] [--follow]\n\n"
         << "Inventory:\n"
         << "  list [--running|--stopped]\n\n"
@@ -359,7 +363,10 @@ namespace
       std::cout
           << "Usage:\n"
           << "  softadastra access [software-name]\n\n"
-          << "Show local access for a Software. If no local network is "
+          << "  softadastra access allow\n"
+          << "  softadastra access deny\n\n"
+          << "Show local access for a Software. `allow` and `deny` apply "
+             "to the current project only. If no local network is "
              "available, Softadastra may start a safe managed local network "
              "when the Host supports it.\n";
     }
@@ -690,9 +697,188 @@ namespace
     return true;
   }
 
+  std::string access_owner(const std::filesystem::path &root)
+  {
+    // A stable tag belongs to the project location, never to TOML content or
+    // to a Host SoftwareId. It fits UFW's short rule-comment limit.
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const char character : root.string())
+    {
+      hash ^= static_cast<unsigned char>(character);
+      hash *= 1099511628211ULL;
+    }
+    std::ostringstream tag;
+    tag << "softadastra:" << std::hex << hash;
+    return tag.str();
+  }
+
+  std::optional<LocalFirewallRule> project_firewall_rule(
+      const Network *network,
+      const std::filesystem::path &root,
+      const ProjectConfig &config)
+  {
+    const auto access = config.access ? config.access
+                                      : (config.access_points.empty()
+                                             ? std::nullopt
+                                             : std::optional<AccessPoint>(config.access_points.front()));
+    if (!access || network == nullptr)
+      return std::nullopt;
+    const auto capability = network->network_capability();
+    if (capability.local_network_state != LocalNetworkState::Existing ||
+        capability.local_subnet.empty())
+      return std::nullopt;
+    return LocalFirewallRule{access_owner(normalized_project_root(root)), capability.local_subnet, access->port()};
+  }
+
+  std::optional<LocalFirewallRule> access_firewall_rule(
+      const Network *network,
+      const std::filesystem::path &root,
+      const AccessPoint &access)
+  {
+    if (network == nullptr)
+      return std::nullopt;
+    const auto capability = network->network_capability();
+    if (capability.local_network_state != LocalNetworkState::Existing ||
+        capability.local_subnet.empty())
+      return std::nullopt;
+    return LocalFirewallRule{
+        access_owner(normalized_project_root(root)), capability.local_subnet, access.port()};
+  }
+
+  int print_firewall_access(
+      const Network *network,
+      LocalFirewall *firewall,
+      const std::string &name,
+      const std::filesystem::path &root,
+      const AccessPoint &configured)
+  {
+    if (firewall == nullptr)
+    {
+      std::cerr << "Local firewall access is unsupported on this Host.\n";
+      return 1;
+    }
+    const auto rule = access_firewall_rule(network, root, configured);
+    if (!rule)
+    {
+      std::cerr << "A usable local network and Access are required.\n";
+      return 1;
+    }
+    const auto result = firewall->status(*rule);
+    std::cout << "Software:      " << name
+              << "\nAccess:        " << access_name(configured) << '\n';
+    if (result == LocalFirewallResult::Open)
+    {
+      const auto ipv4 = network->network_capability().primary_ipv4;
+      const auto url = configured.protocol() == AccessProtocol::Https
+                           ? AccessUrl::https(ipv4, configured.port())
+                           : AccessUrl::http(ipv4, configured.port());
+      std::cout << "Local access:  allowed\nLocal URL:     " << url << '\n';
+      return 0;
+    }
+    std::cout << "Local access:  unavailable\n";
+    if (result == LocalFirewallResult::PermissionRequired)
+      std::cout << "Firewall rule is blocked.\n";
+    else if (result == LocalFirewallResult::Unsupported)
+      std::cout << "Local firewall access is unsupported on this Host.\n";
+    else
+      std::cout << "Local firewall access could not be confirmed.\n";
+    return 1;
+  }
+
+  int print_project_access(const Network *network, LocalFirewall *firewall)
+  {
+    std::string error;
+    const auto project = ProjectConfigFile::find(std::filesystem::current_path(), &error);
+    if (!error.empty()) { std::cerr << error << '\n'; return 1; }
+    if (!project) { no_project("access"); return 1; }
+    const auto access = project->second.access ? project->second.access
+                                               : (project->second.access_points.empty() ? std::nullopt : std::optional<AccessPoint>(project->second.access_points.front()));
+    if (!access) { std::cerr << "No access configured for: " << project->second.name << '\n'; return 1; }
+    return print_firewall_access(network, firewall, project->second.name, project->first, *access);
+  }
+
+  int print_named_access(
+      ControlClient &client,
+      const Network *network,
+      LocalFirewall *firewall,
+      const std::string &name)
+  {
+    const auto entry = software_by_name(client, name);
+    if (!entry) { unknown_software(name); return 1; }
+    const auto root = entry->process_spec().working_directory();
+    const auto access = entry->access_point();
+    if (!root || !access)
+    {
+      std::cerr << "No project Access configured for: " << name << '\n';
+      return 1;
+    }
+    return print_firewall_access(network, firewall, entry->name(), *root, *access);
+  }
+
+  int change_project_access(
+      const std::string &action,
+      const Network *network,
+      LocalFirewall *firewall)
+  {
+    if (firewall == nullptr)
+    {
+      std::cerr << "Local firewall access is unsupported on this Host.\n";
+      return 1;
+    }
+    std::string error;
+    const auto project = ProjectConfigFile::find(std::filesystem::current_path(), &error);
+    if (!error.empty())
+    {
+      std::cerr << error << '\n';
+      return 1;
+    }
+    if (!project)
+    {
+      no_project("access " + action);
+      return 1;
+    }
+    const auto rule = project_firewall_rule(network, project->first, project->second);
+    if (!rule)
+    {
+      std::cerr << "A usable local network and Access are required.\n";
+      return 1;
+    }
+    const auto result = action == "allow" ? firewall->allow(*rule) : firewall->deny(*rule);
+    if (result == LocalFirewallResult::PermissionRequired)
+    {
+      std::cerr << "Firewall authorization was cancelled or denied.\n";
+      return 1;
+    }
+    if (result == LocalFirewallResult::Unsupported)
+    {
+      std::cerr << "Local firewall access is unsupported on this Host.\n";
+      return 1;
+    }
+    if (result != LocalFirewallResult::Open)
+    {
+      std::cerr << "Local firewall access could not be changed.\n";
+      return 1;
+    }
+    if (action == "deny")
+    {
+      std::cout << "Local access denied.\n";
+      return 0;
+    }
+    const auto access = project->second.access ? project->second.access
+                                                : std::optional<AccessPoint>(project->second.access_points.front());
+    const auto ipv4 = network->network_capability().primary_ipv4;
+    const auto url = access->protocol() == AccessProtocol::Https
+                         ? AccessUrl::https(ipv4, access->port())
+                         : AccessUrl::http(ipv4, access->port());
+    std::cout << "Local access allowed.\n" << url << '\n';
+    return 0;
+  }
+
   bool print_access(
       ControlClient &client,
-      const Target &target)
+      const Target &target,
+      const Network *network = nullptr,
+      LocalFirewall *firewall = nullptr)
   {
     const auto configured =
         target.config
@@ -756,6 +942,35 @@ namespace
 
     if (access->state == LocalAccessState::Available)
     {
+      if (firewall != nullptr)
+      {
+        auto root = target.root;
+        if (!root && entry->process_spec().working_directory())
+          root = std::filesystem::path(*entry->process_spec().working_directory());
+        const auto rule = root ? access_firewall_rule(network, *root, *configured)
+                               : std::nullopt;
+        const auto firewall_state = rule ? firewall->status(*rule)
+                                         : LocalFirewallResult::Failed;
+        if (firewall_state != LocalFirewallResult::Open &&
+            firewall_state != LocalFirewallResult::Disabled)
+        {
+          std::cout << "Local access:  unavailable\n";
+          if (firewall_state == LocalFirewallResult::PermissionRequired)
+          {
+            std::cout << "Firewall rule is blocked.\n\nRun:\n\n"
+                      << "  softadastra access allow\n";
+          }
+          else if (firewall_state == LocalFirewallResult::Unsupported)
+          {
+            std::cout << "Local firewall access is unsupported on this Host.\n";
+          }
+          else
+          {
+            std::cout << "Local firewall access could not be confirmed.\n";
+          }
+          return false;
+        }
+      }
       std::cout
           << "Network:       "
           << local_access_network_name(access->network)
@@ -778,30 +993,17 @@ namespace
     std::cout
         << "Local access:  unavailable\n";
 
-    if (access->firewall == LocalAccessFirewallState::PermissionRequired ||
-        access->firewall == LocalAccessFirewallState::Unsupported ||
-        access->firewall == LocalAccessFirewallState::Failed)
+    if (access->firewall == LocalAccessFirewallState::PermissionRequired)
     {
-      std::cout
-          << "\nLocal firewall access was not confirmed.\n"
-          << "Port:          " << access->port << '\n'
-          << "Network:       "
-          << (access->local_subnet.empty() ? "unavailable" : access->local_subnet)
-          << "\nReason:        ";
-      switch (access->firewall)
-      {
-      case LocalAccessFirewallState::PermissionRequired:
-        std::cout << "firewall permission required\n";
-        break;
-      case LocalAccessFirewallState::Unsupported:
-        std::cout << "firewall policy is not managed or verifiable\n";
-        break;
-      case LocalAccessFirewallState::Failed:
-        std::cout << "firewall rule could not be applied\n";
-        break;
-      default:
-        break;
-      }
+      std::cout << "\nLocal firewall access has not been allowed.\n";
+    }
+    else if (access->firewall == LocalAccessFirewallState::Unsupported)
+    {
+      std::cout << "\nLocal firewall access is unsupported on this Host.\n";
+    }
+    else if (access->firewall == LocalAccessFirewallState::Failed)
+    {
+      std::cout << "\nLocal firewall access could not be confirmed.\n";
     }
 
     if (entry->state() == SoftwareState::Stopped)
@@ -865,10 +1067,12 @@ namespace softadastra
   Cli::Cli(
       ControlClient &client,
       const Network &network,
-      ManagedNetwork &managed_network) noexcept
+      ManagedNetwork &managed_network,
+      LocalFirewall &local_firewall) noexcept
       : client_(client),
         network_(&network),
-        managed_network_(&managed_network)
+        managed_network_(&managed_network),
+        local_firewall_(&local_firewall)
   {
   }
 
@@ -1154,6 +1358,20 @@ namespace softadastra
       std::cout << '\n';
 
       return 0;
+    }
+
+    if (local_firewall_ != nullptr && command == "access" && argc == 3 &&
+        (std::string(argv[2]) == "allow" || std::string(argv[2]) == "deny"))
+    {
+      return change_project_access(argv[2], network_, local_firewall_);
+    }
+
+    if (local_firewall_ != nullptr && command == "access")
+    {
+      if (argc == 2)
+        return print_project_access(network_, local_firewall_);
+      if (argc == 3)
+        return print_named_access(client_, network_, local_firewall_, argv[2]);
     }
 
     if (command == "init")
@@ -1721,6 +1939,11 @@ namespace softadastra
       return 0;
     }
 
+    if (command == "access")
+    {
+      return print_access(client_, *target) ? 0 : 1;
+    }
+
     if (command == "logs")
     {
       const auto path =
@@ -1771,15 +1994,6 @@ namespace softadastra
       } while (true);
 
       return 0;
-    }
-
-    if (command == "access")
-    {
-      return print_access(
-                 client_,
-                 *target)
-                 ? 0
-                 : 1;
     }
 
     if (command == "info")
@@ -1906,7 +2120,9 @@ namespace softadastra
         static_cast<void>(
             print_access(
                 client_,
-                *target));
+                *target,
+                network_,
+                local_firewall_));
       }
 
       return 0;

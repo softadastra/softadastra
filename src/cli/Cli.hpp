@@ -17,6 +17,7 @@
 
 #include "control/ControlClient.hpp"
 #include "platform/ManagedNetwork.hpp"
+#include "platform/LocalFirewall.hpp"
 #include "platform/Network.hpp"
 
 namespace softadastra
@@ -51,17 +52,18 @@ namespace softadastra
         const Network &network) noexcept;
 
     /**
-     * @brief Creates a CLI with local network and managed-network providers.
+     * @brief Creates a CLI with local network and privileged firewall providers.
      *
      * @param client Control client used to communicate with the Host.
      * @param network Local network provider used for network inspection.
-     * @param managed_network Managed network provider used for local network
-     *        lifecycle operations.
+     * @param managed_network Retained for compatibility with network commands.
+     * @param local_firewall Privileged local firewall boundary used by access.
      */
     Cli(
         ControlClient &client,
         const Network &network,
-        ManagedNetwork &managed_network) noexcept;
+        ManagedNetwork &managed_network,
+        LocalFirewall &local_firewall) noexcept;
 
     /**
      * @brief Executes a Softadastra command-line operation.
@@ -80,6 +82,7 @@ namespace softadastra
     ControlClient &client_;
     const Network *network_{nullptr};
     ManagedNetwork *managed_network_{nullptr};
+    LocalFirewall *local_firewall_{nullptr};
   };
 
 } // namespace softadastra

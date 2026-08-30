@@ -31,6 +31,7 @@
 #include "platform/NativeManagedNetwork.hpp"
 #include "platform/NativeNetwork.hpp"
 #include "platform/NativePlatform.hpp"
+#include "platform/PrivilegedLocalFirewall.hpp"
 #include "software/ProjectConfig.hpp"
 #include "software/ProjectIdentity.hpp"
 #include "webui/WebUiServer.hpp"
@@ -1291,6 +1292,7 @@ int main(
       cli_command != "--help" &&
       cli_command != "box" &&
       cli_command != "network" &&
+      cli_command != "access" &&
       (cli_command != "init" ||
        legacy_migration) &&
       !command_help;
@@ -1331,11 +1333,14 @@ int main(
 
   softadastra::NativeNetwork network;
   softadastra::NativeManagedNetwork managed_network;
+  softadastra::NativePrivilegedProcessRunner privileged_process_runner;
+  softadastra::PrivilegedLocalFirewall local_firewall(privileged_process_runner);
 
   softadastra::Cli cli(
       control_client,
       network,
-      managed_network);
+      managed_network,
+      local_firewall);
 
   std::vector<const char *> arguments;
 

@@ -394,10 +394,6 @@ namespace softadastra
     [[nodiscard]] std::string primary_ipv4() const;
 
   private:
-    [[nodiscard]] LocalAccessFirewallState ensure_local_firewall(
-        const SoftwareId &id,
-        const LocalAccess &access,
-        const NetworkCapability &network);
     Host &host_;
     SoftwareManager software_manager_;
     ConnectivityManager connectivity_manager_;

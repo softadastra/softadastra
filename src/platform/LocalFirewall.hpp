@@ -15,6 +15,7 @@ namespace softadastra
   enum class LocalFirewallResult
   {
     Open,
+    Disabled,
     PermissionRequired,
     Unsupported,
     Failed
@@ -37,8 +38,30 @@ namespace softadastra
     [[nodiscard]] virtual LocalFirewallResult ensure(
         const LocalFirewallRule &rule) = 0;
 
+    /** Reads the state of a local rule without changing the firewall. */
+    [[nodiscard]] virtual LocalFirewallResult status(
+        const LocalFirewallRule &rule)
+    {
+      return ensure(rule);
+    }
+
+    /** Explicitly creates the Host-owned rule when it is required. */
+    [[nodiscard]] virtual LocalFirewallResult allow(
+        const LocalFirewallRule &rule)
+    {
+      return ensure(rule);
+    }
+
     /** Releases only a rule previously identified as Host-owned. */
     virtual void release(const LocalFirewallRule &rule) noexcept = 0;
+
+    /** Explicitly removes only rules carrying this Host ownership tag. */
+    [[nodiscard]] virtual LocalFirewallResult deny(
+        const LocalFirewallRule &rule)
+    {
+      release(rule);
+      return LocalFirewallResult::Open;
+    }
   };
 
   class UnavailableLocalFirewall final : public LocalFirewall

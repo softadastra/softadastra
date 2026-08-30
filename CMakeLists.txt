@@ -110,6 +110,8 @@ add_library(
   src/host/HostStateFile.cpp
   src/platform/NativeNetwork.cpp
   src/platform/NativeLocalFirewall.cpp
+  src/platform/FirewallHelper.cpp
+  src/platform/PrivilegedLocalFirewall.cpp
   src/platform/ManagedNetwork.cpp
   src/platform/NativeManagedNetwork.cpp
   src/platform/GatewayCapabilityProvisioning.cpp
@@ -133,6 +135,10 @@ add_library(
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(softadastra-firewall-status src/platform/FirewallHelperMain.cpp)
+  add_executable(softadastra-firewall-modify src/platform/FirewallHelperMain.cpp)
+  target_link_libraries(softadastra-firewall-status PRIVATE softadastra_internal)
+  target_link_libraries(softadastra-firewall-modify PRIVATE softadastra_internal)
   target_sources(
     softadastra_internal
     PRIVATE
@@ -276,6 +282,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     TARGETS softadastra-gateway
     RUNTIME DESTINATION bin
   )
+  install(TARGETS softadastra-firewall-status softadastra-firewall-modify RUNTIME DESTINATION libexec PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  install(FILES packaging/com.softadastra.firewall.policy DESTINATION share/polkit-1/actions PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
   install(
     FILES packaging/softadastra.service
     DESTINATION lib/systemd/system
@@ -476,6 +484,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_native_data_directory_test
     tests/platform/native_data_directory_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_native_local_firewall_test
+    tests/platform/native_local_firewall_test.cpp
   )
 
   softadastra_add_test(

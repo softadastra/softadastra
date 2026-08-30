@@ -358,7 +358,7 @@ namespace
         softadastra::SoftwareState::Running);
   }
 
-  TEST(HostServiceTest, OpensLocalAccessOnlyForTheCurrentSubnet)
+  TEST(HostServiceTest, ReportsLocalAccessWithoutTouchingTheFirewall)
   {
     TestPlatform platform;
     platform.test_network().set_capability(existing_network());
@@ -372,12 +372,10 @@ namespace
 
     EXPECT_TRUE(service.start_software(id));
     ASSERT_TRUE(service.local_access(id).has_value());
-    EXPECT_EQ(platform.test_firewall().last_rule.subnet, "192.168.1.0/24");
-    EXPECT_EQ(platform.test_firewall().last_rule.port, 8081);
-    EXPECT_EQ(platform.test_firewall().last_rule.owner, id.value());
+    EXPECT_EQ(platform.test_firewall().ensure_calls, 0);
   }
 
-  TEST(HostServiceTest, DoesNotReportLocalAccessWhenFirewallRequiresPermission)
+  TEST(HostServiceTest, DoesNotQueryFirewallWhenReportingLocalAccess)
   {
     TestPlatform platform;
     platform.test_network().set_capability(existing_network());
@@ -397,9 +395,8 @@ namespace
     ASSERT_TRUE(access.has_value());
     EXPECT_EQ(access->local_subnet, "192.168.1.0/24");
     EXPECT_EQ(access->network, softadastra::LocalAccessNetwork::Existing);
-    EXPECT_EQ(platform.test_firewall().ensure_calls, 1);
-    EXPECT_EQ(access->state, softadastra::LocalAccessState::Unavailable);
-    EXPECT_EQ(access->firewall, softadastra::LocalAccessFirewallState::PermissionRequired);
+    EXPECT_EQ(platform.test_firewall().ensure_calls, 0);
+    EXPECT_EQ(access->state, softadastra::LocalAccessState::Available);
   }
 
   TEST(HostServiceTest, DoesNotMutateExistingFirewallRules)
