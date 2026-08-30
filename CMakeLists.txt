@@ -87,6 +87,7 @@ add_library(
   src/cli/AccessUrl.cpp
   src/connectivity/ConnectivityManager.cpp
   src/control/ControlClient.cpp
+  src/control/LocalControlEndpoint.cpp
   src/control/ControlServer.cpp
   src/control/LocalControlProtocol.cpp
   src/control/LocalControlServer.cpp

@@ -14,13 +14,13 @@
 
 #include "control/LocalControlServer.hpp"
 
+#include "control/LocalControlEndpoint.hpp"
 #include "control/LocalControlProtocol.hpp"
 #include "control/RemoteAccessConfig.hpp"
 #include "host/RemoteReachability.hpp"
 
 #include <array>
 #include <cerrno>
-#include <cstdint>
 #include <cstring>
 #include <utility>
 
@@ -45,20 +45,6 @@ namespace softadastra
     constexpr std::size_t maximum_message_size = 16384;
 
 #if defined(_WIN32)
-
-    std::wstring pipe_name(const std::filesystem::path &path)
-    {
-      std::uint64_t hash = 1469598103934665603ULL;
-
-      for (const wchar_t character : path.wstring())
-      {
-        hash ^= static_cast<std::uint16_t>(character);
-        hash *= 1099511628211ULL;
-      }
-
-      return L"\\\\.\\pipe\\Softadastra-" +
-             std::to_wstring(hash);
-    }
 
 #endif
 
@@ -157,7 +143,7 @@ namespace softadastra
     if (pipe_ != nullptr)
       return true;
 
-    const auto name = pipe_name(path_);
+    const auto name = local_control_pipe_name(path_);
     const HANDLE pipe = ::CreateNamedPipeW(
         name.c_str(),
         PIPE_ACCESS_DUPLEX,

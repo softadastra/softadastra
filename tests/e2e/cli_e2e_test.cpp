@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 
 #if defined(__linux__)
 #include <sys/wait.h>
@@ -62,6 +63,28 @@ namespace
     void TearDown() override
     {
       static_cast<void>(run("host stop"));
+
+      bool stopped = false;
+
+      for (int attempt = 0; attempt < 50; ++attempt)
+      {
+        static_cast<void>(run("host status"));
+
+        if (last_output_.find("Host: stopped") != std::string::npos)
+        {
+          stopped = true;
+          break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      }
+
+      if (!stopped)
+      {
+        ADD_FAILURE() << "Softadastra Host remained active during E2E cleanup";
+        return;
+      }
+
       std::filesystem::remove_all(root_);
     }
 
@@ -89,6 +112,7 @@ namespace
       last_output_.assign(
           std::istreambuf_iterator<char>(input),
           std::istreambuf_iterator<char>());
+      input.close();
 
 #if defined(__linux__)
       return result == -1 ? result : WEXITSTATUS(result);

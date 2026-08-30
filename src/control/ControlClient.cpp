@@ -14,10 +14,10 @@
 
 #include "control/ControlClient.hpp"
 
+#include "control/LocalControlEndpoint.hpp"
 #include "control/LocalControlProtocol.hpp"
 
 #include <array>
-#include <cstdint>
 #include <cstring>
 #include <utility>
 
@@ -36,22 +36,6 @@
 namespace softadastra
 {
 #if defined(_WIN32)
-  namespace
-  {
-    std::wstring pipe_name(const std::filesystem::path &path)
-    {
-      std::uint64_t hash = 1469598103934665603ULL;
-
-      for (const wchar_t character : path.wstring())
-      {
-        hash ^= static_cast<std::uint16_t>(character);
-        hash *= 1099511628211ULL;
-      }
-
-      return L"\\\\.\\pipe\\Softadastra-" +
-             std::to_wstring(hash);
-    }
-  } // namespace
 #endif
 
   ControlClient::ControlClient(ControlServer &server) noexcept
@@ -950,7 +934,7 @@ namespace softadastra
     return std::string(buffer.data(), static_cast<std::size_t>(received));
 #else
 #if defined(_WIN32)
-    const auto name = pipe_name(path_);
+    const auto name = local_control_pipe_name(path_);
 
     if (!::WaitNamedPipeW(name.c_str(), 50))
     {
