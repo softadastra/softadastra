@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <string>
 #include <thread>
@@ -267,7 +268,7 @@ namespace
     const auto project = state_home / "project";
     const auto socket = state_home / "softadastra" / "control.sock";
     std::filesystem::create_directories(project);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {"phone-test", "sleep 30", std::nullopt, {}}));
     HostProcess host(state_home);
     ASSERT_TRUE(wait_for([&socket]
                          { return std::filesystem::exists(socket); }));
@@ -275,13 +276,13 @@ namespace
     softadastra::ControlClient before_restart(socket);
     const auto entries_after_run = before_restart.software();
     ASSERT_EQ(entries_after_run.size(), 1U);
-    const auto after_run = before_restart.software(softadastra::SoftwareId("stable-id"));
-    ASSERT_TRUE(after_run.has_value());
-    EXPECT_EQ(after_run->id().value(), "stable-id");
-    EXPECT_EQ(after_run->name(), "phone-test");
-    EXPECT_EQ(after_run->process_spec().working_directory(), project.string());
-    EXPECT_EQ(after_run->declared_command(), "sleep 30");
-    EXPECT_FALSE(after_run->access_point().has_value());
+    const auto original_id = entries_after_run.front().id();
+    const auto &after_run = entries_after_run.front();
+    EXPECT_EQ(after_run.id(), original_id);
+    EXPECT_EQ(after_run.name(), "phone-test");
+    EXPECT_EQ(after_run.process_spec().working_directory(), project.string());
+    EXPECT_EQ(after_run.declared_command(), "sleep 30");
+    EXPECT_FALSE(after_run.access_point().has_value());
     host.stop();
     softadastra::HostState after_first_stop;
     const softadastra::HostStateFile state_file(state_home / "softadastra" / "host-state");
@@ -289,7 +290,7 @@ namespace
     ASSERT_EQ(after_first_stop.software_count(), 1U);
     const auto *persisted = after_first_stop.find_software_by_name("phone-test");
     ASSERT_NE(persisted, nullptr);
-    EXPECT_EQ(persisted->id().value(), "stable-id");
+    EXPECT_EQ(persisted->id(), original_id);
     EXPECT_EQ(persisted->process_spec().working_directory(), project.string());
     EXPECT_EQ(persisted->declared_command(), "sleep 30");
     EXPECT_FALSE(persisted->access_point().has_value());
@@ -299,20 +300,19 @@ namespace
     softadastra::ControlClient after_restart_client(socket);
     const auto entries_after_restart = after_restart_client.software();
     ASSERT_EQ(entries_after_restart.size(), 1U);
-    const auto after_restart = after_restart_client.software(softadastra::SoftwareId("stable-id"));
-    ASSERT_TRUE(after_restart.has_value());
-    EXPECT_EQ(after_restart->id().value(), "stable-id");
-    EXPECT_EQ(after_restart->name(), "phone-test");
-    EXPECT_EQ(after_restart->process_spec().working_directory(), project.string());
-    EXPECT_EQ(after_restart->declared_command(), "sleep 30");
-    EXPECT_FALSE(after_restart->access_point().has_value());
-    ASSERT_EQ(invoke_cli(state_home, {"status", "stable-id"}).exit_code, 0);
+    const auto &after_restart = entries_after_restart.front();
+    EXPECT_EQ(after_restart.id(), original_id);
+    EXPECT_EQ(after_restart.name(), "phone-test");
+    EXPECT_EQ(after_restart.process_spec().working_directory(), project.string());
+    EXPECT_EQ(after_restart.declared_command(), "sleep 30");
+    EXPECT_FALSE(after_restart.access_point().has_value());
+    ASSERT_EQ(invoke_cli(state_home, {"status", "phone-test"}).exit_code, 0);
     restarted.stop();
     softadastra::HostState restored;
     ASSERT_TRUE(state_file.load(restored));
     const auto *entry = restored.find_software_by_name("phone-test");
     ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(entry->id().value(), "stable-id");
+    EXPECT_EQ(entry->id(), original_id);
     EXPECT_EQ(entry->name(), "phone-test");
     std::filesystem::remove_all(state_home);
   }
@@ -322,31 +322,58 @@ namespace
     const auto state_home = std::filesystem::temp_directory_path() / ("softadastra-rename-restart-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     const auto project = state_home / "project";
     const auto socket = state_home / "softadastra" / "control.sock";
+    const auto toml = project / "softadastra.toml";
     std::filesystem::create_directories(project);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
+    {
+      std::ofstream file(toml);
+      ASSERT_TRUE(file);
+      file << "id = \"legacy-a\"\n"
+           << "name = \"phone-test\"\n"
+           << "command = \"sleep 30\"\n";
+    }
     HostProcess host(state_home);
     ASSERT_TRUE(wait_for([&socket]
                          { return std::filesystem::exists(socket); }));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
+    softadastra::ControlClient before_rename(socket);
+    const auto entries_before_rename = before_rename.software();
+    ASSERT_EQ(entries_before_rename.size(), 1U);
+    const auto original_id = entries_before_rename.front().id();
+    EXPECT_EQ(entries_before_rename.front().name(), "phone-test");
     host.stop();
-    const auto toml = project / "softadastra.toml";
-    std::filesystem::remove(toml);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(project, {softadastra::ProjectIdentity("stable-id"), "phone-api", "sleep 30", std::nullopt, {}}));
+    {
+      std::ofstream file(toml);
+      ASSERT_TRUE(file);
+      file << "id = \"legacy-b\"\n"
+           << "name = \"phone-api\"\n"
+           << "command = \"sleep 30\"\n";
+    }
     HostProcess updated(state_home);
     ASSERT_TRUE(wait_for([&socket]
                          { return std::filesystem::exists(socket); }));
     ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
+    softadastra::ControlClient after_rename(socket);
+    const auto entries_after_rename = after_rename.software();
+    ASSERT_EQ(entries_after_rename.size(), 1U);
+    EXPECT_EQ(entries_after_rename.front().id(), original_id);
+    EXPECT_EQ(entries_after_rename.front().name(), "phone-api");
     updated.stop();
     HostProcess restarted(state_home);
     ASSERT_TRUE(wait_for([&socket]
                          { return std::filesystem::exists(socket); }));
+    softadastra::ControlClient after_restart(socket);
+    const auto entries_after_restart = after_restart.software();
+    ASSERT_EQ(entries_after_restart.size(), 1U);
+    EXPECT_EQ(entries_after_restart.front().id(), original_id);
+    EXPECT_EQ(entries_after_restart.front().name(), "phone-api");
     restarted.stop();
     softadastra::HostState restored;
     ASSERT_TRUE(softadastra::HostStateFile(state_home / "softadastra" / "host-state").load(restored));
     EXPECT_EQ(restored.find_software_by_name("phone-test"), nullptr);
+    EXPECT_EQ(restored.software_count(), 1U);
     const auto *entry = restored.find_software_by_name("phone-api");
     ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(entry->id().value(), "stable-id");
+    EXPECT_EQ(entry->id(), original_id);
     EXPECT_EQ(entry->name(), "phone-api");
     std::filesystem::remove_all(state_home);
   }

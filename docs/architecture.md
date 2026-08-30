@@ -67,7 +67,6 @@ Softadastra does not introduce another application model on top of it.
 A simple project may describe itself with:
 
 ```toml
-id = "bd0d71eca61639a9ae31e3dd5d3208a1"
 name = "example"
 command = "./example"
 access = "http:8080"

@@ -93,18 +93,25 @@ namespace
 
     int run(const std::string &arguments)
     {
+      return run_from(project_, arguments);
+    }
+
+    int run_from(
+        const std::filesystem::path &project,
+        const std::string &arguments)
+    {
       const auto output = root_ / "command-output.txt";
 
 #if defined(_WIN32)
       const std::string command =
-          "cd /d " + quote(project_) + " && set \"LOCALAPPDATA=" +
+          "cd /d " + quote(project) + " && set \"LOCALAPPDATA=" +
           state_.string() + "\" && set \"HOME=" + root_.string() +
           "\" && set \"PATH=" + path_ + "\" && " +
           quote(SOFTADASTRA_E2E_BINARY) + " " + arguments +
           " > " + quote(output) + " 2>&1";
 #else
       const std::string command =
-          "cd " + quote(project_) + " && XDG_STATE_HOME=" + quote(state_) +
+          "cd " + quote(project) + " && XDG_STATE_HOME=" + quote(state_) +
           " HOME=" + quote(root_) + " PATH=" + quote(path_) + " " +
           quote(SOFTADASTRA_E2E_BINARY) +
           " " + arguments + " > " + quote(output) + " 2>&1";
@@ -196,5 +203,46 @@ namespace
     EXPECT_NE(last_output_.find("Software not found: missing"), std::string::npos);
     ASSERT_NE(run("run extra arguments"), 0);
     EXPECT_NE(last_output_.find("Usage: softadastra run [name]"), std::string::npos);
+  }
+
+  TEST_F(CliE2eTest, RejectsDifferentProjectsWithTheSameName)
+  {
+    const auto first_project = root_ / "project-a";
+    const auto second_project = root_ / "project-b";
+    std::filesystem::create_directories(first_project);
+    std::filesystem::create_directories(second_project);
+
+    const auto fixture = first_project / "test-app";
+    std::filesystem::copy_file(
+        SOFTADASTRA_E2E_TEST_APP,
+        fixture,
+        std::filesystem::copy_options::overwrite_existing);
+
+    const std::string command = quote(fixture) + " --stay";
+
+    ASSERT_EQ(
+        run_from(
+            first_project,
+            "init duplicate --command " + quote(command)),
+        0)
+        << last_output_;
+    ASSERT_EQ(run_from(first_project, "run"), 0) << last_output_;
+
+    ASSERT_EQ(
+        run_from(
+            second_project,
+            "init duplicate --command " + quote(command)),
+        0)
+        << last_output_;
+    ASSERT_NE(run_from(second_project, "run"), 0);
+    EXPECT_NE(
+        last_output_.find("Software name already registered: duplicate"),
+        std::string::npos);
+    EXPECT_NE(last_output_.find("Existing project:\n  " + first_project.string()), std::string::npos);
+    EXPECT_NE(last_output_.find("Current project:\n  " + second_project.string()), std::string::npos);
+    EXPECT_NE(
+        last_output_.find(
+            "Choose another name or remove the existing registration."),
+        std::string::npos);
   }
 }

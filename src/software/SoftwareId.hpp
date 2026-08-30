@@ -44,6 +44,11 @@ namespace softadastra
     }
 
     /**
+     * @brief Generates a new Host-owned software identifier.
+     */
+    [[nodiscard]] static SoftwareId generate();
+
+    /**
      * @brief Returns the underlying identifier value.
      *
      * @return Constant reference to the identifier string.

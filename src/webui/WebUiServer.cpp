@@ -17,7 +17,6 @@
 #include "WebUiAssets.hpp"
 #include "platform/NativeDirectoryChooser.hpp"
 #include "software/ProjectConfig.hpp"
-#include "software/ProjectIdentity.hpp"
 
 #include <asio/io_context.hpp>
 #include <asio/ip/address.hpp>
@@ -1068,7 +1067,7 @@ namespace softadastra
               if (status == 200)
               {
                 const SoftwareId id(
-                    ProjectIdentity::generate().value());
+                    SoftwareId::generate());
 
 #if defined(_WIN32)
 

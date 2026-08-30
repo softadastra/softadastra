@@ -32,7 +32,7 @@ The software describes what should run and how it can be reached. The Host handl
 
 ## A first application
 
-Inside an existing project:
+Inside a project, tell Softadastra how the software is started and how it can be reached:
 
 ```bash
 softadastra init my-app \
@@ -40,22 +40,15 @@ softadastra init my-app \
   --access http:8080
 ```
 
-This creates:
-
-```text
-softadastra.toml
-```
-
-For example:
+This creates `softadastra.toml`:
 
 ```toml
-id = "bd0d71eca61639a9ae31e3dd5d3208a1"
 name = "my-app"
 command = "./my-app"
 access = "http:8080"
 ```
 
-Then run it:
+Run the software:
 
 ```bash
 softadastra run
@@ -79,17 +72,7 @@ Stop it:
 softadastra stop
 ```
 
-The same idea works with an existing command.
-
-For example:
-
-```bash
-softadastra init php \
-  --command "php -S 0.0.0.0:8080" \
-  --access http:8080
-```
-
-Softadastra does not need to know that this is PHP. It supervises the command and the access declared by the project.
+The command is opaque to Softadastra. It describes how the software is started, not what kind of software it is.
 
 ## Host
 
@@ -122,7 +105,6 @@ A project is described by `softadastra.toml`.
 A project can declare multiple access points:
 
 ```toml
-id = "bd0d71eca61639a9ae31e3dd5d3208a1"
 name = "example"
 command = "./example"
 

@@ -125,6 +125,7 @@ add_library(
   src/platform/NativeProcessLauncher.cpp
   src/platform/NativeService.cpp
   src/software/SoftwareManager.cpp
+  src/software/SoftwareId.cpp
   src/software/ProjectIdentity.cpp
   src/software/ProjectConfig.cpp
   src/software/SoftwareRegistrationFormat.cpp

@@ -268,8 +268,7 @@ namespace
     ASSERT_TRUE(
         softadastra::ProjectConfigFile::create(
             project,
-            {softadastra::ProjectIdentity("web-project"),
-             "Pico",
+            {"Pico",
              command,
              softadastra::AccessPoint::create(
                  softadastra::AccessProtocol::Http,

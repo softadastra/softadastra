@@ -105,7 +105,6 @@ namespace softadastra
       {
         std::ifstream input(path);
 
-        std::optional<std::string> id;
         std::optional<std::string> name;
         std::optional<std::string> command;
         std::optional<std::string> access;
@@ -202,10 +201,10 @@ namespace softadastra
             endpoint_port =
                 string_value(line, "port");
           }
-          else if (const auto id_text =
-                       string_value(line, "id"))
+          else if (string_value(line, "id"))
           {
-            id = id_text;
+            // Accept legacy project files, but keep this user-owned field
+            // out of Host identity decisions.
           }
           else if (const auto name_text =
                        string_value(line, "name"))
@@ -248,9 +247,7 @@ namespace softadastra
           return std::nullopt;
         }
 
-        if (!id.has_value() ||
-            id->empty() ||
-            !name.has_value() ||
+        if (!name.has_value() ||
             name->empty() ||
             !command.has_value())
         {
@@ -345,7 +342,6 @@ namespace softadastra
         return std::pair(
             root,
             ProjectConfig{
-                ProjectIdentity(id.value()),
                 name.value(),
                 command.value(),
                 primary,
@@ -384,9 +380,7 @@ namespace softadastra
     std::ofstream output(path);
 
     output
-        << "id = "
-        << quote(config.id.value())
-        << "\nname = "
+        << "name = "
         << quote(config.name)
         << "\ncommand = "
         << quote(config.command)

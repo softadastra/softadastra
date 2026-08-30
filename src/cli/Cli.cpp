@@ -193,6 +193,93 @@ namespace
         << "  softadastra list\n";
   }
 
+  std::optional<SoftwareEntry> software_by_name(
+      const ControlClient &client,
+      const std::string &name)
+  {
+    const auto entries =
+        client.software();
+
+    for (const auto &entry : entries)
+    {
+      if (entry.name() == name)
+      {
+        return entry;
+      }
+    }
+
+    // Legacy registrations used their identifier as their visible name.
+    for (const auto &entry : entries)
+    {
+      if (entry.id().value() == name)
+      {
+        return entry;
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  std::filesystem::path normalized_project_root(
+      const std::filesystem::path &path)
+  {
+    std::error_code error;
+    const auto canonical =
+        std::filesystem::weakly_canonical(
+            path,
+            error);
+
+    if (!error)
+    {
+      return canonical;
+    }
+
+    error.clear();
+    const auto absolute =
+        std::filesystem::absolute(
+            path,
+            error);
+
+    return (error ? path : absolute).lexically_normal();
+  }
+
+  std::optional<SoftwareEntry> software_by_project_root(
+      const ControlClient &client,
+      const std::filesystem::path &root)
+  {
+    const auto normalized_root =
+        normalized_project_root(root);
+
+    for (const auto &entry : client.software())
+    {
+      const auto working_directory =
+          entry.process_spec().working_directory();
+
+      if (working_directory &&
+          normalized_project_root(*working_directory) == normalized_root)
+      {
+        return entry;
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  void software_name_conflict(
+      const std::string &name,
+      const SoftwareEntry &existing,
+      const std::filesystem::path &current_root)
+  {
+    std::cerr
+        << "Software name already registered: "
+        << name
+        << "\n\nExisting project:\n  "
+        << existing.process_spec().working_directory().value_or("unavailable")
+        << "\n\nCurrent project:\n  "
+        << current_root.string()
+        << "\n\nChoose another name or remove the existing registration.\n";
+  }
+
   void no_project(
       const std::string &command)
   {
@@ -412,11 +499,15 @@ namespace
   {
     if (name)
     {
+      const auto entry =
+          software_by_name(
+              client,
+              *name);
+
       Target target{
-          SoftwareId(*name),
+          entry ? entry->id() : SoftwareId(""),
           *name,
-          client.software(
-              SoftwareId(*name)),
+          entry,
           std::nullopt,
           std::nullopt};
 
@@ -447,12 +538,15 @@ namespace
 
     if (config)
     {
+      const auto entry =
+          software_by_project_root(
+              client,
+              config->first);
+
       Target target{
-          SoftwareId(config->second.id.value()),
+          entry ? entry->id() : SoftwareId(""),
           config->second.name,
-          client.software(
-              SoftwareId(
-                  config->second.id.value())),
+          entry,
           config->first,
           config->second};
 
@@ -531,26 +625,6 @@ namespace
       return true;
     }
 
-    const auto existing =
-        target.entry->project_identity();
-
-    const auto legacy =
-        ProjectIdentity::find(
-            *target.root);
-
-    if (existing &&
-        existing->value() != target.config->id.value() &&
-        (!legacy ||
-         legacy->second != *existing))
-    {
-      std::cerr
-          << "Software identifier is linked to another project: "
-          << target.id.value()
-          << '\n';
-
-      return false;
-    }
-
     const ProcessSpec configured_process =
         shell_process(
             target.config->command,
@@ -577,6 +651,22 @@ namespace
         target.entry->access_points() !=
             access_points;
 
+    const auto same_name =
+        software_by_name(
+            client,
+            target.config->name);
+
+    if (same_name &&
+        same_name->id() != target.id)
+    {
+      software_name_conflict(
+          target.config->name,
+          *same_name,
+          *target.root);
+
+      return false;
+    }
+
     if (configuration_changed &&
         !client.synchronize_software(
             target.id,
@@ -586,17 +676,6 @@ namespace
     {
       std::cerr
           << "Stop the application before changing its configuration.\n";
-
-      return false;
-    }
-
-    if (existing &&
-        !client.update_project_root(
-            *existing,
-            target.root->string()))
-    {
-      std::cerr
-          << "failed to update project location on this Host\n";
 
       return false;
     }
@@ -1130,31 +1209,9 @@ namespace softadastra
         }
       }
 
-      ProjectIdentity id =
-          ProjectIdentity::generate();
-
-      const auto legacy =
-          ProjectIdentity::find(root);
-
-      if (legacy &&
-          client_.host_available())
-      {
-        const auto entry =
-            client_.software_by_project_identity(
-                legacy->second);
-
-        if (entry)
-        {
-          id =
-              ProjectIdentity(
-                  entry->id().value());
-        }
-      }
-
       if (!ProjectConfigFile::create(
               root,
               ProjectConfig{
-                  id,
                   name,
                   configured_command,
                   access,
@@ -1542,27 +1599,32 @@ namespace softadastra
       }
 
       if (config &&
-          !client_.software(
-              SoftwareId(
-                  config->second.id.value())))
+          !software_by_project_root(
+              client_,
+              config->first))
       {
-        const auto legacy =
-            ProjectIdentity::find(
-                config->first);
+        const auto same_name =
+            software_by_name(
+                client_,
+                config->second.name);
 
-        const auto identity =
-            legacy
-                ? legacy->second
-                : config->second.id;
+        if (same_name)
+        {
+          software_name_conflict(
+              config->second.name,
+              *same_name,
+              config->first);
+
+          return 1;
+        }
 
         if (!client_.register_software(
-                SoftwareId(
-                    config->second.id.value()),
+                SoftwareId::generate(),
                 shell_process(
                     config->second.command,
                     config->first.string()),
                 config->second.access,
-                identity,
+                std::nullopt,
                 config->second.name))
         {
           std::cerr

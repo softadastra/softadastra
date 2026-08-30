@@ -16,8 +16,6 @@
 #define SOFTADASTRA_SOFTWARE_PROJECT_CONFIG_HPP
 
 #include "software/AccessPoint.hpp"
-#include "software/ProjectIdentity.hpp"
-
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -31,11 +29,6 @@ namespace softadastra
    */
   struct ProjectConfig
   {
-    /**
-     * @brief Stable identity of the project.
-     */
-    ProjectIdentity id;
-
     /**
      * @brief Human-readable project name.
      */

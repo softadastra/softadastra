@@ -155,48 +155,45 @@ namespace
     EXPECT_EQ(actual_path.lexically_normal(), expected.lexically_normal());
   }
 
-  TEST(CliTest, RunsMovedProjectFromRootAndSubdirectoryUsingCurrentRoot)
+  TEST(CliTest, RunsProjectFromRootAndSubdirectoryUsingCurrentRoot)
   {
     const auto base = std::filesystem::temp_directory_path() / ("softadastra-cli-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-    const auto old_root = base / "old";
-    const auto new_root = base / "new";
-    std::filesystem::create_directories(old_root / "src");
-    const auto identity = softadastra::ProjectIdentity::create(old_root);
-    ASSERT_TRUE(identity.has_value());
+    const auto root = base / "project";
+    std::filesystem::create_directories(root / "src");
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
-        old_root,
-        {identity.value(), "app", "./build/app", std::nullopt, {}}));
+        root,
+        {"app", "./build/app", std::nullopt, {}}));
 
     Platform platform;
     softadastra::Host host(platform);
     softadastra::HostService service(host, platform.launcher);
     softadastra::ControlServer server(service);
     softadastra::ControlClient client(server);
-    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("app"), softadastra::ProcessSpec("./build/app", {}, old_root.string()), std::nullopt, identity));
-    std::filesystem::rename(old_root, new_root);
+    const softadastra::SoftwareId id("internal-id");
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("./build/app", {}, root.string()), std::nullopt, std::nullopt, "app"));
     const auto previous = std::filesystem::current_path();
-    std::filesystem::current_path(new_root);
+    std::filesystem::current_path(root);
     const char *root_args[] = {"softadastra", "run"};
     softadastra::Cli cli(client);
     EXPECT_EQ(cli.run(2, root_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
     EXPECT_EQ(platform.launcher.last_spec->executable(), shell_executable());
-    expect_same_path(platform.launcher.last_spec->working_directory(), new_root);
-    std::filesystem::current_path(new_root / "src");
-    ASSERT_TRUE(client.stop_software(softadastra::SoftwareId(identity->value())));
+    expect_same_path(platform.launcher.last_spec->working_directory(), root);
+    std::filesystem::current_path(root / "src");
+    ASSERT_TRUE(client.stop_software(id));
     EXPECT_EQ(cli.run(2, root_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
     EXPECT_EQ(platform.launcher.last_spec->executable(), shell_executable());
-    expect_same_path(platform.launcher.last_spec->working_directory(), new_root);
+    expect_same_path(platform.launcher.last_spec->working_directory(), root);
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(base);
   }
 
-  TEST(CliTest, RunsTomlProjectWithConfiguredIdAndName)
+  TEST(CliTest, RunsTomlProjectWithHostOwnedIdAndName)
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-name-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("stable-id"), "phone-test", "sleep 30", std::nullopt, {}}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {"phone-test", "sleep 30", std::nullopt, {}}));
     Platform platform;
     softadastra::Host host(platform);
     softadastra::HostService service(host, platform.launcher);
@@ -208,12 +205,138 @@ namespace
     const char *arguments[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, arguments), 0);
     std::filesystem::current_path(previous);
-    const auto entry = client.software(softadastra::SoftwareId("stable-id"));
-    ASSERT_TRUE(entry.has_value());
-    EXPECT_EQ(entry->id().value(), "stable-id");
-    EXPECT_EQ(entry->name(), "phone-test");
-    EXPECT_EQ(service.find_by_name("phone-test")->id().value(), "stable-id");
+    const auto entries = client.software();
+    ASSERT_EQ(entries.size(), 1U);
+    const auto &entry = entries.front();
+    EXPECT_EQ(entry.name(), "phone-test");
+    EXPECT_FALSE(service.find_by_name("phone-test")->id().value().empty());
     std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, SynchronizesTomlProjectByHostIdWhenItsNameChanges)
+  {
+    const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-identity-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root);
+    const softadastra::SoftwareId id("stable-id");
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        root,
+        {"first-name", "first-command", std::nullopt, {}}));
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(
+        id,
+        softadastra::ProcessSpec("old-command", {}, root.string()),
+        std::nullopt,
+        std::nullopt,
+        "first-name"));
+
+    softadastra::Cli cli(client);
+    const char *run_args[] = {"softadastra", "run"};
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    ASSERT_EQ(cli.run(2, run_args), 0);
+    ASSERT_TRUE(client.stop_software(id));
+    ASSERT_TRUE(std::filesystem::remove(root / "softadastra.toml"));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        root,
+        {"renamed", "second-command",
+         softadastra::AccessPoint::create(
+             softadastra::AccessProtocol::Http,
+             8080),
+         {}}));
+    EXPECT_EQ(cli.run(2, run_args), 0);
+    std::filesystem::current_path(previous);
+
+    const auto entry = client.software(id);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(entry->id(), id);
+    EXPECT_EQ(entry->name(), "renamed");
+    EXPECT_EQ(entry->declared_command(), "second-command");
+    ASSERT_TRUE(entry->access_point().has_value());
+    EXPECT_EQ(entry->access_point()->port(), 8080);
+    EXPECT_EQ(client.software().size(), 1U);
+    std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, RejectsDifferentProjectIdUsingRegisteredNameWithoutLaunching)
+  {
+    const auto base = std::filesystem::temp_directory_path() / ("softadastra-name-conflict-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto existing_root = base / "existing";
+    const auto current_root = base / "current";
+    std::filesystem::create_directories(existing_root);
+    std::filesystem::create_directories(current_root);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        current_root,
+        {"duplicate", "current-command", std::nullopt, {}}));
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(
+        softadastra::SoftwareId("existing-id"),
+        softadastra::ProcessSpec("existing-command", {}, existing_root.string()),
+        std::nullopt,
+        softadastra::ProjectIdentity("existing-id"),
+        "duplicate"));
+
+    softadastra::Cli cli(client);
+    const char *run_args[] = {"softadastra", "run"};
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(current_root);
+    testing::internal::CaptureStderr();
+    EXPECT_EQ(cli.run(2, run_args), 1);
+    const auto output = testing::internal::GetCapturedStderr();
+    std::filesystem::current_path(previous);
+
+    EXPECT_NE(output.find("Software name already registered: duplicate"), std::string::npos);
+    EXPECT_NE(output.find("Existing project:\n  " + existing_root.string()), std::string::npos);
+    EXPECT_NE(output.find("Current project:\n  " + current_root.string()), std::string::npos);
+    EXPECT_NE(output.find("Choose another name or remove the existing registration."), std::string::npos);
+    ASSERT_TRUE(client.software(softadastra::SoftwareId("existing-id")).has_value());
+    EXPECT_FALSE(platform.launcher.last_spec.has_value());
+    EXPECT_EQ(client.software().size(), 1U);
+    std::filesystem::remove_all(base);
+  }
+
+  TEST(CliTest, RegistersDifferentProjectIdWithDifferentName)
+  {
+    const auto base = std::filesystem::temp_directory_path() / ("softadastra-distinct-projects-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto current_root = base / "current";
+    std::filesystem::create_directories(current_root);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        current_root,
+        {"current", "current-command", std::nullopt, {}}));
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(
+        softadastra::SoftwareId("existing-id"),
+        softadastra::ProcessSpec("existing-command", {}, "/existing"),
+        std::nullopt,
+        softadastra::ProjectIdentity("existing-id"),
+        "existing"));
+
+    softadastra::Cli cli(client);
+    const char *run_args[] = {"softadastra", "run"};
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(current_root);
+    EXPECT_EQ(cli.run(2, run_args), 0);
+    std::filesystem::current_path(previous);
+
+    EXPECT_EQ(client.software().size(), 2U);
+    EXPECT_EQ(client.software().size(), 2U);
+    ASSERT_TRUE(platform.launcher.last_spec.has_value());
+    expect_same_path(platform.launcher.last_spec->working_directory(), current_root);
+    std::filesystem::remove_all(base);
   }
 
   TEST(CliTest, MigratesLegacyProjectWithInitThenRunsTomlCommand)
@@ -226,9 +349,7 @@ namespace
     softadastra::HostService service(host, platform.launcher);
     softadastra::ControlServer server(service);
     softadastra::ControlClient client(server);
-    const auto identity = softadastra::ProjectIdentity::create(root);
-    ASSERT_TRUE(identity.has_value());
-    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("legacy"), softadastra::ProcessSpec("--access", {}, "/old/root"), std::nullopt, identity));
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("legacy"), softadastra::ProcessSpec("--access", {}, "/old/root"), std::nullopt, std::nullopt, "legacy"));
     const auto previous = std::filesystem::current_path();
     std::filesystem::current_path(root);
     const char *init_args[] = {"softadastra", "init", "--command", "./build/app", "--access", "http:8080"};
@@ -237,7 +358,6 @@ namespace
     EXPECT_EQ(cli.run(6, init_args), 0);
     const auto config = softadastra::ProjectConfigFile::find(root);
     ASSERT_TRUE(config.has_value());
-    EXPECT_EQ(config->second.id.value(), "legacy");
     std::filesystem::current_path(source);
     EXPECT_EQ(cli.run(2, run_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
@@ -266,6 +386,11 @@ namespace
     EXPECT_EQ(config->second.name, "demo");
     EXPECT_EQ(config->second.command, "python3 server.py --port 8000");
     ASSERT_TRUE(config->second.access.has_value());
+    std::ifstream input(root / "softadastra.toml");
+    const std::string contents{
+        std::istreambuf_iterator<char>(input),
+        std::istreambuf_iterator<char>()};
+    EXPECT_EQ(contents.find("id ="), std::string::npos);
     const char *run_args[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, run_args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
@@ -276,11 +401,99 @@ namespace
     std::filesystem::remove_all(root);
   }
 
+  TEST(CliTest, IgnoresLegacyTomlIdWhenResolvingProjectRoot)
+  {
+    const auto root = std::filesystem::temp_directory_path() / ("softadastra-legacy-id-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root);
+    const auto toml = root / "softadastra.toml";
+
+    {
+      std::ofstream output(toml);
+      output << "id = \"old-user-id\"\n"
+             << "name = \"legacy\"\n"
+             << "command = \"legacy-command\"\n";
+    }
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
+    const char *run_args[] = {"softadastra", "run"};
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    ASSERT_EQ(cli.run(2, run_args), 0);
+    ASSERT_EQ(client.software().size(), 1U);
+    const auto id = client.software().front().id();
+    ASSERT_TRUE(client.stop_software(id));
+
+    {
+      std::ofstream output(toml);
+      output << "id = \"manually-changed-id\"\n"
+             << "name = \"legacy\"\n"
+             << "command = \"legacy-command\"\n";
+    }
+
+    EXPECT_EQ(cli.run(2, run_args), 0);
+    std::filesystem::current_path(previous);
+    ASSERT_EQ(client.software().size(), 1U);
+    EXPECT_EQ(client.software().front().id(), id);
+    std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, CopyingLegacyTomlDoesNotCopyHostIdentity)
+  {
+    const auto base = std::filesystem::temp_directory_path() / ("softadastra-legacy-copy-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto first_root = base / "first";
+    const auto second_root = base / "second";
+    std::filesystem::create_directories(first_root);
+    std::filesystem::create_directories(second_root);
+
+    const auto write_config = [](const std::filesystem::path &root,
+                                 const std::string &name)
+    {
+      std::ofstream output(root / "softadastra.toml");
+      output << "id = \"copied-legacy-id\"\n"
+             << "name = \"" << name << "\"\n"
+             << "command = \"copy-command\"\n";
+    };
+
+    write_config(first_root, "shop");
+    write_config(second_root, "shop");
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(client);
+    const char *run_args[] = {"softadastra", "run"};
+    const auto previous = std::filesystem::current_path();
+
+    std::filesystem::current_path(first_root);
+    ASSERT_EQ(cli.run(2, run_args), 0);
+    const auto first_id = client.software().front().id();
+    ASSERT_TRUE(client.stop_software(first_id));
+
+    std::filesystem::current_path(second_root);
+    EXPECT_EQ(cli.run(2, run_args), 1);
+    EXPECT_EQ(client.software().size(), 1U);
+    EXPECT_FALSE(platform.launcher.last_spec->working_directory() == second_root.string());
+
+    write_config(second_root, "shop-copy");
+    EXPECT_EQ(cli.run(2, run_args), 0);
+    std::filesystem::current_path(previous);
+    ASSERT_EQ(client.software().size(), 2U);
+    EXPECT_NE(client.software().back().id(), first_id);
+    std::filesystem::remove_all(base);
+  }
+
   TEST(CliTest, TomlConfigurationWinsOverLegacyRegistration)
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-toml-wins-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
-    const softadastra::ProjectConfig config{softadastra::ProjectIdentity("toml-stable-id"), "pico", "./build/app", std::nullopt, {}};
+    const softadastra::ProjectConfig config{"pico", "./build/app", std::nullopt, {}};
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, config));
     Platform platform;
     softadastra::Host host(platform);
@@ -295,7 +508,7 @@ namespace
     EXPECT_EQ(cli.run(2, args), 0);
     ASSERT_TRUE(platform.launcher.last_spec.has_value());
     EXPECT_NE(platform.launcher.last_spec->arguments()[1].find("./build/app"), std::string::npos);
-    EXPECT_TRUE(client.software(softadastra::SoftwareId("toml-stable-id")).has_value());
+    EXPECT_EQ(client.software().size(), 2U);
     std::filesystem::current_path(previous);
     std::filesystem::remove_all(root);
   }
@@ -576,14 +789,14 @@ namespace
   {
     const auto root = std::filesystem::temp_directory_path() / ("softadastra-target-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
-    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {softadastra::ProjectIdentity("project-app"), "app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080), {}}));
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {"app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080), {}}));
     Platform platform;
     softadastra::Host host(platform);
     softadastra::HostService service(host, platform.launcher);
     softadastra::ControlServer server(service);
     softadastra::ControlClient client(server);
     softadastra::Cli cli(client);
-    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("project-app"), softadastra::ProcessSpec("--access"), std::nullopt, softadastra::ProjectIdentity("project-app")));
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("project-app"), softadastra::ProcessSpec("--access", {}, root.string()), std::nullopt, std::nullopt, "app"));
     const auto previous = std::filesystem::current_path();
     std::filesystem::current_path(root);
     const char *start_project[] = {"softadastra", "run"};
@@ -592,12 +805,12 @@ namespace
     const char *status_project[] = {"softadastra", "status"};
     const char *info_project[] = {"softadastra", "info"};
     const char *access_project[] = {"softadastra", "access"};
-    const char *start_named[] = {"softadastra", "start", "project-app"};
-    const char *stop_named[] = {"softadastra", "stop", "project-app"};
-    const char *restart_named[] = {"softadastra", "restart", "project-app"};
-    const char *status_named[] = {"softadastra", "status", "project-app"};
-    const char *info_named[] = {"softadastra", "info", "project-app"};
-    const char *access_named[] = {"softadastra", "access", "project-app"};
+    const char *start_named[] = {"softadastra", "start", "app"};
+    const char *stop_named[] = {"softadastra", "stop", "app"};
+    const char *restart_named[] = {"softadastra", "restart", "app"};
+    const char *status_named[] = {"softadastra", "status", "app"};
+    const char *info_named[] = {"softadastra", "info", "app"};
+    const char *access_named[] = {"softadastra", "access", "app"};
     EXPECT_EQ(cli.run(2, start_project), 0);
     EXPECT_EQ(cli.run(2, status_project), 0);
     EXPECT_EQ(cli.run(2, info_project), 0);
