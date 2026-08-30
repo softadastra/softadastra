@@ -143,6 +143,10 @@ namespace
     case SoftwareOperationError::StopFailed:
       std::cerr << "stop failed";
       break;
+
+    case SoftwareOperationError::LocalAccessUnavailable:
+      std::cerr << "local access could not be opened on this Host";
+      break;
     }
   }
 
@@ -773,6 +777,32 @@ namespace
 
     std::cout
         << "Local access:  unavailable\n";
+
+    if (access->firewall == LocalAccessFirewallState::PermissionRequired ||
+        access->firewall == LocalAccessFirewallState::Unsupported ||
+        access->firewall == LocalAccessFirewallState::Failed)
+    {
+      std::cout
+          << "\nLocal firewall access was not confirmed.\n"
+          << "Port:          " << access->port << '\n'
+          << "Network:       "
+          << (access->local_subnet.empty() ? "unavailable" : access->local_subnet)
+          << "\nReason:        ";
+      switch (access->firewall)
+      {
+      case LocalAccessFirewallState::PermissionRequired:
+        std::cout << "firewall permission required\n";
+        break;
+      case LocalAccessFirewallState::Unsupported:
+        std::cout << "firewall policy is not managed or verifiable\n";
+        break;
+      case LocalAccessFirewallState::Failed:
+        std::cout << "firewall rule could not be applied\n";
+        break;
+      default:
+        break;
+      }
+    }
 
     if (entry->state() == SoftwareState::Stopped)
     {

@@ -17,6 +17,7 @@
 
 #include "platform/Network.hpp"
 #include "platform/ManagedNetwork.hpp"
+#include "platform/LocalFirewall.hpp"
 #include "platform/ProcessLauncher.hpp"
 #include "platform/Service.hpp"
 
@@ -64,6 +65,12 @@ namespace softadastra
      * @brief Returns the network capability.
      */
     [[nodiscard]] virtual const Network &network() const noexcept = 0;
+
+    /** Returns the local firewall capability, when the platform supports it. */
+    [[nodiscard]] virtual LocalFirewall &local_firewall() noexcept
+    { static UnavailableLocalFirewall firewall; return firewall; }
+    [[nodiscard]] virtual const LocalFirewall &local_firewall() const noexcept
+    { static UnavailableLocalFirewall firewall; return firewall; }
 
     [[nodiscard]] virtual ManagedNetwork &managed_network() noexcept
     { static UnavailableManagedNetwork network; return network; }

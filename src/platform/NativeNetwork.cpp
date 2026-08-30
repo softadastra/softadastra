@@ -229,6 +229,43 @@ namespace
 
 #if defined(__linux__)
 
+  std::string ipv4_subnet(
+      const std::string &interface_name,
+      const std::string &ipv4)
+  {
+    ifaddrs *interfaces = nullptr;
+    if (::getifaddrs(&interfaces) != 0)
+      return {};
+
+    std::string result;
+    for (const ifaddrs *interface = interfaces; interface != nullptr;
+         interface = interface->ifa_next)
+    {
+      if (interface->ifa_name == nullptr || interface->ifa_addr == nullptr ||
+          interface->ifa_netmask == nullptr || interface_name != interface->ifa_name ||
+          interface->ifa_addr->sa_family != AF_INET)
+        continue;
+      const auto &address = reinterpret_cast<const sockaddr_in &>(*interface->ifa_addr);
+      const auto &mask = reinterpret_cast<const sockaddr_in &>(*interface->ifa_netmask);
+      std::array<char, INET_ADDRSTRLEN> text{};
+      if (::inet_ntop(AF_INET, &address.sin_addr, text.data(), text.size()) == nullptr ||
+          ipv4 != text.data())
+        continue;
+      const std::uint32_t value = ntohl(address.sin_addr.s_addr);
+      const std::uint32_t netmask = ntohl(mask.sin_addr.s_addr);
+      unsigned int prefix = 0;
+      for (std::uint32_t bit = 0x80000000U; bit != 0U; bit >>= 1U)
+        prefix += (netmask & bit) != 0U ? 1U : 0U;
+      in_addr network{};
+      network.s_addr = htonl(value & netmask);
+      if (::inet_ntop(AF_INET, &network, text.data(), text.size()) != nullptr)
+        result = std::string(text.data()) + "/" + std::to_string(prefix);
+      break;
+    }
+    ::freeifaddrs(interfaces);
+    return result;
+  }
+
   bool attribute_ok(const nlattr *attribute, int length) noexcept
   {
     return length >= static_cast<int>(sizeof(nlattr)) &&
@@ -853,6 +890,10 @@ namespace softadastra
         capability.interface_type = NetworkInterfaceType::Other;
       }
     }
+
+    capability.local_subnet = ipv4_subnet(
+        capability.primary_interface,
+        capability.primary_ipv4);
 
 #endif
 

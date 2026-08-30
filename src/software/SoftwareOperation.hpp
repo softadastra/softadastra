@@ -33,6 +33,7 @@ namespace softadastra
     ProcessExitedSuccessfully,
     ProcessExitedWithNonZeroCode,
     StopFailed
+    ,LocalAccessUnavailable
   };
 
   /**

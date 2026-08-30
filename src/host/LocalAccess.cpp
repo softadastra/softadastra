@@ -108,7 +108,10 @@ namespace softadastra
         {},
         LocalAccessNetwork::Unavailable,
         network_capability.local_network_state,
-        network_capability.managed_network_capability};
+        network_capability.managed_network_capability,
+        false,
+        LocalAccessFirewallState::NotRequired,
+        network_capability.local_subnet};
 
     if (!software_running)
     {

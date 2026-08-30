@@ -109,6 +109,7 @@ add_library(
   src/host/HostState.cpp
   src/host/HostStateFile.cpp
   src/platform/NativeNetwork.cpp
+  src/platform/NativeLocalFirewall.cpp
   src/platform/ManagedNetwork.cpp
   src/platform/NativeManagedNetwork.cpp
   src/platform/GatewayCapabilityProvisioning.cpp

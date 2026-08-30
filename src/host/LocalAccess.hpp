@@ -44,6 +44,16 @@ namespace softadastra
     Managed
   };
 
+  /** Reports whether local firewall policy has made the declared port usable. */
+  enum class LocalAccessFirewallState
+  {
+    NotRequired,
+    Open,
+    PermissionRequired,
+    Unsupported,
+    Failed
+  };
+
   /**
    * @brief Describes the current local access resolved for a software AccessPoint.
    *
@@ -102,6 +112,13 @@ namespace softadastra
      * usable local access.
      */
     bool managed_network_start_failed{false};
+
+    /** Firewall policy result for an existing local network. */
+    LocalAccessFirewallState firewall{
+        LocalAccessFirewallState::NotRequired};
+
+    /** Local IPv4 subnet to which any Host-owned rule is restricted. */
+    std::string local_subnet;
   };
 
   /**

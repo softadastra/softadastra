@@ -15,6 +15,7 @@
 #include "host/Host.hpp"
 #include "host/HostService.hpp"
 #include "platform/Network.hpp"
+#include "platform/LocalFirewall.hpp"
 #include "platform/Platform.hpp"
 #include "platform/Process.hpp"
 #include "platform/ProcessLauncher.hpp"
@@ -177,6 +178,16 @@ namespace
       return primary_ipv4_;
     }
 
+    [[nodiscard]] softadastra::NetworkCapability network_capability() const override
+    {
+      return capability_;
+    }
+
+    void set_capability(softadastra::NetworkCapability value)
+    {
+      capability_ = std::move(value);
+    }
+
     void set_available(bool value) noexcept
     {
       available_ = value;
@@ -196,6 +207,39 @@ namespace
     bool available_{false};
     bool connected_{false};
     std::string primary_ipv4_;
+    softadastra::NetworkCapability capability_;
+  };
+
+  class TestLocalFirewall final : public softadastra::LocalFirewall
+  {
+  public:
+    [[nodiscard]] softadastra::LocalFirewallResult ensure(
+        const softadastra::LocalFirewallRule &rule) override
+    {
+      ++ensure_calls;
+      last_rule = rule;
+      if (result == softadastra::LocalFirewallResult::Open && !already_open)
+        owned = true;
+      return result;
+    }
+
+    void release(const softadastra::LocalFirewallRule &rule) noexcept override
+    {
+      if (owned)
+      {
+        ++release_calls;
+        last_released = rule;
+        owned = false;
+      }
+    }
+
+    softadastra::LocalFirewallResult result{softadastra::LocalFirewallResult::Open};
+    bool already_open{false};
+    bool owned{false};
+    int ensure_calls{0};
+    int release_calls{0};
+    softadastra::LocalFirewallRule last_rule;
+    softadastra::LocalFirewallRule last_released;
   };
 
   class TestManagedNetwork final : public softadastra::ManagedNetwork
@@ -251,6 +295,8 @@ namespace
     {
       return network_;
     }
+    [[nodiscard]] softadastra::LocalFirewall &local_firewall() noexcept override { return firewall_; }
+    [[nodiscard]] const softadastra::LocalFirewall &local_firewall() const noexcept override { return firewall_; }
     [[nodiscard]] softadastra::ManagedNetwork &managed_network() noexcept override { return managed_network_; }
     [[nodiscard]] const softadastra::ManagedNetwork &managed_network() const noexcept override { return managed_network_; }
 
@@ -259,12 +305,24 @@ namespace
       return network_;
     }
 
+    TestLocalFirewall &test_firewall() noexcept { return firewall_; }
+
   private:
     TestProcessLauncher process_launcher_;
     TestService service_;
     TestNetwork network_;
     TestManagedNetwork managed_network_;
+    TestLocalFirewall firewall_;
   };
+
+  softadastra::NetworkCapability existing_network()
+  {
+    return {softadastra::NetworkState::Available, "192.168.1.6", "wlan0",
+            softadastra::NetworkInterfaceType::Wifi,
+            softadastra::LocalNetworkState::Existing,
+            softadastra::ManagedNetworkCapability::Unavailable,
+            "192.168.1.0/24"};
+  }
 
   TEST(HostServiceTest, RegistersSoftware)
   {
@@ -298,6 +356,94 @@ namespace
     EXPECT_EQ(
         service.software_state(id).value(),
         softadastra::SoftwareState::Running);
+  }
+
+  TEST(HostServiceTest, OpensLocalAccessOnlyForTheCurrentSubnet)
+  {
+    TestPlatform platform;
+    platform.test_network().set_capability(existing_network());
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    const softadastra::SoftwareId id("example");
+    ASSERT_TRUE(service.register_software(
+        id, softadastra::ProcessSpec("/usr/bin/example"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081)));
+
+    EXPECT_TRUE(service.start_software(id));
+    ASSERT_TRUE(service.local_access(id).has_value());
+    EXPECT_EQ(platform.test_firewall().last_rule.subnet, "192.168.1.0/24");
+    EXPECT_EQ(platform.test_firewall().last_rule.port, 8081);
+    EXPECT_EQ(platform.test_firewall().last_rule.owner, id.value());
+  }
+
+  TEST(HostServiceTest, DoesNotReportLocalAccessWhenFirewallRequiresPermission)
+  {
+    TestPlatform platform;
+    platform.test_network().set_capability(existing_network());
+    ASSERT_EQ(platform.test_network().network_capability().local_subnet, "192.168.1.0/24");
+    platform.test_firewall().result = softadastra::LocalFirewallResult::PermissionRequired;
+    EXPECT_EQ(platform.test_firewall().result, softadastra::LocalFirewallResult::PermissionRequired);
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    const softadastra::SoftwareId id("example");
+    ASSERT_TRUE(service.register_software(
+        id, softadastra::ProcessSpec("/usr/bin/example"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081)));
+
+    ASSERT_TRUE(service.start_software(id));
+    const auto access = service.local_access(id);
+    ASSERT_TRUE(access.has_value());
+    EXPECT_EQ(access->local_subnet, "192.168.1.0/24");
+    EXPECT_EQ(access->network, softadastra::LocalAccessNetwork::Existing);
+    EXPECT_EQ(platform.test_firewall().ensure_calls, 1);
+    EXPECT_EQ(access->state, softadastra::LocalAccessState::Unavailable);
+    EXPECT_EQ(access->firewall, softadastra::LocalAccessFirewallState::PermissionRequired);
+  }
+
+  TEST(HostServiceTest, DoesNotMutateExistingFirewallRules)
+  {
+    TestPlatform platform;
+    platform.test_network().set_capability(existing_network());
+    platform.test_firewall().already_open = true;
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    const softadastra::SoftwareId id("example");
+    ASSERT_TRUE(service.register_software(
+        id, softadastra::ProcessSpec("/usr/bin/example"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081)));
+    ASSERT_TRUE(service.start_software(id));
+    ASSERT_TRUE(service.local_access(id).has_value());
+    ASSERT_TRUE(service.stop_software(id));
+    EXPECT_EQ(platform.test_firewall().release_calls, 0);
+
+    platform.test_firewall().already_open = false;
+    ASSERT_TRUE(service.start_software(id));
+    ASSERT_TRUE(service.local_access(id).has_value());
+    ASSERT_TRUE(service.stop_software(id));
+    EXPECT_EQ(platform.test_firewall().release_calls, 0);
+  }
+
+  TEST(HostServiceTest, DoesNotMutateFirewallWhenAccessPortChanges)
+  {
+    TestPlatform platform;
+    platform.test_network().set_capability(existing_network());
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    const softadastra::SoftwareId id("example");
+    ASSERT_TRUE(service.register_software(
+        id, softadastra::ProcessSpec("/usr/bin/example"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081)));
+    ASSERT_TRUE(service.start_software(id));
+    ASSERT_TRUE(service.local_access(id).has_value());
+    ASSERT_TRUE(service.stop_software(id));
+    ASSERT_TRUE(service.synchronize_software(
+        id, softadastra::ProcessSpec("/usr/bin/example"),
+        softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8082)));
+    EXPECT_EQ(platform.test_firewall().release_calls, 0);
   }
 
   TEST(HostServiceTest, StopsRegisteredSoftware)

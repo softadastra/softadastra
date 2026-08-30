@@ -46,6 +46,16 @@ namespace softadastra
     return network_;
   }
 
+  LocalFirewall &NativePlatform::local_firewall() noexcept
+  {
+    return local_firewall_;
+  }
+
+  const LocalFirewall &NativePlatform::local_firewall() const noexcept
+  {
+    return local_firewall_;
+  }
+
   ManagedNetwork &NativePlatform::managed_network() noexcept
   {
     return managed_network_;

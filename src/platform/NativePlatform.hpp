@@ -17,6 +17,7 @@
 
 #include "platform/NativeNetwork.hpp"
 #include "platform/NativeManagedNetwork.hpp"
+#include "platform/NativeLocalFirewall.hpp"
 #include "platform/NativeProcessLauncher.hpp"
 #include "platform/NativeService.hpp"
 #include "platform/Platform.hpp"
@@ -94,6 +95,8 @@ namespace softadastra
      * @brief Returns the native network capability.
      */
     [[nodiscard]] const Network &network() const noexcept override;
+    [[nodiscard]] LocalFirewall &local_firewall() noexcept override;
+    [[nodiscard]] const LocalFirewall &local_firewall() const noexcept override;
     [[nodiscard]] ManagedNetwork &managed_network() noexcept override;
     [[nodiscard]] const ManagedNetwork &managed_network() const noexcept override;
 
@@ -101,6 +104,7 @@ namespace softadastra
     NativeProcessLauncher process_launcher_;
     NativeService service_;
     NativeNetwork network_;
+    NativeLocalFirewall local_firewall_;
     NativeManagedNetwork managed_network_;
   };
 

@@ -193,9 +193,15 @@ namespace softadastra
            "\n"
            "[Service]\n"
            "Type=simple\n"
+           "User=softadastra\n"
+           "Group=softadastra\n"
+           "Environment=XDG_STATE_HOME=/var/lib\n"
            "ExecStart=" +
            escape_systemd_argument(executable.string()) + " host\n"
                                                           "Restart=on-failure\n"
+                                                          "RestartSec=2\n"
+                                                          "StateDirectory=softadastra\n"
+                                                          "NoNewPrivileges=true\n"
                                                           "\n"
                                                           "[Install]\n"
                                                           "WantedBy=multi-user.target\n";

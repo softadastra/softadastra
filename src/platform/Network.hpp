@@ -81,6 +81,9 @@ namespace softadastra
     LocalNetworkState local_network_state{LocalNetworkState::Unavailable};
     ManagedNetworkCapability managed_network_capability{
         ManagedNetworkCapability::Unavailable};
+
+    /** CIDR subnet containing primary_ipv4 when the platform can determine it. */
+    std::string local_subnet;
   };
 
   [[nodiscard]] const char *network_state_name(NetworkState value) noexcept;
@@ -195,7 +198,8 @@ namespace softadastra
               address.interface_name,
               NetworkInterfaceType::Unknown,
               LocalNetworkState::Existing,
-              ManagedNetworkCapability::Unavailable};
+              ManagedNetworkCapability::Unavailable,
+              {}};
         }
       }
 

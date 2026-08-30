@@ -21,6 +21,7 @@
 #include "host/LocalGatewayTargetResolver.hpp"
 #include "host/LocalReachability.hpp"
 #include "platform/ManagedNetwork.hpp"
+#include "platform/LocalFirewall.hpp"
 #include "platform/Network.hpp"
 #include "platform/ProcessLauncher.hpp"
 #include "platform/ProcessSpec.hpp"
@@ -393,6 +394,10 @@ namespace softadastra
     [[nodiscard]] std::string primary_ipv4() const;
 
   private:
+    [[nodiscard]] LocalAccessFirewallState ensure_local_firewall(
+        const SoftwareId &id,
+        const LocalAccess &access,
+        const NetworkCapability &network);
     Host &host_;
     SoftwareManager software_manager_;
     ConnectivityManager connectivity_manager_;

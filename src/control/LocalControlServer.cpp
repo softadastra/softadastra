@@ -626,7 +626,11 @@ namespace softadastra
              std::to_string(
                  access->managed_network_start_failed
                      ? 1
-                     : 0);
+                     : 0) +
+             " " +
+             std::to_string(static_cast<int>(access->firewall)) +
+             " " +
+             LocalControlProtocol::encode(access->local_subnet);
     }
 
     if (fields[0] == "access-point" &&

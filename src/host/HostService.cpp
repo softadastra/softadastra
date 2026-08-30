@@ -177,7 +177,8 @@ namespace softadastra
   SoftwareOperationResult HostService::stop_software(
       const SoftwareId &id)
   {
-    return software_manager_.stop(id);
+    const auto result = software_manager_.stop(id);
+    return result;
   }
 
   SoftwareOperationResult HostService::restart_software(
@@ -329,6 +330,19 @@ namespace softadastra
             entry->name(),
             local_reachability_state());
 
+    if (access.state == LocalAccessState::Available &&
+        access.network == LocalAccessNetwork::Existing &&
+        !access.local_subnet.empty())
+    {
+      access.firewall = ensure_local_firewall(id, access, network_capability());
+      if (access.firewall != LocalAccessFirewallState::Open)
+      {
+        access.state = LocalAccessState::Unavailable;
+        access.url.clear();
+        return access;
+      }
+    }
+
     // `access` may change networking only here: a real, running AccessPoint
     // has no usable local network and ManagedNetwork has conservatively
     // declared itself available. Existing networks and running managed
@@ -408,5 +422,25 @@ namespace softadastra
         .network()
         .primary_ipv4();
   }
+
+  LocalAccessFirewallState HostService::ensure_local_firewall(
+      const SoftwareId &id,
+      const LocalAccess &access,
+      const NetworkCapability &network)
+  {
+    if (network.local_subnet.empty())
+      return LocalAccessFirewallState::Unsupported;
+    const auto result = host_.platform().local_firewall().ensure(
+        {id.value(), network.local_subnet, access.port});
+    switch (result)
+    {
+    case LocalFirewallResult::Open: return LocalAccessFirewallState::Open;
+    case LocalFirewallResult::PermissionRequired: return LocalAccessFirewallState::PermissionRequired;
+    case LocalFirewallResult::Unsupported: return LocalAccessFirewallState::Unsupported;
+    case LocalFirewallResult::Failed: return LocalAccessFirewallState::Failed;
+    }
+    return LocalAccessFirewallState::Failed;
+  }
+
 
 } // namespace softadastra
