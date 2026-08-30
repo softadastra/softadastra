@@ -131,6 +131,7 @@ namespace
     ASSERT_TRUE(certificate_input);
     const std::string certificate_pem(
         (std::istreambuf_iterator<char>(certificate_input)), {});
+    certificate_input.close();
     BIO *certificate_bio = BIO_new_mem_buf(
         certificate_pem.data(), static_cast<int>(certificate_pem.size()));
     ASSERT_NE(certificate_bio, nullptr);

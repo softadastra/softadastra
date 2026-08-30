@@ -44,8 +44,17 @@ namespace
                                   .count()));
       project_ = root_ / "project";
       state_ = root_ / "state";
+#if defined(_WIN32)
+      char *path = nullptr;
+      std::size_t path_size = 0;
+      const errno_t path_result =
+          ::_dupenv_s(&path, &path_size, "PATH");
+      path_ = path_result == 0 && path != nullptr ? path : "";
+      std::free(path);
+#else
       const char *path = std::getenv("PATH");
       path_ = path == nullptr ? "" : path;
+#endif
       std::filesystem::create_directories(project_);
       std::filesystem::create_directories(state_);
     }
