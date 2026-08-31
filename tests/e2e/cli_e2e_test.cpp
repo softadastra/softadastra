@@ -4,11 +4,16 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <thread>
 
 #if defined(__linux__)
 #include <sys/wait.h>
+#endif
+
+#if defined(_WIN32)
+#include <windows.h>
 #endif
 
 namespace
@@ -58,10 +63,66 @@ namespace
 #endif
       std::filesystem::create_directories(project_);
       std::filesystem::create_directories(state_);
+
+#if defined(_WIN32)
+      previous_local_app_data_ = environment("LOCALAPPDATA");
+      previous_home_ = environment("HOME");
+      ASSERT_TRUE(::SetEnvironmentVariableA(
+          "LOCALAPPDATA", state_.string().c_str()));
+      ASSERT_TRUE(::SetEnvironmentVariableA("HOME", root_.string().c_str()));
+
+      std::wstring command =
+          L"\"" + std::filesystem::path(SOFTADASTRA_E2E_BINARY).wstring() +
+          L"\" host";
+      STARTUPINFOW startup{};
+      startup.cb = sizeof(startup);
+      PROCESS_INFORMATION process{};
+
+      ASSERT_TRUE(::CreateProcessW(
+          nullptr,
+          command.data(),
+          nullptr,
+          nullptr,
+          FALSE,
+          CREATE_NEW_PROCESS_GROUP,
+          nullptr,
+          project_.c_str(),
+          &startup,
+          &process));
+      ::CloseHandle(process.hThread);
+      host_process_ = process.hProcess;
+      host_pid_ = process.dwProcessId;
+#endif
     }
 
     void TearDown() override
     {
+#if defined(_WIN32)
+      static_cast<void>(run("host stop"));
+
+      if (host_process_ != nullptr)
+      {
+        if (::WaitForSingleObject(host_process_, 5000) == WAIT_TIMEOUT)
+        {
+          static_cast<void>(::TerminateProcess(host_process_, 1));
+          static_cast<void>(::WaitForSingleObject(host_process_, INFINITE));
+        }
+
+        ::CloseHandle(host_process_);
+        host_process_ = nullptr;
+      }
+
+      static_cast<void>(::SetEnvironmentVariableA(
+          "LOCALAPPDATA",
+          previous_local_app_data_.has_value()
+              ? previous_local_app_data_->c_str()
+              : nullptr));
+      static_cast<void>(::SetEnvironmentVariableA(
+          "HOME",
+          previous_home_.has_value() ? previous_home_->c_str() : nullptr));
+      std::filesystem::remove_all(root_);
+      return;
+#else
       bool stopped = false;
 
       for (int attempt = 0; attempt < 500; ++attempt)
@@ -89,6 +150,7 @@ namespace
       }
 
       std::filesystem::remove_all(root_);
+#endif
     }
 
     int run(const std::string &arguments)
@@ -136,6 +198,28 @@ namespace
     std::filesystem::path state_;
     std::string path_;
     std::string last_output_;
+
+#if defined(_WIN32)
+    static std::optional<std::string> environment(const char *name)
+    {
+      char *value = nullptr;
+      std::size_t size = 0;
+
+      if (::_dupenv_s(&value, &size, name) != 0 || value == nullptr)
+      {
+        return std::nullopt;
+      }
+
+      std::string result(value);
+      std::free(value);
+      return result;
+    }
+
+    HANDLE host_process_{nullptr};
+    DWORD host_pid_{0};
+    std::optional<std::string> previous_local_app_data_;
+    std::optional<std::string> previous_home_;
+#endif
   };
 
   TEST_F(CliE2eTest, RunsAProjectCommandWithArgumentsAndManagesItsLifecycle)

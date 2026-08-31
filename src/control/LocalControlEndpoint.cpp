@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cwctype>
 #include <system_error>
+#include <vector>
 
 #include <windows.h>
 
@@ -25,7 +26,16 @@ namespace softadastra
       std::error_code error;
       const auto absolute = std::filesystem::absolute(path, error);
       const auto resolved = error ? path : absolute;
-      const auto parent = resolved.parent_path();
+      auto parent = resolved.parent_path();
+      std::vector<std::filesystem::path> missing;
+
+      while (!parent.empty() &&
+             !std::filesystem::exists(parent, error))
+      {
+        missing.push_back(parent.filename());
+        parent = parent.parent_path();
+        error.clear();
+      }
 
       std::array<wchar_t, 32768> buffer{};
       const DWORD length = ::GetLongPathNameW(
@@ -39,7 +49,17 @@ namespace softadastra
                     std::wstring(buffer.data(), length))
               : parent;
 
-      std::wstring value = (long_parent / resolved.filename()).wstring();
+      std::filesystem::path normalized_parent = long_parent;
+
+      for (auto component = missing.rbegin();
+           component != missing.rend();
+           ++component)
+      {
+        normalized_parent /= *component;
+      }
+
+      std::wstring value =
+          (normalized_parent / resolved.filename()).wstring();
 
       for (wchar_t &character : value)
       {

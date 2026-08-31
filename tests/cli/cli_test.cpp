@@ -203,6 +203,23 @@ namespace
     EXPECT_EQ(actual_path.lexically_normal(), expected.lexically_normal());
   }
 
+  void expect_reported_path(
+      const std::string &output,
+      const std::string &label,
+      const std::filesystem::path &expected)
+  {
+    const auto start = output.find(label);
+    ASSERT_NE(start, std::string::npos);
+    const auto value_start = start + label.size();
+    const auto value_end = output.find('\n', value_start);
+    const std::filesystem::path actual(
+        output.substr(value_start, value_end - value_start));
+    std::error_code error;
+
+    ASSERT_TRUE(std::filesystem::equivalent(actual, expected, error));
+    EXPECT_FALSE(error);
+  }
+
   TEST(CliTest, RunsProjectFromRootAndSubdirectoryUsingCurrentRoot)
   {
     const auto base = std::filesystem::temp_directory_path() / ("softadastra-cli-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -343,8 +360,8 @@ namespace
     std::filesystem::current_path(previous);
 
     EXPECT_NE(output.find("Software name already registered: duplicate"), std::string::npos);
-    EXPECT_NE(output.find("Existing project:\n  " + existing_root.string()), std::string::npos);
-    EXPECT_NE(output.find("Current project:\n  " + current_root.string()), std::string::npos);
+    expect_reported_path(output, "Existing project:\n  ", existing_root);
+    expect_reported_path(output, "Current project:\n  ", current_root);
     EXPECT_NE(output.find("Choose another name or remove the existing registration."), std::string::npos);
     ASSERT_TRUE(client.software(softadastra::SoftwareId("existing-id")).has_value());
     EXPECT_FALSE(platform.launcher.last_spec.has_value());
@@ -438,6 +455,7 @@ namespace
     const std::string contents{
         std::istreambuf_iterator<char>(input),
         std::istreambuf_iterator<char>()};
+    input.close();
     EXPECT_EQ(contents.find("id ="), std::string::npos);
     const char *run_args[] = {"softadastra", "run"};
     EXPECT_EQ(cli.run(2, run_args), 0);

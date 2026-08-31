@@ -87,6 +87,12 @@ namespace
         softadastra::local_control_pipe_name(directory / "control.sock"),
         softadastra::local_control_pipe_name(short_path / "control.sock"));
 
+    EXPECT_EQ(
+        softadastra::local_control_pipe_name(
+            directory / "state" / "control.sock"),
+        softadastra::local_control_pipe_name(
+            short_path / "state" / "control.sock"));
+
     std::filesystem::remove_all(directory);
   }
 } // namespace
