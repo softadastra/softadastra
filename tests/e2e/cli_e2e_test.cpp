@@ -224,7 +224,9 @@ namespace
 
   TEST_F(CliE2eTest, RunsAProjectCommandWithArgumentsAndManagesItsLifecycle)
   {
-    const auto fixture_copy = project_ / "fixture with spaces";
+    auto fixture_copy = project_ / "fixture with spaces";
+    fixture_copy.replace_extension(
+        std::filesystem::path(SOFTADASTRA_E2E_TEST_APP).extension());
     std::filesystem::copy_file(
         SOFTADASTRA_E2E_TEST_APP,
         fixture_copy,
@@ -296,7 +298,9 @@ namespace
     std::filesystem::create_directories(first_project);
     std::filesystem::create_directories(second_project);
 
-    const auto fixture = first_project / "test-app";
+    auto fixture = first_project / "test-app";
+    fixture.replace_extension(
+        std::filesystem::path(SOFTADASTRA_E2E_TEST_APP).extension());
     std::filesystem::copy_file(
         SOFTADASTRA_E2E_TEST_APP,
         fixture,
