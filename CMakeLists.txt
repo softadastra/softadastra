@@ -84,6 +84,7 @@ add_library(
   softadastra_internal
   STATIC
   src/cli/Cli.cpp
+  src/cli/CliStyle.cpp
   src/cli/AccessUrl.cpp
   src/connectivity/ConnectivityManager.cpp
   src/control/ControlClient.cpp

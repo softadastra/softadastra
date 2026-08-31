@@ -15,6 +15,7 @@
 #include "cli/Cli.hpp"
 
 #include "cli/AccessUrl.hpp"
+#include "cli/CliStyle.hpp"
 #include "platform/NativeDataDirectory.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "platform/QrCode.hpp"
@@ -40,6 +41,13 @@ namespace
 {
   using namespace softadastra;
 
+  namespace style = softadastra::cli::style;
+
+  // Shared column width for all label/value blocks, so that `info`, `status`,
+  // `network info`, and access output align consistently instead of each block
+  // choosing its own hand-tuned padding.
+  constexpr std::size_t field_width = 17;
+
   const char *state_name(
       SoftwareState state) noexcept
   {
@@ -59,6 +67,31 @@ namespace
     }
 
     return "unknown";
+  }
+
+  // Styles a state word without changing the word itself: color only reinforces
+  // the always-present text, never replaces it.
+  std::string state_display(
+      SoftwareState state,
+      style::Stream stream = style::Stream::Out)
+  {
+    const char *const name =
+        state_name(state);
+
+    switch (state)
+    {
+    case SoftwareState::Running:
+      return style::success(name, stream);
+
+    case SoftwareState::Failed:
+      return style::error(name, stream);
+
+    case SoftwareState::Stopped:
+    case SoftwareState::Starting:
+      return style::muted(name, stream);
+    }
+
+    return name;
   }
 
   std::string access_name(
@@ -184,8 +217,10 @@ namespace
           << "  "
           << last
           << "\n\nFull output:\n"
-          << "  softadastra logs "
-          << id.value();
+          << "  "
+          << style::command(
+                 "softadastra logs " + id.value(),
+                 style::Stream::Err);
     }
   }
 
@@ -196,7 +231,11 @@ namespace
         << "Software not found: "
         << name
         << "\n\nView registered software with:\n\n"
-        << "  softadastra list\n";
+        << "  "
+        << style::command(
+               "softadastra list",
+               style::Stream::Err)
+        << "\n";
   }
 
   std::optional<SoftwareEntry> software_by_name(
@@ -295,9 +334,11 @@ namespace
       std::cerr
           << "No Softadastra project found.\n\n"
           << "Select a registered software explicitly:\n\n"
-          << "  softadastra "
-          << command
-          << " <name>\n";
+          << "  "
+          << style::command(
+                 "softadastra " + command + " <name>",
+                 style::Stream::Err)
+          << "\n";
 
       return;
     }
@@ -305,11 +346,16 @@ namespace
     std::cerr
         << "No Softadastra project found.\n\n"
         << "Initialize the current project with:\n\n"
-        << "  softadastra init\n\n"
-        << "Or select a registered software explicitly:\n\n"
-        << "  softadastra "
-        << command
-        << " <name>\n";
+        << "  "
+        << style::command(
+               "softadastra init",
+               style::Stream::Err)
+        << "\n\nOr select a registered software explicitly:\n\n"
+        << "  "
+        << style::command(
+               "softadastra " + command + " <name>",
+               style::Stream::Err)
+        << "\n";
   }
 
   void usage()
@@ -764,24 +810,25 @@ namespace
       return 1;
     }
     const auto result = firewall->status(*rule);
-    std::cout << "Software:      " << name
-              << "\nAccess:        " << access_name(configured) << '\n';
+    std::cout << style::field("Software:", name, field_width) << '\n'
+              << style::field("Access:", access_name(configured), field_width) << '\n';
     if (result == LocalFirewallResult::Open)
     {
       const auto ipv4 = network->network_capability().primary_ipv4;
       const auto url = configured.protocol() == AccessProtocol::Https
                            ? AccessUrl::https(ipv4, configured.port())
                            : AccessUrl::http(ipv4, configured.port());
-      std::cout << "Local access:  allowed\nLocal URL:     " << url << '\n';
+      std::cout << style::field("Local access:", style::success("allowed"), field_width) << '\n'
+                << style::field("Local URL:", url, field_width) << '\n';
       return 0;
     }
-    std::cout << "Local access:  unavailable\n";
+    std::cout << style::field("Local access:", style::warning("unavailable"), field_width) << '\n';
     if (result == LocalFirewallResult::PermissionRequired)
-      std::cout << "Firewall rule is blocked.\n";
+      std::cout << style::warning("Firewall rule is blocked.") << '\n';
     else if (result == LocalFirewallResult::Unsupported)
-      std::cout << "Local firewall access is unsupported on this Host.\n";
+      std::cout << style::muted("Local firewall access is unsupported on this Host.") << '\n';
     else
-      std::cout << "Local firewall access could not be confirmed.\n";
+      std::cout << style::muted("Local firewall access could not be confirmed.") << '\n';
     return 1;
   }
 
@@ -789,11 +836,23 @@ namespace
   {
     std::string error;
     const auto project = ProjectConfigFile::find(std::filesystem::current_path(), &error);
-    if (!error.empty()) { std::cerr << error << '\n'; return 1; }
-    if (!project) { no_project("access"); return 1; }
+    if (!error.empty())
+    {
+      std::cerr << error << '\n';
+      return 1;
+    }
+    if (!project)
+    {
+      no_project("access");
+      return 1;
+    }
     const auto access = project->second.access ? project->second.access
                                                : (project->second.access_points.empty() ? std::nullopt : std::optional<AccessPoint>(project->second.access_points.front()));
-    if (!access) { std::cerr << "No access configured for: " << project->second.name << '\n'; return 1; }
+    if (!access)
+    {
+      std::cerr << "No access configured for: " << project->second.name << '\n';
+      return 1;
+    }
     return print_firewall_access(network, firewall, project->second.name, project->first, *access);
   }
 
@@ -804,7 +863,11 @@ namespace
       const std::string &name)
   {
     const auto entry = software_by_name(client, name);
-    if (!entry) { unknown_software(name); return 1; }
+    if (!entry)
+    {
+      unknown_software(name);
+      return 1;
+    }
     const auto root = entry->process_spec().working_directory();
     const auto access = entry->access_point();
     if (!root || !access)
@@ -861,16 +924,17 @@ namespace
     }
     if (action == "deny")
     {
-      std::cout << "Local access denied.\n";
+      std::cout << style::success("Local access denied.") << '\n';
       return 0;
     }
     const auto access = project->second.access ? project->second.access
-                                                : std::optional<AccessPoint>(project->second.access_points.front());
+                                               : std::optional<AccessPoint>(project->second.access_points.front());
     const auto ipv4 = network->network_capability().primary_ipv4;
     const auto url = access->protocol() == AccessProtocol::Https
                          ? AccessUrl::https(ipv4, access->port())
                          : AccessUrl::http(ipv4, access->port());
-    std::cout << "Local access allowed.\n" << url << '\n';
+    std::cout << style::success("Local access allowed.") << '\n'
+              << style::arrow() << ' ' << url << '\n';
     return 0;
   }
 
@@ -932,12 +996,17 @@ namespace
     }
 
     std::cout
-        << "Software:      "
-        << target.name
-        << "\nState:         "
-        << state_name(entry->state())
-        << "\nAccess:        "
-        << access_name(configured)
+        << style::field("Software:", target.name, field_width)
+        << '\n'
+        << style::field(
+               "State:",
+               state_display(entry->state()),
+               field_width)
+        << '\n'
+        << style::field(
+               "Access:",
+               access_name(configured),
+               field_width)
         << '\n';
 
     if (access->state == LocalAccessState::Available)
@@ -954,28 +1023,48 @@ namespace
         if (firewall_state != LocalFirewallResult::Open &&
             firewall_state != LocalFirewallResult::Disabled)
         {
-          std::cout << "Local access:  unavailable\n";
+          std::cout
+              << style::field(
+                     "Local access:",
+                     style::warning("unavailable"),
+                     field_width)
+              << '\n';
           if (firewall_state == LocalFirewallResult::PermissionRequired)
           {
-            std::cout << "Firewall rule is blocked.\n\nRun:\n\n"
-                      << "  softadastra access allow\n";
+            std::cout
+                << style::warning("Firewall rule is blocked.")
+                << "\n\nRun:\n\n"
+                << "  "
+                << style::command("softadastra access allow")
+                << "\n";
           }
           else if (firewall_state == LocalFirewallResult::Unsupported)
           {
-            std::cout << "Local firewall access is unsupported on this Host.\n";
+            std::cout
+                << style::muted(
+                       "Local firewall access is unsupported on this Host.")
+                << '\n';
           }
           else
           {
-            std::cout << "Local firewall access could not be confirmed.\n";
+            std::cout
+                << style::muted(
+                       "Local firewall access could not be confirmed.")
+                << '\n';
           }
           return false;
         }
       }
       std::cout
-          << "Network:       "
-          << local_access_network_name(access->network)
-          << "\nLocal URL:     "
-          << access->url
+          << style::field(
+                 "Network:",
+                 local_access_network_name(access->network),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Local URL:",
+                 access->url,
+                 field_width)
           << "\n\n";
 
       if (!QrCode::print(access->url))
@@ -991,55 +1080,73 @@ namespace
     }
 
     std::cout
-        << "Local access:  unavailable\n";
+        << style::field(
+               "Local access:",
+               style::warning("unavailable"),
+               field_width)
+        << '\n';
 
     if (access->firewall == LocalAccessFirewallState::PermissionRequired)
     {
-      std::cout << "\nLocal firewall access has not been allowed.\n";
+      std::cout << "\n"
+                << style::muted("Local firewall access has not been allowed.")
+                << '\n';
     }
     else if (access->firewall == LocalAccessFirewallState::Unsupported)
     {
-      std::cout << "\nLocal firewall access is unsupported on this Host.\n";
+      std::cout << "\n"
+                << style::muted("Local firewall access is unsupported on this Host.")
+                << '\n';
     }
     else if (access->firewall == LocalAccessFirewallState::Failed)
     {
-      std::cout << "\nLocal firewall access could not be confirmed.\n";
+      std::cout << "\n"
+                << style::muted("Local firewall access could not be confirmed.")
+                << '\n';
     }
 
     if (entry->state() == SoftwareState::Stopped)
     {
       std::cout
           << "\nStart it with:\n\n"
-          << "  softadastra run"
-          << (target.root
-                  ? ""
-                  : " " + target.name)
+          << "  "
+          << style::command(
+                 target.root
+                     ? "softadastra run"
+                     : "softadastra run " + target.name)
           << "\n";
     }
     else if (entry->state() == SoftwareState::Failed)
     {
       std::cout
           << "\nInspect logs with:\n\n"
-          << "  softadastra logs"
-          << (target.root
-                  ? ""
-                  : " " + target.name)
+          << "  "
+          << style::command(
+                 target.root
+                     ? "softadastra logs"
+                     : "softadastra logs " + target.name)
           << "\n";
     }
     else if (access->managed_network_start_failed)
     {
       std::cout
-          << "\nUnable to start a local Softadastra network.\n";
+          << "\n"
+          << style::warning("Unable to start a local Softadastra network.")
+          << '\n';
     }
     else if (
         access->local_network_state ==
         LocalNetworkState::Unavailable)
     {
       std::cout
-          << "\nNo local network is available on this Host.\n\n"
-          << "Managed network: "
-          << managed_network_capability_name(
-                 access->managed_network_capability)
+          << "\n"
+          << style::muted("No local network is available on this Host.")
+          << "\n\n"
+          << style::field(
+                 "Managed network:",
+                 managed_network_capability_name(
+                     access->managed_network_capability),
+                 field_width)
           << "\n";
     }
 
@@ -1235,12 +1342,14 @@ namespace softadastra
         std::cout
             << (*result ==
                         ManagedNetworkStartResult::AlreadyRunning
-                    ? "Softadastra local network is already running.\n"
-                    : "Softadastra local network started.\n")
-            << "\nNetwork:   "
-            << current->ssid
-            << "\nIPv4:      "
-            << current->ipv4
+                    ? style::success(
+                          "Softadastra local network is already running.")
+                    : style::success(
+                          "Softadastra local network started."))
+            << '\n'
+            << style::field("Network:", current->ssid, field_width)
+            << '\n'
+            << style::field("IPv4:", current->ipv4, field_width)
             << '\n';
 
         return 0;
@@ -1260,13 +1369,17 @@ namespace softadastra
             !*stopped)
         {
           std::cout
-              << "Softadastra local network is not running.\n";
+              << style::muted(
+                     "Softadastra local network is not running.")
+              << '\n';
 
           return 0;
         }
 
         std::cout
-            << "Softadastra local network stopped.\n";
+            << style::success(
+                   "Softadastra local network stopped.")
+            << '\n';
 
         return 0;
       }
@@ -1282,8 +1395,10 @@ namespace softadastra
         }
 
         std::cout
-            << "Managed network: "
-            << managed_network_state_name(status->state)
+            << style::field(
+                   "Managed network:",
+                   managed_network_state_name(status->state),
+                   field_width)
             << '\n';
 
         return 0;
@@ -1314,44 +1429,73 @@ namespace softadastra
               ManagedNetworkStatus{});
 
       std::cout
-          << "State:            "
-          << network_state_name(capability->state)
-          << "\nPrimary IPv4:     "
-          << (capability->primary_ipv4.empty()
-                  ? "-"
-                  : capability->primary_ipv4)
-          << "\nInterface:        "
-          << (capability->primary_interface.empty()
-                  ? "-"
-                  : capability->primary_interface)
-          << "\nType:             "
-          << network_interface_type_name(
-                 capability->interface_type)
-          << "\nLocal network:    "
-          << local_network_state_name(
-                 capability->local_network_state)
-          << "\nManaged network:  "
-          << managed_network_capability_name(
-                 managed.capability);
+          << style::field(
+                 "State:",
+                 network_state_name(capability->state),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Primary IPv4:",
+                 capability->primary_ipv4.empty()
+                     ? "-"
+                     : capability->primary_ipv4,
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Interface:",
+                 capability->primary_interface.empty()
+                     ? "-"
+                     : capability->primary_interface,
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Type:",
+                 network_interface_type_name(
+                     capability->interface_type),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Local network:",
+                 local_network_state_name(
+                     capability->local_network_state),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Managed network:",
+                 managed_network_capability_name(
+                     managed.capability),
+                 field_width);
 
       if (managed.capability ==
           ManagedNetworkCapability::Available)
       {
         std::cout
-            << "\nManaged state:    "
-            << managed_network_state_name(
-                   managed.state);
+            << '\n'
+            << style::field(
+                   "Managed state:",
+                   managed_network_state_name(
+                       managed.state),
+                   field_width);
 
         if (managed.state ==
             ManagedNetworkState::Running)
         {
           std::cout
-              << "\nManaged interface: "
-              << managed.interface_name
-              << "\nManaged IPv4:      "
-              << managed.ipv4
-              << "\nManaged SSID:      "
-              << managed.ssid;
+              << '\n'
+              << style::field(
+                     "Managed interface:",
+                     managed.interface_name,
+                     field_width)
+              << '\n'
+              << style::field(
+                     "Managed IPv4:",
+                     managed.ipv4,
+                     field_width)
+              << '\n'
+              << style::field(
+                     "Managed SSID:",
+                     managed.ssid,
+                     field_width);
         }
       }
 
@@ -1474,13 +1618,16 @@ namespace softadastra
       }
 
       std::cout
-          << "Created softadastra.toml\n";
+          << style::success("Created softadastra.toml")
+          << '\n';
 
       if (configured_command.empty())
       {
         std::cout
             << "\nSet `command` in softadastra.toml, then run:\n\n"
-            << "  softadastra run\n";
+            << "  "
+            << style::command("softadastra run")
+            << "\n";
       }
 
       return 0;
@@ -1515,32 +1662,56 @@ namespace softadastra
                         : SoftwareState::Stopped)
               : std::nullopt;
 
-      std::cout
-          << std::left
-          << std::setw(12)
-          << "NAME"
-          << std::setw(11)
-          << "STATE"
-          << std::setw(13)
-          << "ACCESS"
-          << "PROJECT\n";
+      {
+        std::ostringstream header;
+        header
+            << std::left
+            << std::setw(12)
+            << "NAME"
+            << std::setw(11)
+            << "STATE"
+            << std::setw(13)
+            << "ACCESS"
+            << "PROJECT";
+
+        std::cout
+            << style::muted(header.str())
+            << '\n';
+      }
 
       for (const auto &entry : client_.software())
       {
         if (!filter ||
             entry.state() == *filter)
         {
-          std::cout
+          // The state column is padded on its plain name so alignment holds,
+          // then the visible word is styled in place without shifting columns.
+          std::ostringstream row;
+          row
               << std::left
               << std::setw(12)
-              << entry.name()
-              << std::setw(11)
-              << state_name(entry.state())
+              << entry.name();
+
+          const std::string state_plain =
+              state_name(entry.state());
+          const std::string state_styled =
+              state_display(entry.state());
+
+          row << state_styled;
+          if (state_plain.size() < 11)
+          {
+            row << std::string(11 - state_plain.size(), ' ');
+          }
+
+          row
               << std::setw(13)
               << access_name(entry.access_point())
               << entry.process_spec()
                      .working_directory()
-                     .value_or("-")
+                     .value_or("-");
+
+          std::cout
+              << row.str()
               << '\n';
         }
       }
@@ -1556,20 +1727,30 @@ namespace softadastra
         return 2;
       }
 
+      const bool available =
+          client_.connectivity_available();
+
       std::cout
-          << "network: "
-          << (client_.connectivity_available()
-                  ? "available"
-                  : "unavailable")
+          << style::field(
+                 "network:",
+                 available
+                     ? style::success("available")
+                     : style::warning("unavailable"),
+                 field_width)
           << '\n';
 
-      if (client_.connectivity_available())
+      if (available)
       {
+        const bool connected =
+            client_.connected();
+
         std::cout
-            << "connected: "
-            << (client_.connected()
-                    ? "yes"
-                    : "no")
+            << style::field(
+                   "connected:",
+                   connected
+                       ? style::success("yes")
+                       : style::muted("no"),
+                   field_width)
             << '\n';
       }
 
@@ -1619,8 +1800,15 @@ namespace softadastra
 
       std::cout
           << (*response == "remote 1"
-                  ? "remote reachability: enabled\n"
-                  : "remote reachability: disabled\n");
+                  ? style::field(
+                        "remote reachability:",
+                        style::success("enabled"),
+                        field_width)
+                  : style::field(
+                        "remote reachability:",
+                        style::muted("disabled"),
+                        field_width))
+          << '\n';
 
       return 0;
     }
@@ -1727,7 +1915,8 @@ namespace softadastra
       }
 
       std::cout
-          << "registered: "
+          << style::success("registered:")
+          << ' '
           << id.value()
           << '\n';
 
@@ -1913,10 +2102,12 @@ namespace softadastra
             << "Cannot remove running software: "
             << target->name
             << "\n\nStop it first:\n\n"
-            << "  softadastra stop"
-            << (name
-                    ? " " + *name
-                    : "")
+            << "  "
+            << style::command(
+                   name
+                       ? "softadastra stop " + *name
+                       : "softadastra stop",
+                   style::Stream::Err)
             << "\n";
 
         return 1;
@@ -1932,7 +2123,8 @@ namespace softadastra
       }
 
       std::cout
-          << "removed: "
+          << style::success("removed:")
+          << ' '
           << target->name
           << '\n';
 
@@ -2002,30 +2194,44 @@ namespace softadastra
           *target->entry;
 
       std::cout
-          << "Name:       "
-          << target->name
-          << "\nState:      "
-          << state_name(entry.state())
-          << "\nCommand:    "
-          << (target->config
-                  ? target->config->command
-                  : command_name(entry))
-          << "\nProject:    "
-          << (target->root
-                  ? target->root->string()
-                  : entry.process_spec()
-                        .working_directory()
-                        .value_or("-"))
-          << "\nAccess:     "
-          << access_name(
+          << style::field("Name:", target->name, field_width)
+          << '\n'
+          << style::field(
+                 "State:",
+                 state_display(entry.state()),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Command:",
                  target->config
-                     ? target->config->access
-                     : entry.access_point())
-          << "\nPID:        "
-          << (entry.pid()
-                  ? std::to_string(*entry.pid())
-                  : "-")
-          << "\n";
+                     ? target->config->command
+                     : command_name(entry),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Project:",
+                 target->root
+                     ? target->root->string()
+                     : entry.process_spec()
+                           .working_directory()
+                           .value_or("-"),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "Access:",
+                 access_name(
+                     target->config
+                         ? target->config->access
+                         : entry.access_point()),
+                 field_width)
+          << '\n'
+          << style::field(
+                 "PID:",
+                 entry.pid()
+                     ? std::to_string(*entry.pid())
+                     : "-",
+                 field_width)
+          << '\n';
 
       return 0;
     }
@@ -2047,7 +2253,7 @@ namespace softadastra
       std::cout
           << target->name
           << ": "
-          << state_name(*state)
+          << state_display(*state)
           << '\n';
 
       return 0;
@@ -2103,10 +2309,11 @@ namespace softadastra
 
       std::cout
           << (running
-                  ? "already running: "
+                  ? style::warning("already running:")
                   : (command == "run"
-                         ? "running: "
-                         : "started: "))
+                         ? style::success("running:")
+                         : style::success("started:")))
+          << ' '
           << target->name
           << '\n';
 
@@ -2154,8 +2361,9 @@ namespace softadastra
 
     std::cout
         << (command == "stop"
-                ? "stopped: "
-                : "restarted: ")
+                ? style::success("stopped:")
+                : style::success("restarted:"))
+        << ' '
         << target->name
         << '\n';
 
