@@ -327,12 +327,10 @@ namespace
 
     windows_stop = false;
 
-    if (!::SetConsoleCtrlHandler(
+    const bool console_handler_installed =
+        ::SetConsoleCtrlHandler(
             console_control,
-            TRUE))
-    {
-      return 1;
-    }
+            TRUE) != FALSE;
 
     std::atomic_bool completed{false};
 
@@ -357,9 +355,12 @@ namespace
 
     thread.join();
 
-    ::SetConsoleCtrlHandler(
-        console_control,
-        FALSE);
+    if (console_handler_installed)
+    {
+      ::SetConsoleCtrlHandler(
+          console_control,
+          FALSE);
+    }
 
     return completed
                ? 0
