@@ -285,9 +285,25 @@ namespace softadastra
     std::wstring command =
         quote(spec.executable());
 
-    for (const auto &argument : spec.arguments())
+    if (spec.executable() == "cmd.exe" &&
+        spec.arguments().size() == 2 &&
+        spec.arguments()[0] == "/C")
     {
-      command += L" " + quote(argument);
+      // cmd.exe parses its command tail itself, rather than using the usual
+      // Windows argv rules. In particular, it does not treat \" as an
+      // escaped quote. /S removes only these outer quotes and preserves the
+      // quoted executable and arguments inside the command.
+      command +=
+          L" /D /S /C \"" +
+          wide(spec.arguments()[1]) +
+          L"\"";
+    }
+    else
+    {
+      for (const auto &argument : spec.arguments())
+      {
+        command += L" " + quote(argument);
+      }
     }
 
     STARTUPINFOW startup{};

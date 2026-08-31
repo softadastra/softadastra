@@ -20,7 +20,10 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <optional>
+#include <string>
 #include <thread>
 
 #if defined(__linux__)
@@ -203,6 +206,60 @@ namespace
     EXPECT_EQ(code.value(), 7);
     EXPECT_FALSE(process->is_running());
   }
+
+#if defined(_WIN32)
+
+  TEST(
+      NativeProcessLauncherTest,
+      LaunchesQuotedCmdCommandWithSpacedExecutableAndArguments)
+  {
+    const auto directory =
+        std::filesystem::temp_directory_path() /
+        ("softadastra launcher " +
+         std::to_string(
+             std::chrono::steady_clock::now()
+                 .time_since_epoch()
+                 .count()));
+    const auto executable =
+        directory / "fixture with spaces.exe";
+    const auto output = directory / "output.txt";
+
+    ASSERT_TRUE(std::filesystem::create_directories(directory));
+    ASSERT_TRUE(std::filesystem::copy_file(
+        SOFTADASTRA_TEST_APP,
+        executable));
+
+    const std::string command =
+        "\"" + executable.string() +
+        "\" --echo plain \"argument with spaces\"";
+    const softadastra::ProcessSpec spec(
+        "cmd.exe",
+        {"/C", command},
+        directory.string(),
+        output.string());
+    softadastra::NativeProcessLauncher launcher;
+
+    auto process = launcher.launch(spec);
+
+    ASSERT_NE(process, nullptr);
+
+    const auto code = wait_for_exit_code(*process);
+
+    ASSERT_TRUE(code.has_value());
+    EXPECT_EQ(code.value(), 0);
+
+    std::ifstream input(output);
+    std::string line;
+
+    ASSERT_TRUE(std::getline(input, line));
+    EXPECT_EQ(line, "plain");
+    ASSERT_TRUE(std::getline(input, line));
+    EXPECT_EQ(line, "argument with spaces");
+
+    std::filesystem::remove_all(directory);
+  }
+
+#endif
 
   TEST(NativeProcessLauncherTest, PreservesArguments)
   {

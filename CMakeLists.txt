@@ -579,6 +579,15 @@ if(SOFTADASTRA_BUILD_TESTS)
     softadastra_native_process_launcher_test
     tests/platform/native_process_launcher_test.cpp
   )
+  add_dependencies(
+    softadastra_native_process_launcher_test
+    softadastra_test_app
+  )
+  target_compile_definitions(
+    softadastra_native_process_launcher_test
+    PRIVATE
+      SOFTADASTRA_TEST_APP="$<TARGET_FILE:softadastra_test_app>"
+  )
 
   softadastra_add_test(
     softadastra_native_network_test
