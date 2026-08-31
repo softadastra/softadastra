@@ -32,25 +32,25 @@ PrivilegedProcessResult NativePrivilegedProcessRunner::run(const std::string &pr
 LocalFirewallResult PrivilegedLocalFirewall::ensure(const LocalFirewallRule&r) {
 return status(r);
 }
+#if defined(__linux__)
 LocalFirewallResult PrivilegedLocalFirewall::status(const LocalFirewallRule&r) {
-#if !defined(__linux__)
-return LocalFirewallResult::Unsupported;
-#else
 auto x=runner_.run("pkexec",{"/usr/libexec/softadastra-firewall-status",std::to_string(r.port),r.subnet,r.owner}); if(x.exit_code==127)return LocalFirewallResult::Unsupported; if(x.output=="allowed\n"||x.output=="disabled\n")return LocalFirewallResult::Open; if(x.output=="unsupported\n")return LocalFirewallResult::Unsupported; return x.output=="blocked\n"?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
-#endif
 }
 LocalFirewallResult PrivilegedLocalFirewall::allow(const LocalFirewallRule&r) {
-#if !defined(__linux__)
-return LocalFirewallResult::Unsupported;
-#else
 auto x=runner_.run("pkexec",{"/usr/libexec/softadastra-firewall-modify","allow-local-tcp",std::to_string(r.port),r.subnet,r.owner});return x.exit_code==0?LocalFirewallResult::Open:x.exit_code==126?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
-#endif
 }
 LocalFirewallResult PrivilegedLocalFirewall::deny(const LocalFirewallRule&r) {
-#if !defined(__linux__)
-return LocalFirewallResult::Unsupported;
-#else
 auto x=runner_.run("pkexec",{"/usr/libexec/softadastra-firewall-modify","deny-owned-local-tcp",std::to_string(r.port),r.subnet,r.owner});return x.exit_code==0?LocalFirewallResult::Open:x.exit_code==126?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
-#endif
 }
+#else
+LocalFirewallResult PrivilegedLocalFirewall::status(const LocalFirewallRule&) {
+return LocalFirewallResult::Unsupported;
+}
+LocalFirewallResult PrivilegedLocalFirewall::allow(const LocalFirewallRule&) {
+return LocalFirewallResult::Unsupported;
+}
+LocalFirewallResult PrivilegedLocalFirewall::deny(const LocalFirewallRule&) {
+return LocalFirewallResult::Unsupported;
+}
+#endif
 }

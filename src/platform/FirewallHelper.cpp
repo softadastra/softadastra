@@ -3,6 +3,7 @@
 
 #include <charconv>
 #include <optional>
+#include <ostream>
 #include <regex>
 
 #if !defined(_WIN32)

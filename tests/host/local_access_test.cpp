@@ -14,10 +14,14 @@ namespace
 {
   softadastra::NetworkCapability existing_network(std::string ipv4)
   {
+    const auto separator = ipv4.rfind('.');
+    const auto subnet = separator == std::string::npos
+                            ? std::string{}
+                            : ipv4.substr(0, separator) + ".0/24";
     return {softadastra::NetworkState::Available, std::move(ipv4), "wlp108s0",
             softadastra::NetworkInterfaceType::Wifi,
             softadastra::LocalNetworkState::Existing,
-            softadastra::ManagedNetworkCapability::Available};
+            softadastra::ManagedNetworkCapability::Available, subnet};
   }
 
   softadastra::ManagedNetworkStatus managed_network(
@@ -29,7 +33,10 @@ namespace
 
   softadastra::NetworkCapability no_local_network()
   {
-    return {softadastra::NetworkState::Unavailable, {}, {}, softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
+    return {softadastra::NetworkState::Unavailable, {}, {},
+            softadastra::NetworkInterfaceType::Unknown,
+            softadastra::LocalNetworkState::Unavailable,
+            softadastra::ManagedNetworkCapability::Available, {}};
   }
 
   TEST(LocalAccessTest, ResolvesHttpFromCurrentPrimaryIpv4WhenManagedNetworkIsStopped)

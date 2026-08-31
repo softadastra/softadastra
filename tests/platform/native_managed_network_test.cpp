@@ -18,7 +18,11 @@ namespace
     [[nodiscard]] bool is_connected() const noexcept override { return true; }
     [[nodiscard]] softadastra::NetworkCapability network_capability() const override
     {
-      return {softadastra::NetworkState::Available, "192.168.1.6", primary, softadastra::NetworkInterfaceType::Wifi, softadastra::LocalNetworkState::Existing, softadastra::ManagedNetworkCapability::Unavailable};
+      return {softadastra::NetworkState::Available, "192.168.1.6", primary,
+              softadastra::NetworkInterfaceType::Wifi,
+              softadastra::LocalNetworkState::Existing,
+              softadastra::ManagedNetworkCapability::Unavailable,
+              "192.168.1.0/24"};
     }
   };
   class Runner final : public softadastra::NmcliRunner

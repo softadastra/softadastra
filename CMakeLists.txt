@@ -110,7 +110,6 @@ add_library(
   src/host/HostStateFile.cpp
   src/platform/NativeNetwork.cpp
   src/platform/NativeLocalFirewall.cpp
-  src/platform/FirewallHelper.cpp
   src/platform/PrivilegedLocalFirewall.cpp
   src/platform/ManagedNetwork.cpp
   src/platform/NativeManagedNetwork.cpp
@@ -142,6 +141,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_sources(
     softadastra_internal
     PRIVATE
+      src/platform/FirewallHelper.cpp
       src/host/LocalDns.cpp
       src/host/LocalGateway.cpp
       src/host/LocalGatewayProcessEndpoint.cpp
@@ -469,6 +469,10 @@ if(SOFTADASTRA_BUILD_TESTS)
       softadastra_native_managed_network_test
       tests/platform/native_managed_network_test.cpp
     )
+    softadastra_add_test(
+      softadastra_native_local_firewall_test
+      tests/platform/native_local_firewall_test.cpp
+    )
   endif()
 
   softadastra_add_test(
@@ -484,11 +488,6 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_native_data_directory_test
     tests/platform/native_data_directory_test.cpp
-  )
-
-  softadastra_add_test(
-    softadastra_native_local_firewall_test
-    tests/platform/native_local_firewall_test.cpp
   )
 
   softadastra_add_test(
