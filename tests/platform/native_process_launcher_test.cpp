@@ -251,9 +251,9 @@ namespace
     EXPECT_EQ(code.value(), 0);
 
     std::ifstream input(output);
-    const std::string logs(
+    const std::string logs{
         std::istreambuf_iterator<char>(input),
-        std::istreambuf_iterator<char>());
+        std::istreambuf_iterator<char>()};
 
     EXPECT_NE(logs.find("stdout-value"), std::string::npos);
     EXPECT_NE(logs.find("stderr value"), std::string::npos);
