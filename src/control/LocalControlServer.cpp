@@ -390,6 +390,10 @@ namespace softadastra
     ::FlushFileBuffers(pipe);
     ::DisconnectNamedPipe(pipe);
 
+    // Re-arm the single nonblocking instance before the next HostLoop cycle.
+    // Otherwise a second client can observe no available pipe between cycles.
+    static_cast<void>(::ConnectNamedPipe(pipe, nullptr));
+
     return processed;
 
 #else
