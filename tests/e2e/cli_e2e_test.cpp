@@ -6,6 +6,7 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <thread>
 
 #if defined(__linux__)
@@ -36,6 +37,24 @@ namespace
     }
 
     return result + "\"";
+  }
+
+  std::optional<std::filesystem::path> reported_path(
+      const std::string &output,
+      const std::string &heading)
+  {
+    const auto start = output.find(heading);
+
+    if (start == std::string::npos)
+    {
+      return std::nullopt;
+    }
+
+    const auto path_start = start + heading.size();
+    const auto path_end = output.find('\n', path_start);
+
+    return std::filesystem::path(
+        output.substr(path_start, path_end - path_start));
   }
 
   class CliE2eTest : public ::testing::Test
@@ -326,8 +345,27 @@ namespace
     EXPECT_NE(
         last_output_.find("Software name already registered: duplicate"),
         std::string::npos);
-    EXPECT_NE(last_output_.find("Existing project:\n  " + first_project.string()), std::string::npos);
-    EXPECT_NE(last_output_.find("Current project:\n  " + second_project.string()), std::string::npos);
+    const auto existing_project = reported_path(
+        last_output_,
+        "Existing project:\n  ");
+    const auto current_project = reported_path(
+        last_output_,
+        "Current project:\n  ");
+    ASSERT_TRUE(existing_project.has_value());
+    ASSERT_TRUE(current_project.has_value());
+
+    std::error_code error;
+    EXPECT_TRUE(std::filesystem::equivalent(
+        existing_project.value(),
+        first_project,
+        error));
+    EXPECT_FALSE(error);
+    error.clear();
+    EXPECT_TRUE(std::filesystem::equivalent(
+        current_project.value(),
+        second_project,
+        error));
+    EXPECT_FALSE(error);
     EXPECT_NE(
         last_output_.find(
             "Choose another name or remove the existing registration."),

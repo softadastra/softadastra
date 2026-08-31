@@ -22,6 +22,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <thread>
@@ -231,7 +232,8 @@ namespace
 
     const std::string command =
         "\"" + executable.string() +
-        "\" --echo plain \"argument with spaces\"";
+        "\" --stdout stdout-value --stderr \"stderr value\""
+        " --echo plain \"argument with spaces\"";
     const softadastra::ProcessSpec spec(
         "cmd.exe",
         {"/C", command},
@@ -249,12 +251,14 @@ namespace
     EXPECT_EQ(code.value(), 0);
 
     std::ifstream input(output);
-    std::string line;
+    const std::string logs(
+        std::istreambuf_iterator<char>(input),
+        std::istreambuf_iterator<char>());
 
-    ASSERT_TRUE(std::getline(input, line));
-    EXPECT_EQ(line, "plain");
-    ASSERT_TRUE(std::getline(input, line));
-    EXPECT_EQ(line, "argument with spaces");
+    EXPECT_NE(logs.find("stdout-value"), std::string::npos);
+    EXPECT_NE(logs.find("stderr value"), std::string::npos);
+    EXPECT_NE(logs.find("plain"), std::string::npos);
+    EXPECT_NE(logs.find("argument with spaces"), std::string::npos);
 
     std::filesystem::remove_all(directory);
   }

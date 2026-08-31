@@ -315,11 +315,15 @@ namespace softadastra
 
     if (spec.output_file())
     {
+      SECURITY_ATTRIBUTES attributes{};
+      attributes.nLength = sizeof(attributes);
+      attributes.bInheritHandle = TRUE;
+
       log = ::CreateFileW(
           wide(*spec.output_file()).c_str(),
           FILE_APPEND_DATA,
           FILE_SHARE_READ | FILE_SHARE_WRITE,
-          nullptr,
+          &attributes,
           OPEN_ALWAYS,
           FILE_ATTRIBUTE_NORMAL,
           nullptr);
