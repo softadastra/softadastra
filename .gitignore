@@ -74,3 +74,7 @@ cmd.md
 document.md
 .vix/
 /notes/
+
+# CPack artifacts
+/Softadastra-*-Linux.deb
+/_CPack_Packages/
