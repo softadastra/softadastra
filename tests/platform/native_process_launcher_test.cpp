@@ -254,6 +254,7 @@ namespace
     const std::string logs{
         std::istreambuf_iterator<char>(input),
         std::istreambuf_iterator<char>()};
+    input.close();
 
     EXPECT_NE(logs.find("stdout-value"), std::string::npos);
     EXPECT_NE(logs.find("stderr value"), std::string::npos);
