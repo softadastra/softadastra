@@ -71,7 +71,7 @@ namespace
         softadastra::NetworkState::Available, "10.56.116.55", "wlp108s0",
         softadastra::NetworkInterfaceType::Wifi,
         softadastra::LocalNetworkState::Existing,
-        softadastra::ManagedNetworkCapability::Available};
+        softadastra::ManagedNetworkCapability::Available, "10.56.116.0/24"};
   };
 
   class ManagedNetwork final : public softadastra::ManagedNetwork
@@ -715,7 +715,8 @@ namespace
     platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
                                     softadastra::NetworkInterfaceType::Unknown,
                                     softadastra::LocalNetworkState::Unavailable,
-                                    softadastra::ManagedNetworkCapability::Unavailable};
+                                    softadastra::ManagedNetworkCapability::Unavailable,
+                                    {}};
     testing::internal::CaptureStdout();
     EXPECT_EQ(cli.run(3, access_secure), 1);
     output = testing::internal::GetCapturedStdout();
@@ -736,7 +737,11 @@ namespace
     const auto id = softadastra::SoftwareId("api");
     ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.start_software(id));
-    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
+                                    softadastra::NetworkInterfaceType::Unknown,
+                                    softadastra::LocalNetworkState::Unavailable,
+                                    softadastra::ManagedNetworkCapability::Available,
+                                    {}};
     platform.managed_network_.current = {softadastra::ManagedNetworkCapability::Available, softadastra::ManagedNetworkState::Stopped, "wlan1", "10.42.0.1", "Softadastra-test"};
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Started;
     const char *access[] = {"softadastra", "access", "api"};
@@ -803,7 +808,11 @@ namespace
     const auto id = softadastra::SoftwareId("api");
     ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.start_software(id));
-    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available};
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
+                                    softadastra::NetworkInterfaceType::Unknown,
+                                    softadastra::LocalNetworkState::Unavailable,
+                                    softadastra::ManagedNetworkCapability::Available,
+                                    {}};
     platform.managed_network_.current.capability = softadastra::ManagedNetworkCapability::Available;
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Failed;
     const char *access[] = {"softadastra", "access", "api"};
