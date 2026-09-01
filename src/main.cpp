@@ -691,11 +691,17 @@ int main(
 
     softadastra::RemoteAccessSettings remote_settings;
 
-    if (!remote_config.load(remote_settings) &&
-        !remote_config.save(remote_settings))
+    std::error_code remote_access_error;
+    const bool remote_access_exists = std::filesystem::exists(
+        data_directory / "remote-access", remote_access_error);
+    if (remote_access_error ||
+        (!remote_access_exists && !remote_config.save(remote_settings)) ||
+        (remote_access_exists && !remote_config.load(remote_settings)))
     {
       std::cerr
-          << "failed to initialize remote access configuration\n";
+          << (remote_access_exists
+                  ? "invalid remote access configuration\n"
+                  : "failed to initialize remote access configuration\n");
 
       return 1;
     }
@@ -1059,6 +1065,18 @@ int main(
 
         return 0;
       }
+
+#if defined(__linux__)
+      softadastra::NativePlatform box_platform;
+      if (::getpwnam("softadastra") == nullptr ||
+          !static_cast<softadastra::NativeService &>(box_platform.service()).is_installed())
+      {
+        std::cout << "Box:              incomplete\n"
+                  << "Reason:           system account or service is missing\n"
+                  << "Repair:          softadastra box provision\n";
+        return 0;
+      }
+#endif
 
       std::cout
           << "Box:              provisioned\n"
