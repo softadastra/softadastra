@@ -299,23 +299,28 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if(WIN32)
+  # FindOpenSSL's Windows targets can be UNKNOWN_LIBRARY imported targets backed
+  # by import libraries.  Let runtime dependency resolution inspect the
+  # executable instead, with vcpkg's runtime directory as an optional search
+  # location for the DLLs it actually imports.
+  set(SOFTADASTRA_RUNTIME_DEPENDENCY_DIRECTORIES)
+  if(DEFINED VCPKG_INSTALLED_DIR AND NOT VCPKG_INSTALLED_DIR STREQUAL ""
+     AND DEFINED VCPKG_TARGET_TRIPLET AND NOT VCPKG_TARGET_TRIPLET STREQUAL "")
+    list(APPEND SOFTADASTRA_RUNTIME_DEPENDENCY_DIRECTORIES
+      "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
+    )
+  endif()
+
   install(
     TARGETS softadastra
     RUNTIME_DEPENDENCIES
+      DIRECTORIES ${SOFTADASTRA_RUNTIME_DEPENDENCY_DIRECTORIES}
       PRE_EXCLUDE_REGEXES
         "^api-ms-"
         "^ext-ms-"
         "^[Hh]vsiFileTrust\\.dll$"
         "^[Ww]tdccm\\.dll$"
       POST_EXCLUDE_REGEXES ".*/[Ss]ystem32/.*"
-    RUNTIME DESTINATION bin
-  )
-  # OpenSSL::SSL and OpenSSL::Crypto are imported DLL targets on the Windows
-  # vcpkg triplet. Install their runtime artifacts through the targets rather
-  # than relying solely on recursive dependency discovery, which may omit an
-  # imported runtime DLL. CMake resolves the actual versioned DLL names.
-  install(
-    IMPORTED_RUNTIME_ARTIFACTS OpenSSL::SSL OpenSSL::Crypto
     RUNTIME DESTINATION bin
   )
 endif()
