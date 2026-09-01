@@ -56,6 +56,16 @@ jobs:
           dpkg-deb --extract "$package" "$smoke_root"
           installed="$smoke_root/usr/bin/softadastra"
           test -x "$installed"
+          test -x "$smoke_root/usr/bin/softadastra-gateway"
+          test -x "$smoke_root/usr/libexec/softadastra-firewall-status"
+          test -x "$smoke_root/usr/libexec/softadastra-firewall-modify"
+          policy="$smoke_root/usr/share/polkit-1/actions/com.softadastra.firewall.policy"
+          unit="$smoke_root/usr/lib/systemd/system/softadastra.service"
+          test -f "$policy" && test -f "$unit"
+          grep -F '/usr/libexec/softadastra-firewall-status' "$policy"
+          grep -F '/usr/libexec/softadastra-firewall-modify' "$policy"
+          grep -F 'ExecStart=/usr/bin/softadastra host' "$unit"
+          systemd-analyze verify "$unit"
           ldd "$installed"
           ! ldd "$installed" | grep -F 'not found'
           env -i PATH=/usr/bin:/bin HOME="$smoke_root/home" "$installed" --help
@@ -121,7 +131,11 @@ jobs:
           $binary = $binaries[0]
           $runtimeDlls = @(Get-ChildItem $binary.Directory -Filter '*.dll' -File)
           $runtimeDlls.Name | Sort-Object
-          if (-not ($runtimeDlls.Name -match '^libcrypto.*\.dll$')) { throw 'OpenSSL crypto runtime DLL is missing from the ZIP.' }
+          $dependencies = @((dumpbin /dependents $binary.FullName) | Select-String -Pattern '\.dll' | ForEach-Object { ($_ -replace '^\s*','').Trim() })
+          foreach ($dependency in $dependencies) {
+            if ($dependency -match '^(KERNEL32|ADVAPI32|SHELL32|WS2_32|OLE32|USER32|GDI32)\.dll$') { continue }
+            if (-not (Test-Path (Join-Path $binary.Directory $dependency))) { throw "Missing packaged runtime dependency: $dependency" }
+          }
           & $binary.FullName --help
           if ($LASTEXITCODE -ne 0) { throw 'Packaged softadastra.exe --help failed.' }
       - uses: actions/upload-artifact@v4

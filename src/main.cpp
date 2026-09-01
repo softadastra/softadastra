@@ -33,6 +33,7 @@
 #include "platform/NativeManagedNetwork.hpp"
 #include "platform/NativeNetwork.hpp"
 #include "platform/NativePlatform.hpp"
+#include "platform/NativeService.hpp"
 #include "platform/PrivilegedLocalFirewall.hpp"
 #include "software/ProjectConfig.hpp"
 #include "software/ProjectIdentity.hpp"
@@ -40,6 +41,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -56,8 +58,11 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <grp.h>
+#include <pwd.h>
 
 #endif
 
@@ -72,6 +77,24 @@ namespace
 {
   constexpr int host_start_attempts = 500;
   constexpr std::size_t host_info_field_width = 16;
+
+#if defined(__linux__)
+  bool prepare_box_prerequisites(const std::filesystem::path &directory)
+  {
+    if (::geteuid() != 0) return false;
+    if (::getgrnam("softadastra") == nullptr &&
+        std::system("groupadd --system softadastra") != 0) return false;
+    if (::getpwnam("softadastra") == nullptr &&
+        std::system("useradd --system --gid softadastra --home-dir /var/lib/softadastra --shell /usr/sbin/nologin softadastra") != 0) return false;
+    const auto *account = ::getpwnam("softadastra");
+    if (account == nullptr) return false;
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    if (error || ::chown(directory.c_str(), account->pw_uid, account->pw_gid) != 0 ||
+        ::chmod(directory.c_str(), 0750) != 0) return false;
+    return true;
+  }
+#endif
 
   softadastra::HostObservation host_observation(
       const softadastra::ControlClient &client)
@@ -943,6 +966,13 @@ int main(
     if (action == "provision" &&
         argc == 3)
     {
+#if defined(__linux__)
+      if (!prepare_box_prerequisites(data_directory))
+      {
+        std::cerr << "Box provisioning requires root and could not prepare its system account\n";
+        return 1;
+      }
+#endif
       if (!profile_store.provision_box(
               identity.id()))
       {
@@ -952,6 +982,15 @@ int main(
         return 1;
       }
 
+      softadastra::NativePlatform platform;
+#if defined(__linux__)
+      auto &service = static_cast<softadastra::NativeService &>(platform.service());
+      if (!service.is_installed() || !service.enable_auto_start() || !service.start())
+      {
+        std::cerr << "failed to enable and start Softadastra Box service\n";
+        return 1;
+      }
+#endif
       std::cout
           << "Softadastra Box provisioned.\n"
           << "Host ID: "
