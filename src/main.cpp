@@ -1117,6 +1117,7 @@ int main(
 
       std::size_t running = 0;
       std::size_t stopped = 0;
+      std::size_t starting = 0;
       std::size_t failed = 0;
 
       for (const auto &entry : entries)
@@ -1130,6 +1131,11 @@ int main(
                  softadastra::SoftwareState::Stopped)
         {
           ++stopped;
+        }
+        else if (entry.state() ==
+                 softadastra::SoftwareState::Starting)
+        {
+          ++starting;
         }
         else if (entry.state() ==
                  softadastra::SoftwareState::Failed)
@@ -1177,6 +1183,8 @@ int main(
           << running
           << "\n  stopped:  "
           << stopped
+          << "\n  starting: "
+          << starting
           << "\n  failed:   "
           << failed
           << '\n';

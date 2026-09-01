@@ -199,7 +199,10 @@ namespace softadastra
       const auto declared = LocalControlProtocol::decode(fields[offset++]);
       const auto pid = LocalControlProtocol::integer(fields[offset++]);
       const auto access_count = LocalControlProtocol::integer(fields[offset++]);
-      if (!id || !name || !state || !executable || !root || !identity ||
+      const auto parsed_state = state
+                                    ? software_state_from_value(*state)
+                                    : std::nullopt;
+      if (!id || !name || !parsed_state || !executable || !root || !identity ||
           !declared || !pid || !access_count || *access_count < 0)
       {
         return {};
@@ -260,7 +263,7 @@ namespace softadastra
       {
         entries.back().set_pid(*pid);
       }
-      entries.back().set_state(static_cast<SoftwareState>(*state));
+      entries.back().set_state(*parsed_state);
     }
     if (offset != fields.size())
     {
@@ -594,12 +597,7 @@ namespace softadastra
       return std::nullopt;
     }
 
-    const int state_value = *state;
-    if (state_value < 0)
-    {
-      return std::nullopt;
-    }
-    return static_cast<SoftwareState>(state_value);
+    return software_state_from_value(*state);
   }
 
   std::optional<SoftwareOperationResult> ControlClient::software_result(

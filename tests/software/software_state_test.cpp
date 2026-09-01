@@ -57,3 +57,13 @@ TEST(SoftwareStateTest, KeepsLifecycleStatesDistinct)
       softadastra::SoftwareState::Running,
       softadastra::SoftwareState::Failed);
 }
+
+TEST(SoftwareStateTest, UsesCanonicalNamesAndRejectsInvalidProtocolValues)
+{
+  EXPECT_STREQ(softadastra::software_state_name(softadastra::SoftwareState::Stopped), "stopped");
+  EXPECT_STREQ(softadastra::software_state_name(softadastra::SoftwareState::Starting), "starting");
+  EXPECT_STREQ(softadastra::software_state_name(softadastra::SoftwareState::Running), "running");
+  EXPECT_STREQ(softadastra::software_state_name(softadastra::SoftwareState::Failed), "failed");
+  EXPECT_FALSE(softadastra::software_state_from_value(99).has_value());
+  EXPECT_FALSE(softadastra::software_state_from_value(-1).has_value());
+}

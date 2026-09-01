@@ -95,29 +95,6 @@ namespace
     return escaped;
   }
 
-  const char *state_name(
-      softadastra::SoftwareState state)
-  {
-    using softadastra::SoftwareState;
-
-    if (state == SoftwareState::Running)
-    {
-      return "running";
-    }
-
-    if (state == SoftwareState::Starting)
-    {
-      return "starting";
-    }
-
-    if (state == SoftwareState::Failed)
-    {
-      return "failed";
-    }
-
-    return "stopped";
-  }
-
   std::optional<std::string> url_decode(
       const std::string &value)
   {
@@ -1149,7 +1126,7 @@ namespace softadastra
                   "{\"name\":\"" +
                   escape_json(entry.name()) +
                   "\",\"state\":\"" +
-                  state_name(entry.state()) +
+                  softadastra::software_state_name(entry.state()) +
                   "\",\"project_directory\":\"" +
                   escape_json(
                       entry.process_spec()

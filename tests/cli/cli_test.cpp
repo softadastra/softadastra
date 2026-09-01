@@ -608,6 +608,74 @@ namespace
     EXPECT_EQ(cli.run(3, info_args), 0);
   }
 
+  TEST(CliTest, ShowsTerminalResultsInStatusAndInfo)
+  {
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    const softadastra::SoftwareId id("api");
+    ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), std::nullopt, std::nullopt, "api"));
+    auto *entry = host.state().find_software(id);
+    ASSERT_NE(entry, nullptr);
+    entry->set_state(softadastra::SoftwareState::Stopped);
+    entry->set_result(softadastra::SoftwareOperationError::ProcessExitedSuccessfully);
+    softadastra::Cli cli(client);
+    const char *status[] = {"softadastra", "status", "api"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, status), 0);
+    const auto stopped_output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(stopped_output.find("api: stopped"), std::string::npos);
+    EXPECT_NE(stopped_output.find("Result:"), std::string::npos);
+    EXPECT_NE(stopped_output.find("exited successfully"), std::string::npos);
+
+    entry->set_state(softadastra::SoftwareState::Failed);
+    entry->set_result(softadastra::SoftwareOperationResult(
+        softadastra::SoftwareOperationError::ProcessExitedWithNonZeroCode, 1));
+    const char *info[] = {"softadastra", "info", "api"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, info), 0);
+    const auto failed_output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(failed_output.find("failed"), std::string::npos);
+    EXPECT_NE(failed_output.find("Reason:"), std::string::npos);
+    EXPECT_NE(failed_output.find("process exited with code 1"), std::string::npos);
+  }
+
+  TEST(CliTest, DoesNotCallRunningSoftwareNotFoundWhenRemoveIsRefused)
+  {
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("api"), softadastra::ProcessSpec("api"), std::nullopt, std::nullopt, "api"));
+    ASSERT_TRUE(client.start_software(softadastra::SoftwareId("api")));
+    softadastra::Cli cli(client);
+    const char *remove[] = {"softadastra", "remove", "api"};
+    testing::internal::CaptureStderr();
+    EXPECT_EQ(cli.run(3, remove), 1);
+    const auto output = testing::internal::GetCapturedStderr();
+    EXPECT_NE(output.find("Cannot remove running software: api"), std::string::npos);
+    EXPECT_EQ(output.find("Software not found"), std::string::npos);
+  }
+
+  TEST(CliTest, TreatsStoppingAlreadyStoppedSoftwareAsIdempotent)
+  {
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(softadastra::SoftwareId("api"), softadastra::ProcessSpec("api"), std::nullopt, std::nullopt, "api"));
+    softadastra::Cli cli(client);
+    const char *stop[] = {"softadastra", "stop", "api"};
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(3, stop), 0);
+    const auto output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("already stopped: api"), std::string::npos);
+  }
+
   TEST(CliTest, HelpFlagsAreNeverSoftwareNames)
   {
     Platform platform;

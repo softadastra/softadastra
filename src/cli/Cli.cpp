@@ -53,27 +53,6 @@ namespace
   constexpr std::size_t managed_network_info_field_width = 19;
   constexpr std::size_t software_info_field_width = 12;
 
-  const char *state_name(
-      SoftwareState state) noexcept
-  {
-    switch (state)
-    {
-    case SoftwareState::Stopped:
-      return "stopped";
-
-    case SoftwareState::Starting:
-      return "starting";
-
-    case SoftwareState::Running:
-      return "running";
-
-    case SoftwareState::Failed:
-      return "failed";
-    }
-
-    return "unknown";
-  }
-
   // Styles a state word without changing the word itself: color only reinforces
   // the always-present text, never replaces it.
   std::string state_display(
@@ -81,7 +60,7 @@ namespace
       style::Stream stream = style::Stream::Out)
   {
     const char *const name =
-        state_name(state);
+        software_state_name(state);
 
     switch (state)
     {
@@ -187,6 +166,38 @@ namespace
     case SoftwareOperationError::LocalAccessUnavailable:
       std::cerr << "local access could not be opened on this Host";
       break;
+    }
+  }
+
+  std::string operation_result_text(
+      const SoftwareOperationResult &result)
+  {
+    switch (result.error().value_or(SoftwareOperationError::LaunchFailed))
+    {
+    case SoftwareOperationError::ProcessExitedSuccessfully: return "exited successfully";
+    case SoftwareOperationError::ProcessExitedWithNonZeroCode: return "process exited with code " + std::to_string(result.exit_code().value_or(-1));
+    case SoftwareOperationError::SoftwareUnknown: return "software is unknown";
+    case SoftwareOperationError::AlreadyRunning: return "software is already running";
+    case SoftwareOperationError::NotRunning: return "software is not running";
+    case SoftwareOperationError::ExecutableNotFound: return "command could not be started";
+    case SoftwareOperationError::PermissionDenied: return "permission denied";
+    case SoftwareOperationError::LaunchFailed: return "launch failed";
+    case SoftwareOperationError::StopFailed: return "stop failed";
+    case SoftwareOperationError::LocalAccessUnavailable: return "local access could not be opened on this Host";
+    }
+    return "launch failed";
+  }
+
+  void print_last_result(
+      const std::optional<SoftwareOperationResult> &result,
+      const SoftwareState state,
+      const std::size_t width)
+  {
+    if (result)
+    {
+      std::cout << '\n' << style::field(
+          state == SoftwareState::Failed ? "Reason:" : "Result:",
+          operation_result_text(*result), width);
     }
   }
 
@@ -1906,7 +1917,7 @@ namespace softadastra
               << entry.name();
 
           const std::string state_plain =
-              state_name(entry.state());
+              software_state_name(entry.state());
           const std::string state_styled =
               state_display(entry.state());
 
@@ -2302,27 +2313,25 @@ namespace softadastra
 
     if (command == "remove")
     {
-      if (target->entry->state() ==
-          SoftwareState::Running)
-      {
-        std::cerr
-            << "Cannot remove running software: "
-            << target->name
-            << "\n\nStop it first:\n\n"
-            << "  "
-            << style::command(
-                   name
-                       ? "softadastra stop " + *name
-                       : "softadastra stop",
-                   style::Stream::Err)
-            << "\n";
-
-        return 1;
-      }
-
       if (!client_.remove_software(
               target->id))
       {
+        const auto current = client_.software_state(target->id);
+        if (current && *current == SoftwareState::Running)
+        {
+          std::cerr
+              << "Cannot remove running software: "
+              << target->name
+              << "\n\nStop it first:\n\n"
+              << "  "
+              << style::command(
+                     name
+                         ? "softadastra stop " + *name
+                         : "softadastra stop",
+                     style::Stream::Err)
+              << "\n";
+          return 1;
+        }
         unknown_software(
             target->name);
 
@@ -2437,6 +2446,11 @@ namespace softadastra
                      : "-",
                  software_info_field_width)
           << '\n';
+      print_last_result(
+          client_.software_result(target->id),
+          entry.state(),
+          software_info_field_width);
+      std::cout << '\n';
 
       return 0;
     }
@@ -2458,8 +2472,9 @@ namespace softadastra
       std::cout
           << target->name
           << ": "
-          << state_display(*state)
-          << '\n';
+          << state_display(*state);
+      print_last_result(client_.software_result(target->id), *state, 0);
+      std::cout << '\n';
 
       return 0;
     }
@@ -2467,23 +2482,13 @@ namespace softadastra
     if (command == "start" ||
         command == "run")
     {
-      const auto state =
-          client_.software_state(
-              target->id);
+      const auto result = client_.start_software(target->id);
+      const bool already_running =
+          result.error() == SoftwareOperationError::AlreadyRunning;
 
-      const bool running =
-          state &&
-          *state == SoftwareState::Running;
-
-      if (!running)
+      if (!result && !already_running)
       {
-        const auto result =
-            client_.start_software(
-                target->id);
-
-        if (!result)
-        {
-          std::cerr
+        std::cerr
               << "Failed to start software: "
               << target->name
               << "\n\nCommand:\n"
@@ -2508,12 +2513,11 @@ namespace softadastra
 
           std::cerr << '\n';
 
-          return 1;
-        }
+        return 1;
       }
 
       std::cout
-          << (running
+          << (already_running
                   ? style::warning("already running:")
                   : (command == "run"
                          ? style::success("running:")
@@ -2542,8 +2546,11 @@ namespace softadastra
                   target->id)
             : client_.restart_software(
                   target->id);
+    const bool already_stopped =
+        command == "stop" &&
+        result.error() == SoftwareOperationError::NotRunning;
 
-    if (!result)
+    if (!result && !already_stopped)
     {
       std::cerr
           << "Failed to "
@@ -2562,7 +2569,9 @@ namespace softadastra
 
     std::cout
         << (command == "stop"
-                ? style::success("stopped:")
+                ? (already_stopped
+                       ? style::warning("already stopped:")
+                       : style::success("stopped:"))
                 : style::success("restarted:"))
         << ' '
         << target->name

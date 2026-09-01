@@ -15,6 +15,8 @@
 #ifndef SOFTADASTRA_SOFTWARE_SOFTWARE_STATE_HPP
 #define SOFTADASTRA_SOFTWARE_SOFTWARE_STATE_HPP
 
+#include <optional>
+
 namespace softadastra
 {
   /**
@@ -46,6 +48,33 @@ namespace softadastra
      */
     Failed
   };
+
+  [[nodiscard]] constexpr bool software_state_valid(const int value) noexcept
+  {
+    return value >= static_cast<int>(SoftwareState::Stopped) &&
+           value <= static_cast<int>(SoftwareState::Failed);
+  }
+
+  [[nodiscard]] constexpr std::optional<SoftwareState>
+  software_state_from_value(const int value) noexcept
+  {
+    return software_state_valid(value)
+               ? std::optional<SoftwareState>(static_cast<SoftwareState>(value))
+               : std::nullopt;
+  }
+
+  [[nodiscard]] constexpr const char *software_state_name(
+      const SoftwareState state) noexcept
+  {
+    switch (state)
+    {
+    case SoftwareState::Stopped: return "stopped";
+    case SoftwareState::Starting: return "starting";
+    case SoftwareState::Running: return "running";
+    case SoftwareState::Failed: return "failed";
+    }
+    return "unknown";
+  }
 
 } // namespace softadastra
 
