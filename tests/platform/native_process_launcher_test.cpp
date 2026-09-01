@@ -41,6 +41,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -179,6 +180,30 @@ namespace
     EXPECT_EQ(
         process.error(),
         softadastra::ProcessLaunchError::ExecutableNotFound);
+  }
+
+  TEST(NativeProcessLauncherTest, RejectsNonExecutableFileWithPermissionDenied)
+  {
+#if defined(__linux__)
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("softadastra-non-executable-" +
+                       std::to_string(::getpid()));
+    {
+      std::ofstream output(path);
+      output << "#!/bin/sh\nexit 0\n";
+    }
+    ASSERT_EQ(::chmod(path.c_str(), S_IRUSR | S_IWUSR), 0);
+
+    softadastra::NativeProcessLauncher launcher;
+    const auto process = launcher.launch(
+        softadastra::ProcessSpec(path.string()));
+
+    EXPECT_EQ(process, nullptr);
+    EXPECT_EQ(
+        process.error(),
+        softadastra::ProcessLaunchError::PermissionDenied);
+    std::filesystem::remove(path);
+#endif
   }
 
   TEST(NativeProcessLauncherTest, LaunchesRunningProcess)

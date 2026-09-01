@@ -13,6 +13,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -20,6 +21,37 @@
 
 namespace
 {
+#if defined(__linux__)
+  class StateHome final
+  {
+  public:
+    explicit StateHome(const std::filesystem::path &path)
+    {
+      if (const char *value = std::getenv("XDG_STATE_HOME"))
+      {
+        previous_ = value;
+      }
+
+      ::setenv("XDG_STATE_HOME", path.c_str(), 1);
+    }
+
+    ~StateHome()
+    {
+      if (previous_.has_value())
+      {
+        ::setenv("XDG_STATE_HOME", previous_->c_str(), 1);
+      }
+      else
+      {
+        ::unsetenv("XDG_STATE_HOME");
+      }
+    }
+
+  private:
+    std::optional<std::string> previous_;
+  };
+#endif
+
   class Process final : public softadastra::Process
   {
   public:
@@ -674,6 +706,72 @@ namespace
     EXPECT_EQ(cli.run(3, stop), 0);
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_NE(output.find("already stopped: api"), std::string::npos);
+  }
+
+  TEST(CliTest, ClearsLogsThroughTheHost)
+  {
+#if defined(__linux__)
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-cli-logs-" +
+                            std::to_string(std::chrono::steady_clock::now()
+                                               .time_since_epoch()
+                                               .count()));
+    StateHome state_home(directory);
+    const auto log = directory / "softadastra" / "logs" / "api.log";
+    std::filesystem::create_directories(log.parent_path());
+    std::ofstream(log) << "old output\n";
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(
+        softadastra::SoftwareId("api"),
+        softadastra::ProcessSpec("api"),
+        std::nullopt,
+        std::nullopt,
+        "api"));
+    softadastra::Cli cli(client);
+    const char *logs[] = {"softadastra", "logs", "api", "--clear"};
+
+    EXPECT_EQ(cli.run(4, logs), 0);
+    EXPECT_TRUE(std::ifstream(log).peek() == std::ifstream::traits_type::eof());
+    std::filesystem::remove_all(directory);
+#endif
+  }
+
+  TEST(CliTest, PropagatesHostLogClearFailure)
+  {
+#if defined(__linux__)
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-cli-log-failure-" +
+                            std::to_string(std::chrono::steady_clock::now()
+                                               .time_since_epoch()
+                                               .count()));
+    StateHome state_home(directory);
+
+    Platform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    ASSERT_TRUE(client.register_software(
+        softadastra::SoftwareId("api"),
+        softadastra::ProcessSpec("api"),
+        std::nullopt,
+        std::nullopt,
+        "api"));
+    softadastra::Cli cli(client);
+    const char *logs[] = {"softadastra", "logs", "api", "--clear"};
+
+    testing::internal::CaptureStderr();
+    EXPECT_EQ(cli.run(4, logs), 1);
+    const auto output = testing::internal::GetCapturedStderr();
+    EXPECT_NE(output.find("Failed to clear logs for software: api"),
+              std::string::npos);
+    std::filesystem::remove_all(directory);
+#endif
   }
 
   TEST(CliTest, HelpFlagsAreNeverSoftwareNames)

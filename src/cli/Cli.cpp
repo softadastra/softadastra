@@ -2359,19 +2359,25 @@ namespace softadastra
 
     if (command == "logs")
     {
+      if (clear)
+      {
+        if (client_.clear_logs(target->id))
+        {
+          return 0;
+        }
+
+        std::cerr
+            << "Failed to clear logs for software: "
+            << target->name
+            << '\n';
+
+        return 1;
+      }
+
       const auto path =
           NativeDataDirectory::path() /
           "logs" /
           (target->id.value() + ".log");
-
-      if (clear)
-      {
-        std::ofstream output(
-            path,
-            std::ios::trunc);
-
-        return 0;
-      }
 
       std::uintmax_t offset = 0;
 

@@ -14,9 +14,15 @@
 
 #include <gtest/gtest.h>
 #include "control/ControlClient.hpp"
+#include "control/ControlServer.hpp"
+#include "control/LocalControlServer.hpp"
+#include "host/Host.hpp"
+#include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
+#include "platform/NativePlatform.hpp"
 #include "software/ProjectConfig.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -196,6 +202,87 @@ namespace
     pid_t process_{-1};
     int output_descriptor_{-1};
   };
+
+  TEST(LocalControlTest, PersistsRemovalBeforeConfirmingSuccess)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-remove-checkpoint-" +
+                            std::to_string(::getpid()));
+    const auto socket = directory / "control.sock";
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::ControlServer server(service);
+    const softadastra::SoftwareId id("removed");
+    ASSERT_TRUE(server.register_software(id, softadastra::ProcessSpec("app")));
+
+    softadastra::LocalControlServer local(server, socket);
+    bool persisted = false;
+    local.set_state_persistence_handler(
+        [&host, &id, &persisted]()
+        {
+          persisted = host.state().find_software(id) == nullptr;
+          return persisted;
+        });
+    ASSERT_TRUE(local.start());
+
+    std::atomic_bool serving{true};
+    std::thread loop(
+        [&local, &serving]()
+        {
+          while (serving.load())
+          {
+            static_cast<void>(local.process_pending());
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
+        });
+
+    softadastra::ControlClient client(socket);
+    EXPECT_TRUE(client.remove_software(id));
+    EXPECT_TRUE(persisted);
+
+    serving = false;
+    loop.join();
+    local.stop();
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(LocalControlTest, PropagatesRemovalPersistenceFailure)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-remove-persistence-failure-" +
+                            std::to_string(::getpid()));
+    const auto socket = directory / "control.sock";
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.process_launcher());
+    softadastra::ControlServer server(service);
+    const softadastra::SoftwareId id("removed");
+    ASSERT_TRUE(server.register_software(id, softadastra::ProcessSpec("app")));
+
+    softadastra::LocalControlServer local(server, socket);
+    local.set_state_persistence_handler([] { return false; });
+    ASSERT_TRUE(local.start());
+
+    std::atomic_bool serving{true};
+    std::thread loop(
+        [&local, &serving]()
+        {
+          while (serving.load())
+          {
+            static_cast<void>(local.process_pending());
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
+        });
+
+    softadastra::ControlClient client(socket);
+    EXPECT_FALSE(client.remove_software(id));
+
+    serving = false;
+    loop.join();
+    local.stop();
+    std::filesystem::remove_all(directory);
+  }
 
   TEST(LocalControlTest, PreservesRegisteredNameAcrossHostRestart)
   {

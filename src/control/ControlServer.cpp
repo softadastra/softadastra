@@ -241,8 +241,9 @@ namespace softadastra
   }
 
   std::optional<SoftwareState> ControlServer::software_state(
-      const SoftwareId &id) const noexcept
+      const SoftwareId &id) noexcept
   {
+    host_service_.refresh();
     return host_service_.software_state(id);
   }
 

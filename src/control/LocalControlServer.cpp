@@ -70,7 +70,8 @@ namespace softadastra
       return fields.size() == 2 &&
              (fields[0] == "start" ||
               fields[0] == "stop" ||
-              fields[0] == "restart");
+              fields[0] == "restart" ||
+              fields[0] == "remove");
     }
 
   } // namespace

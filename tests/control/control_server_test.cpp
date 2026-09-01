@@ -313,7 +313,7 @@ namespace
         softadastra::SoftwareState::Running);
   }
 
-  TEST(ControlServerTest, DetectsSuccessfulProcessExitAfterRefresh)
+  TEST(ControlServerTest, RefreshesSuccessfulProcessExitBeforeReportingState)
   {
     TestPlatform platform;
     TestProcessLauncher launcher;
@@ -337,14 +337,12 @@ namespace
     process->running = false;
     process->exit_code = 0;
 
-    server.refresh();
-
     EXPECT_EQ(
         server.software_state(id).value(),
         softadastra::SoftwareState::Stopped);
   }
 
-  TEST(ControlServerTest, DetectsFailedProcessExitAfterRefresh)
+  TEST(ControlServerTest, RefreshesFailedProcessExitBeforeReportingState)
   {
     TestPlatform platform;
     TestProcessLauncher launcher;
@@ -367,8 +365,6 @@ namespace
 
     process->running = false;
     process->exit_code = 7;
-
-    server.refresh();
 
     EXPECT_EQ(
         server.software_state(id).value(),
@@ -430,7 +426,7 @@ namespace
     softadastra::Host host(platform);
     softadastra::HostService host_service(host, launcher);
 
-    const softadastra::ControlServer server(host_service);
+    softadastra::ControlServer server(host_service);
 
     EXPECT_FALSE(
         server.software_state(

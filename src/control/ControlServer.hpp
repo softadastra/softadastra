@@ -286,7 +286,7 @@ namespace softadastra
      * @return Current lifecycle state, or std::nullopt if unavailable.
      */
     [[nodiscard]] std::optional<SoftwareState> software_state(
-        const SoftwareId &id) const noexcept;
+        const SoftwareId &id) noexcept;
 
     /**
      * @brief Returns the last terminal lifecycle result for registered software.

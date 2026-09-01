@@ -340,6 +340,20 @@ namespace softadastra
 
 #if defined(__linux__)
 
+    const std::filesystem::path executable_path(spec.executable());
+
+    if (executable_path.has_parent_path() &&
+        ::access(executable_path.c_str(), X_OK) != 0)
+    {
+      return errno == EACCES
+                 ? ProcessLaunchError::PermissionDenied
+                 : ProcessLaunchError::LaunchFailed;
+    }
+
+#endif
+
+#if defined(__linux__)
+
     if (spec.output_file().has_value())
     {
       int ready[2]{};
