@@ -62,6 +62,7 @@ namespace
     runner.result = {0, "unsupported\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Unsupported);
     runner.result = {0, "error\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Failed);
     runner.result = {0, "ufw status\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Failed);
+    runner.result = {127, {}}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Failed);
   }
 
   TEST(FirewallHelperTest, RejectsInvalidStatusAndModifyInterfaces)

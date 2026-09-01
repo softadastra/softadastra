@@ -736,9 +736,15 @@ int main(
     }
     else if (argc != 2)
     {
-      std::cerr
-          << "Usage:\n"
-          << "  softadastra ui [--port <port>]\n";
+      std::ostream &out = std::cerr;
+
+      out << "Usage:\n";
+      out << "  softadastra ui [options]\n\n";
+
+      out << "Open the local Softadastra web interface.\n\n";
+
+      out << "Options:\n";
+      out << "  --port <port>    Use a specific local port\n";
 
       return 2;
     }
@@ -989,11 +995,17 @@ int main(
       return 0;
     }
 
-    std::cerr
-        << "Usage:\n"
-        << "  softadastra box provision\n"
-        << "  softadastra box status\n"
-        << "  softadastra box unprovision\n";
+    std::ostream &out = std::cerr;
+
+    out << "Usage:\n";
+    out << "  softadastra box <command>\n\n";
+
+    out << "Manage this Host as a Softadastra Box.\n\n";
+
+    out << "Commands:\n";
+    out << "  provision      Provision this Host as a Box\n";
+    out << "  status         Show Box status\n";
+    out << "  unprovision    Remove Box provisioning\n";
 
     return 2;
   }
@@ -1007,10 +1019,25 @@ int main(
     if (action == "-h" ||
         action == "--help")
     {
-      std::cout
-          << "Usage:\n"
-          << "  softadastra host\n"
-          << "  softadastra host start|stop|restart|status|info\n";
+      std::ostream &out = std::cout;
+
+      out << "Usage:\n";
+      out << "  softadastra host\n";
+      out << "  softadastra host <command>\n\n";
+
+      out << "Run and manage the Softadastra Host.\n\n";
+
+      out << "Commands:\n";
+      out << "  start       Start the Host\n";
+      out << "  stop        Stop the Host\n";
+      out << "  restart     Restart the Host\n";
+      out << "  status      Show Host status\n";
+      out << "  info        Show Host information\n\n";
+
+      out << "Without a command, the Host runs in the foreground.\n\n";
+
+      out << "Options:\n";
+      out << "  -h, --help  Show this help\n";
 
       return 0;
     }
@@ -1255,16 +1282,26 @@ int main(
       return 0;
     }
 
-    std::cerr
-        << "Unknown host action: "
+    std::ostream &out = std::cerr;
+
+    out << "Unknown host action: "
         << action
-        << "\n\nUsage:\n"
-        << "  softadastra host\n"
-        << "  softadastra host start\n"
-        << "  softadastra host stop\n"
-        << "  softadastra host restart\n"
-        << "  softadastra host status\n"
-        << "  softadastra host info\n";
+        << "\n\n";
+
+    out << "Usage:\n";
+    out << "  softadastra host\n";
+    out << "  softadastra host <command>\n\n";
+
+    out << "Run and manage the Softadastra Host.\n\n";
+
+    out << "Commands:\n";
+    out << "  start       Start the Host\n";
+    out << "  stop        Stop the Host\n";
+    out << "  restart     Restart the Host\n";
+    out << "  status      Show Host status\n";
+    out << "  info        Show Host information\n\n";
+
+    out << "Without a command, the Host runs in the foreground.\n";
 
     return 2;
   }

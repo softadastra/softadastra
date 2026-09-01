@@ -365,120 +365,188 @@ namespace
 
   void usage()
   {
-    std::cout
-        << "Softadastra runs software on this Host.\n\n"
-        << "Usage:\n"
-        << "  softadastra <command> [arguments]\n\n"
-        << "Project:\n"
-        << "  init [name] [--command <command>] [--access http:port]\n"
-        << "  run [name]\n\n"
-        << "Software:\n"
-        << "  start [name]\n"
-        << "  stop [name]\n"
-        << "  restart [name]\n"
-        << "  status [name]\n"
-        << "  info [name]\n"
-        << "  access [name]\n"
-        << "  access allow\n"
-        << "  access deny\n"
-        << "  logs [name] [--follow]\n\n"
-        << "Inventory:\n"
-        << "  list [--running|--stopped]\n\n"
-        << "Host:\n"
-        << "  connectivity\n"
-        << "  network info\n"
-        << "  remote enable <ipv4-address> <port>\n"
-        << "  remote disable\n\n"
-        << "Advanced:\n"
-        << "  register <name> [--access http:port] -- <command> "
-           "[arguments...]\n";
+    std::ostream &out = std::cout;
+
+    out << "Usage:\n";
+    out << "  softadastra <command> [arguments]\n";
+    out << "  softadastra help <command>\n\n";
+
+    out << "Run software on this Host.\n\n";
+
+    out << "Project:\n";
+    out << "  init          [name]               Create softadastra.toml\n";
+    out << "  run           [name]               Run software\n\n";
+
+    out << "Software:\n";
+    out << "  start         [name]               Start registered software\n";
+    out << "  stop          [name]               Stop software\n";
+    out << "  restart       [name]               Restart software\n";
+    out << "  status        [name]               Show software status\n";
+    out << "  info          [name]               Show software information\n";
+    out << "  access        [name]               Show local access\n";
+    out << "  access        allow                Allow local access\n";
+    out << "  access        deny                 Deny local access\n";
+    out << "  logs          [name]               Show software logs\n";
+    out << "  remove        [name]               Remove software from this Host\n\n";
+
+    out << "Inventory:\n";
+    out << "  list                               List registered software\n\n";
+
+    out << "Host:\n";
+    out << "  connectivity                      Show Host connectivity\n";
+    out << "  network       <command>            Manage local networking\n";
+    out << "  remote        <command>            Manage remote access\n\n";
+
+    out << "Advanced:\n";
+    out << "  register      <name>               Register software directly\n\n";
+
+    out << "Options:\n";
+    out << "  -h, --help                         Show this help\n\n";
+
+    out << "Run 'softadastra help <command>' for detailed command usage.\n";
   }
 
   void command_usage(
       const std::string &command)
   {
+    std::ostream &out = std::cout;
+
     if (command == "logs")
     {
-      std::cout
-          << "Usage:\n"
-          << "  softadastra logs [software-name] [--follow]\n\n"
-          << "Without a name:\n"
-          << "  Show logs for the current Softadastra project.\n\n"
-          << "With a name:\n"
-          << "  Show logs for a registered software.\n\n"
-          << "Options:\n"
-          << "  -f, --follow    Follow new log output\n";
+      out << "Usage:\n";
+      out << "  softadastra logs [name] [options]\n\n";
+
+      out << "Show stored output for software.\n\n";
+
+      out << "Without a name, logs for the current project are shown.\n";
+      out << "With a name, logs for registered software are shown.\n\n";
+
+      out << "Options:\n";
+      out << "  -f, --follow    Follow new log output\n";
+      out << "      --clear     Clear stored logs\n";
     }
     else if (command == "access")
     {
-      std::cout
-          << "Usage:\n"
-          << "  softadastra access [software-name]\n\n"
-          << "  softadastra access allow\n"
-          << "  softadastra access deny\n\n"
-          << "Show local access for a Software. `allow` and `deny` apply "
-             "to the current project only. If no local network is "
-             "available, Softadastra may start a safe managed local network "
-             "when the Host supports it.\n";
+      out << "Usage:\n";
+      out << "  softadastra access [name]\n";
+      out << "  softadastra access <command>\n\n";
+
+      out << "Show or manage local access for software.\n\n";
+
+      out << "Commands:\n";
+      out << "  allow           Allow local access for the current project\n";
+      out << "  deny            Deny local access for the current project\n\n";
+
+      out << "Without a command, show the current local access state.\n";
     }
     else if (command == "network")
     {
-      std::cout
-          << "Usage:\n"
-          << "  softadastra network info\n"
-          << "  softadastra network status\n"
-          << "  softadastra network start\n"
-          << "  softadastra network stop\n\n"
-          << "Commands:\n"
-          << "  info      Show current Host network state and capabilities\n"
-          << "  status    Show managed local network state\n"
-          << "  start     Start the managed local network\n"
-          << "  stop      Stop the managed local network\n";
+      out << "Usage:\n";
+      out << "  softadastra network <command>\n\n";
+
+      out << "Show and manage local networking on this Host.\n\n";
+
+      out << "Commands:\n";
+      out << "  info            Show Host network information\n";
+      out << "  status          Show managed network status\n";
+      out << "  start           Start the managed local network\n";
+      out << "  stop            Stop the managed local network\n";
     }
     else if (command == "init")
     {
-      std::cout
-          << "Usage: softadastra init [name] [--command <command>] "
-             "[--access http:port]\n";
+      out << "Usage:\n";
+      out << "  softadastra init [name] [options]\n\n";
+
+      out << "Create softadastra.toml for the current project.\n\n";
+
+      out << "Options:\n";
+      out << "  --command <command>    Set the software command\n";
+      out << "  --access <http:port>   Set local HTTP access\n";
     }
     else if (command == "run")
     {
-      std::cout
-          << "Usage: softadastra run [name]\n";
+      out << "Usage:\n";
+      out << "  softadastra run [name]\n\n";
+
+      out << "Run software on this Host.\n\n";
+
+      out << "Without a name, run the current Softadastra project.\n";
+      out << "With a name, run registered software.\n";
     }
     else if (command == "list")
     {
-      std::cout
-          << "Usage: softadastra list [--running|--stopped]\n";
+      out << "Usage:\n";
+      out << "  softadastra list [options]\n\n";
+
+      out << "List software registered on this Host.\n\n";
+
+      out << "Options:\n";
+      out << "  --running    Show only running software\n";
+      out << "  --stopped    Show only stopped software\n";
     }
     else if (command == "register")
     {
-      std::cout
-          << "Usage: softadastra register <name> [--access http:port] -- "
-             "<command> [arguments...]\n";
+      out << "Usage:\n";
+      out << "  softadastra register <name> [options] -- <command> [arguments...]\n\n";
+
+      out << "Register software directly on this Host.\n\n";
+
+      out << "Options:\n";
+      out << "  --access <http:port>   Set local HTTP access\n";
     }
     else if (command == "connectivity")
     {
-      std::cout
-          << "Usage: softadastra connectivity\n";
+      out << "Usage:\n";
+      out << "  softadastra connectivity\n\n";
+
+      out << "Show Host connectivity.\n";
     }
     else if (command == "remote")
     {
-      std::cout
-          << "Usage:\n"
-          << "  softadastra remote enable <ipv4-address> <port>\n"
-          << "       softadastra remote disable\n";
+      out << "Usage:\n";
+      out << "  softadastra remote <command>\n\n";
+
+      out << "Manage remote access to this Host.\n\n";
+
+      out << "Commands:\n";
+      out << "  status                         Show remote access status\n";
+      out << "  enable <ipv4-address> <port>   Enable remote access\n";
+      out << "  disable                        Disable remote access\n";
     }
-    else if (command == "start" ||
-             command == "stop" ||
-             command == "restart" ||
-             command == "status" ||
-             command == "info")
+    else if (command == "start")
     {
-      std::cout
-          << "Usage: softadastra "
-          << command
-          << " [name]\n";
+      out << "Usage:\n";
+      out << "  softadastra start [name]\n\n";
+
+      out << "Start registered software.\n";
+    }
+    else if (command == "stop")
+    {
+      out << "Usage:\n";
+      out << "  softadastra stop [name]\n\n";
+
+      out << "Stop running software.\n";
+    }
+    else if (command == "restart")
+    {
+      out << "Usage:\n";
+      out << "  softadastra restart [name]\n\n";
+
+      out << "Restart software.\n";
+    }
+    else if (command == "status")
+    {
+      out << "Usage:\n";
+      out << "  softadastra status [name]\n\n";
+
+      out << "Show software status.\n";
+    }
+    else if (command == "info")
+    {
+      out << "Usage:\n";
+      out << "  softadastra info [name]\n\n";
+
+      out << "Show software information.\n";
     }
     else
     {
@@ -553,6 +621,28 @@ namespace
     std::optional<std::filesystem::path> root;
     std::optional<ProjectConfig> config;
   };
+
+  std::optional<AccessPoint> effective_access(
+      const ProjectConfig &config)
+  {
+    if (config.access)
+    {
+      return config.access;
+    }
+
+    return config.access_points.empty()
+               ? std::nullopt
+               : std::optional<AccessPoint>(
+                     config.access_points.front());
+  }
+
+  std::optional<AccessPoint> effective_access(
+      const Target &target)
+  {
+    return target.config
+               ? effective_access(*target.config)
+               : target.entry->access_point();
+  }
 
   std::optional<Target> resolve_target(
       ControlClient &client,
@@ -763,25 +853,7 @@ namespace
     return tag.str();
   }
 
-  std::optional<LocalFirewallRule> project_firewall_rule(
-      const Network *network,
-      const std::filesystem::path &root,
-      const ProjectConfig &config)
-  {
-    const auto access = config.access ? config.access
-                                      : (config.access_points.empty()
-                                             ? std::nullopt
-                                             : std::optional<AccessPoint>(config.access_points.front()));
-    if (!access || network == nullptr)
-      return std::nullopt;
-    const auto capability = network->network_capability();
-    if (capability.local_network_state != LocalNetworkState::Existing ||
-        capability.local_subnet.empty())
-      return std::nullopt;
-    return LocalFirewallRule{access_owner(normalized_project_root(root)), capability.local_subnet, access->port()};
-  }
-
-  std::optional<LocalFirewallRule> access_firewall_rule(
+  std::optional<LocalFirewallRule> local_firewall_rule(
       const Network *network,
       const std::filesystem::path &root,
       const AccessPoint &access)
@@ -796,44 +868,202 @@ namespace
         access_owner(normalized_project_root(root)), capability.local_subnet, access.port()};
   }
 
+  enum class LocalAccessFirewallStatus
+  {
+    NotChecked,
+    Allowed,
+    Blocked,
+    Unsupported,
+    Failed
+  };
+
+  LocalAccessFirewallStatus local_firewall_status(
+      LocalFirewallResult result) noexcept
+  {
+    switch (result)
+    {
+    case LocalFirewallResult::Open:
+    case LocalFirewallResult::Disabled:
+      return LocalAccessFirewallStatus::Allowed;
+
+    case LocalFirewallResult::PermissionRequired:
+      return LocalAccessFirewallStatus::Blocked;
+
+    case LocalFirewallResult::Unsupported:
+      return LocalAccessFirewallStatus::Unsupported;
+
+    case LocalFirewallResult::Failed:
+      return LocalAccessFirewallStatus::Failed;
+    }
+
+    return LocalAccessFirewallStatus::Failed;
+  }
+
+  LocalAccessFirewallStatus local_firewall_status(
+      LocalAccessFirewallState state) noexcept
+  {
+    switch (state)
+    {
+    case LocalAccessFirewallState::Open:
+      return LocalAccessFirewallStatus::Allowed;
+
+    case LocalAccessFirewallState::PermissionRequired:
+      return LocalAccessFirewallStatus::Blocked;
+
+    case LocalAccessFirewallState::Unsupported:
+      return LocalAccessFirewallStatus::Unsupported;
+
+    case LocalAccessFirewallState::Failed:
+      return LocalAccessFirewallStatus::Failed;
+
+    case LocalAccessFirewallState::NotRequired:
+      return LocalAccessFirewallStatus::NotChecked;
+    }
+
+    return LocalAccessFirewallStatus::Failed;
+  }
+
+  struct LocalAccessView
+  {
+    std::optional<AccessPoint> access;
+    LocalAccessFirewallStatus firewall{
+        LocalAccessFirewallStatus::NotChecked};
+    bool firewall_rule_available{true};
+  };
+
+  LocalAccessView local_access_view(
+      const Target &target,
+      const std::optional<LocalAccess> &host_access,
+      const Network *network,
+      LocalFirewall *firewall)
+  {
+    LocalAccessView view{
+        effective_access(target),
+        host_access
+            ? local_firewall_status(host_access->firewall)
+            : LocalAccessFirewallStatus::NotChecked};
+
+    const bool check_firewall =
+        firewall != nullptr &&
+        view.access.has_value() &&
+        (!host_access ||
+         host_access->state == LocalAccessState::Available);
+
+    if (!check_firewall)
+    {
+      return view;
+    }
+
+    auto root = target.root;
+
+    if (!root &&
+        target.entry &&
+        target.entry->process_spec().working_directory())
+    {
+      root = std::filesystem::path(
+          *target.entry->process_spec().working_directory());
+    }
+
+    const auto rule =
+        root
+            ? local_firewall_rule(
+                  network,
+                  *root,
+                  *view.access)
+            : std::nullopt;
+
+    view.firewall_rule_available = rule.has_value();
+
+    view.firewall =
+        rule
+            ? local_firewall_status(
+                  firewall->status(*rule))
+            : LocalAccessFirewallStatus::Failed;
+
+    return view;
+  }
+
+  bool firewall_allows_local_access(
+      LocalAccessFirewallStatus status) noexcept
+  {
+    return status == LocalAccessFirewallStatus::NotChecked ||
+           status == LocalAccessFirewallStatus::Allowed;
+  }
+
+  void print_local_firewall_reason(
+      LocalAccessFirewallStatus status)
+  {
+    switch (status)
+    {
+    case LocalAccessFirewallStatus::Blocked:
+      std::cout
+          << style::warning("Firewall rule is blocked.")
+          << "\n\nRun:\n\n"
+          << "  "
+          << style::command("softadastra access allow")
+          << "\n";
+      return;
+
+    case LocalAccessFirewallStatus::Unsupported:
+      std::cout
+          << style::muted(
+                 "Local firewall access is unsupported on this Host.")
+          << '\n';
+      return;
+
+    case LocalAccessFirewallStatus::Failed:
+      std::cout
+          << style::muted(
+                 "Local firewall access could not be confirmed.")
+          << '\n';
+      return;
+
+    case LocalAccessFirewallStatus::NotChecked:
+    case LocalAccessFirewallStatus::Allowed:
+      return;
+    }
+  }
+
   int print_firewall_access(
       const Network *network,
       LocalFirewall *firewall,
-      const std::string &name,
-      const std::filesystem::path &root,
-      const AccessPoint &configured)
+      const Target &target)
   {
     if (firewall == nullptr)
     {
       std::cerr << "Local firewall access is unsupported on this Host.\n";
       return 1;
     }
-    const auto rule = access_firewall_rule(network, root, configured);
-    if (!rule)
+    const auto view = local_access_view(
+        target,
+        std::nullopt,
+        network,
+        firewall);
+    if (!view.access)
+    {
+      std::cerr << "No access configured for: " << target.name << '\n';
+      return 1;
+    }
+    if (view.firewall == LocalAccessFirewallStatus::Failed &&
+        !view.firewall_rule_available)
     {
       std::cerr << "A usable local network and Access are required.\n";
       return 1;
     }
-    const auto result = firewall->status(*rule);
-    std::cout << style::field("Software:", name, access_field_width) << '\n'
-              << style::field("Access:", access_name(configured), access_field_width) << '\n';
-    if (result == LocalFirewallResult::Open)
+    std::cout << style::field("Software:", target.name, access_field_width) << '\n'
+              << style::field("Access:", access_name(view.access), access_field_width) << '\n';
+    if (firewall_allows_local_access(view.firewall))
     {
       const auto ipv4 = network->network_capability().primary_ipv4;
-      const auto url = configured.protocol() == AccessProtocol::Https
-                           ? AccessUrl::https(ipv4, configured.port())
-                           : AccessUrl::http(ipv4, configured.port());
+      const auto url = view.access->protocol() == AccessProtocol::Https
+                           ? AccessUrl::https(ipv4, view.access->port())
+                           : AccessUrl::http(ipv4, view.access->port());
       std::cout << style::field("Local access:", style::success("allowed"), access_field_width) << '\n'
                 << style::field("Local URL:", url, access_field_width) << '\n';
       return 0;
     }
     std::cout << style::field("Local access:", style::warning("unavailable"), access_field_width) << '\n';
-    if (result == LocalFirewallResult::PermissionRequired)
-      std::cout << style::warning("Firewall rule is blocked.") << '\n';
-    else if (result == LocalFirewallResult::Unsupported)
-      std::cout << style::muted("Local firewall access is unsupported on this Host.") << '\n';
-    else
-      std::cout << style::muted("Local firewall access could not be confirmed.") << '\n';
+    print_local_firewall_reason(view.firewall);
     return 1;
   }
 
@@ -851,14 +1081,11 @@ namespace
       no_project("access");
       return 1;
     }
-    const auto access = project->second.access ? project->second.access
-                                               : (project->second.access_points.empty() ? std::nullopt : std::optional<AccessPoint>(project->second.access_points.front()));
-    if (!access)
-    {
-      std::cerr << "No access configured for: " << project->second.name << '\n';
-      return 1;
-    }
-    return print_firewall_access(network, firewall, project->second.name, project->first, *access);
+    return print_firewall_access(
+        network,
+        firewall,
+        Target{SoftwareId(""), project->second.name, std::nullopt,
+               project->first, project->second});
   }
 
   int print_named_access(
@@ -874,13 +1101,15 @@ namespace
       return 1;
     }
     const auto root = entry->process_spec().working_directory();
-    const auto access = entry->access_point();
-    if (!root || !access)
+    if (!root)
     {
       std::cerr << "No project Access configured for: " << name << '\n';
       return 1;
     }
-    return print_firewall_access(network, firewall, entry->name(), *root, *access);
+    return print_firewall_access(
+        network,
+        firewall,
+        Target{entry->id(), entry->name(), entry, *root, std::nullopt});
   }
 
   int change_project_access(
@@ -905,24 +1134,31 @@ namespace
       no_project("access " + action);
       return 1;
     }
-    const auto rule = project_firewall_rule(network, project->first, project->second);
+    const auto access = effective_access(project->second);
+    const auto rule = access
+                          ? local_firewall_rule(
+                                network,
+                                project->first,
+                                *access)
+                          : std::nullopt;
     if (!rule)
     {
       std::cerr << "A usable local network and Access are required.\n";
       return 1;
     }
     const auto result = action == "allow" ? firewall->allow(*rule) : firewall->deny(*rule);
-    if (result == LocalFirewallResult::PermissionRequired)
+    const auto firewall_status = local_firewall_status(result);
+    if (firewall_status == LocalAccessFirewallStatus::Blocked)
     {
       std::cerr << "Firewall authorization was cancelled or denied.\n";
       return 1;
     }
-    if (result == LocalFirewallResult::Unsupported)
+    if (firewall_status == LocalAccessFirewallStatus::Unsupported)
     {
       std::cerr << "Local firewall access is unsupported on this Host.\n";
       return 1;
     }
-    if (result != LocalFirewallResult::Open)
+    if (firewall_status != LocalAccessFirewallStatus::Allowed)
     {
       std::cerr << "Local firewall access could not be changed.\n";
       return 1;
@@ -932,8 +1168,6 @@ namespace
       std::cout << style::success("Local access denied.") << '\n';
       return 0;
     }
-    const auto access = project->second.access ? project->second.access
-                                               : std::optional<AccessPoint>(project->second.access_points.front());
     const auto ipv4 = network->network_capability().primary_ipv4;
     const auto url = access->protocol() == AccessProtocol::Https
                          ? AccessUrl::https(ipv4, access->port())
@@ -950,9 +1184,7 @@ namespace
       LocalFirewall *firewall = nullptr)
   {
     const auto configured =
-        target.config
-            ? target.config->access
-            : target.entry->access_point();
+        effective_access(target);
 
     if (!configured)
     {
@@ -1000,6 +1232,12 @@ namespace
       return false;
     }
 
+    const auto view = local_access_view(
+        target,
+        access,
+        network,
+        firewall);
+
     std::cout
         << style::field("Software:", target.name, access_field_width)
         << '\n'
@@ -1016,49 +1254,16 @@ namespace
 
     if (access->state == LocalAccessState::Available)
     {
-      if (firewall != nullptr)
+      if (!firewall_allows_local_access(view.firewall))
       {
-        auto root = target.root;
-        if (!root && entry->process_spec().working_directory())
-          root = std::filesystem::path(*entry->process_spec().working_directory());
-        const auto rule = root ? access_firewall_rule(network, *root, *configured)
-                               : std::nullopt;
-        const auto firewall_state = rule ? firewall->status(*rule)
-                                         : LocalFirewallResult::Failed;
-        if (firewall_state != LocalFirewallResult::Open &&
-            firewall_state != LocalFirewallResult::Disabled)
-        {
-          std::cout
-              << style::field(
-                     "Local access:",
-                     style::warning("unavailable"),
-                     access_field_width)
-              << '\n';
-          if (firewall_state == LocalFirewallResult::PermissionRequired)
-          {
-            std::cout
-                << style::warning("Firewall rule is blocked.")
-                << "\n\nRun:\n\n"
-                << "  "
-                << style::command("softadastra access allow")
-                << "\n";
-          }
-          else if (firewall_state == LocalFirewallResult::Unsupported)
-          {
-            std::cout
-                << style::muted(
-                       "Local firewall access is unsupported on this Host.")
-                << '\n';
-          }
-          else
-          {
-            std::cout
-                << style::muted(
-                       "Local firewall access could not be confirmed.")
-                << '\n';
-          }
-          return false;
-        }
+        std::cout
+            << style::field(
+                   "Local access:",
+                   style::warning("unavailable"),
+                   access_field_width)
+            << '\n';
+        print_local_firewall_reason(view.firewall);
+        return false;
       }
       std::cout
           << style::field(
@@ -1091,23 +1296,10 @@ namespace
                access_field_width)
         << '\n';
 
-    if (access->firewall == LocalAccessFirewallState::PermissionRequired)
+    if (!firewall_allows_local_access(view.firewall))
     {
-      std::cout << "\n"
-                << style::muted("Local firewall access has not been allowed.")
-                << '\n';
-    }
-    else if (access->firewall == LocalAccessFirewallState::Unsupported)
-    {
-      std::cout << "\n"
-                << style::muted("Local firewall access is unsupported on this Host.")
-                << '\n';
-    }
-    else if (access->firewall == LocalAccessFirewallState::Failed)
-    {
-      std::cout << "\n"
-                << style::muted("Local firewall access could not be confirmed.")
-                << '\n';
+      std::cout << '\n';
+      print_local_firewall_reason(view.firewall);
     }
 
     if (entry->state() == SoftwareState::Stopped)
@@ -1210,21 +1402,29 @@ namespace softadastra
           argc == 3 &&
           std::string(argv[2]) == "remove")
       {
-        std::cout
-            << "Usage:\n"
-            << "  softadastra remove [software-name]\n\n"
-            << "The project files and logs are not deleted.\n";
+        std::ostream &out = std::cout;
+
+        out << "Usage:\n";
+        out << "  softadastra remove [name]\n\n";
+
+        out << "Remove software from this Host.\n\n";
+
+        out << "The project files and logs are not deleted.\n";
       }
       else if (
           argc == 3 &&
           std::string(argv[2]) == "logs")
       {
-        std::cout
-            << "Usage:\n"
-            << "  softadastra logs [software-name] [--follow|--clear]\n\n"
-            << "Options:\n"
-            << "  -f, --follow    Follow new log output\n"
-            << "  --clear         Clear stored logs\n";
+        std::ostream &out = std::cout;
+
+        out << "Usage:\n";
+        out << "  softadastra logs [name] [options]\n\n";
+
+        out << "Show stored output for software.\n\n";
+
+        out << "Options:\n";
+        out << "  -f, --follow    Follow new log output\n";
+        out << "      --clear     Clear stored logs\n";
       }
       else if (argc == 3)
       {
@@ -1258,19 +1458,27 @@ namespace softadastra
 
       if (command == "remove")
       {
-        std::cout
-            << "Usage:\n"
-            << "  softadastra remove [software-name]\n\n"
-            << "The project files and logs are not deleted.\n";
+        std::ostream &out = std::cout;
+
+        out << "Usage:\n";
+        out << "  softadastra remove [name]\n\n";
+
+        out << "Remove software from this Host.\n\n";
+
+        out << "The project files and logs are not deleted.\n";
       }
       else if (command == "logs")
       {
-        std::cout
-            << "Usage:\n"
-            << "  softadastra logs [software-name] [--follow|--clear]\n\n"
-            << "Options:\n"
-            << "  -f, --follow    Follow new log output\n"
-            << "  --clear         Clear stored logs\n";
+        std::ostream &out = std::cout;
+
+        out << "Usage:\n";
+        out << "  softadastra logs [name] [options]\n\n";
+
+        out << "Show stored output for software.\n\n";
+
+        out << "Options:\n";
+        out << "  -f, --follow    Follow new log output\n";
+        out << "      --clear     Clear stored logs\n";
       }
       else
       {
@@ -2059,7 +2267,7 @@ namespace softadastra
                 shell_process(
                     config->second.command,
                     config->first.string()),
-                config->second.access,
+                effective_access(config->second),
                 std::nullopt,
                 config->second.name))
         {
@@ -2219,9 +2427,7 @@ namespace softadastra
           << style::field(
                  "Access:",
                  access_name(
-                     target->config
-                         ? target->config->access
-                         : entry.access_point()),
+                     effective_access(*target)),
                  software_info_field_width)
           << '\n'
           << style::field(
@@ -2317,11 +2523,7 @@ namespace softadastra
           << '\n';
 
       if (command == "run" &&
-          (target->config
-               ? target->config->access.has_value()
-               : target->entry
-                     ->access_point()
-                     .has_value()))
+          effective_access(*target).has_value())
       {
         static_cast<void>(
             print_access(

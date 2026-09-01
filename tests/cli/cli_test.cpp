@@ -125,6 +125,11 @@ namespace
     {
       last_rule = rule;
       ++allow_calls;
+      if (stateful &&
+          allow_result == softadastra::LocalFirewallResult::Open)
+      {
+        status_result = softadastra::LocalFirewallResult::Open;
+      }
       return allow_result;
     }
     void release(const softadastra::LocalFirewallRule &) noexcept override {}
@@ -133,6 +138,12 @@ namespace
     {
       last_rule = rule;
       ++deny_calls;
+      if (stateful &&
+          deny_result == softadastra::LocalFirewallResult::Open)
+      {
+        status_result =
+            softadastra::LocalFirewallResult::PermissionRequired;
+      }
       return deny_result;
     }
     softadastra::LocalFirewallResult ensure_result{softadastra::LocalFirewallResult::Open};
@@ -140,6 +151,7 @@ namespace
     softadastra::LocalFirewallResult allow_result{softadastra::LocalFirewallResult::Open};
     softadastra::LocalFirewallResult deny_result{softadastra::LocalFirewallResult::Open};
     softadastra::LocalFirewallRule last_rule;
+    bool stateful{false};
     int ensure_calls{0};
     int status_calls{0};
     int allow_calls{0};
@@ -1064,6 +1076,166 @@ namespace
     EXPECT_EQ(platform.firewall_.deny_calls, 0);
     ASSERT_EQ(client.software().size(), 1U);
     EXPECT_EQ(client.software().front().state(), softadastra::SoftwareState::Running);
+    std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, DenyingLocalAccessMakesTheNextRunReportBlocked)
+  {
+    const auto root = std::filesystem::temp_directory_path() /
+                      "softadastra-run-after-deny-firewall";
+    std::filesystem::create_directories(root);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        root, {"app", "sleep 30",
+               softadastra::AccessPoint::create(
+                   softadastra::AccessProtocol::Http, 8087), {}}));
+    Platform platform;
+    platform.network_.capability.local_subnet = "192.168.1.0/24";
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    Firewall firewall;
+    firewall.stateful = true;
+    softadastra::Cli cli(
+        client, platform.network_, platform.managed_network_, firewall);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const char *allow[] = {"softadastra", "access", "allow"};
+    const char *deny[] = {"softadastra", "access", "deny"};
+    const char *run[] = {"softadastra", "run"};
+
+    EXPECT_EQ(cli.run(3, allow), 0);
+    EXPECT_EQ(cli.run(3, deny), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, run), 0);
+    const auto output = testing::internal::GetCapturedStdout();
+    std::filesystem::current_path(previous);
+
+    EXPECT_NE(output.find("Local access:  unavailable"), std::string::npos);
+    EXPECT_NE(output.find("Firewall rule is blocked."), std::string::npos);
+    EXPECT_NE(output.find("softadastra access allow"), std::string::npos);
+    EXPECT_EQ(output.find("unsupported"), std::string::npos);
+    EXPECT_EQ(firewall.status_result,
+              softadastra::LocalFirewallResult::PermissionRequired);
+    std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, AccessAndRunShareBlockedFirewallInterpretation)
+  {
+    const auto root = std::filesystem::temp_directory_path() /
+                      "softadastra-access-run-blocked-firewall";
+    std::filesystem::create_directories(root);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        root, {"app", "sleep 30",
+               softadastra::AccessPoint::create(
+                   softadastra::AccessProtocol::Http, 8088), {}}));
+    Platform platform;
+    platform.network_.capability.local_subnet = "192.168.1.0/24";
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    Firewall firewall;
+    firewall.status_result = softadastra::LocalFirewallResult::PermissionRequired;
+    softadastra::Cli cli(
+        client, platform.network_, platform.managed_network_, firewall);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const char *access[] = {"softadastra", "access"};
+    const char *run[] = {"softadastra", "run"};
+
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, access), 1);
+    const auto access_output = testing::internal::GetCapturedStdout();
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, run), 0);
+    const auto run_output = testing::internal::GetCapturedStdout();
+    std::filesystem::current_path(previous);
+
+    for (const auto *output : {&access_output, &run_output})
+    {
+      EXPECT_NE(output->find("Firewall rule is blocked."), std::string::npos);
+      EXPECT_NE(output->find("softadastra access allow"), std::string::npos);
+      EXPECT_EQ(output->find("unsupported"), std::string::npos);
+    }
+    std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, DistinguishesUnsupportedAndFailedFirewallStatus)
+  {
+    const auto root = std::filesystem::temp_directory_path() /
+                      "softadastra-firewall-status-distinction";
+    std::filesystem::create_directories(root);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        root, {"app", "sleep 30",
+               softadastra::AccessPoint::create(
+                   softadastra::AccessProtocol::Http, 8089), {}}));
+    Platform platform;
+    platform.network_.capability.local_subnet = "192.168.1.0/24";
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    Firewall firewall;
+    softadastra::Cli cli(
+        client, platform.network_, platform.managed_network_, firewall);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const char *access[] = {"softadastra", "access"};
+
+    firewall.status_result = softadastra::LocalFirewallResult::Unsupported;
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, access), 1);
+    const auto unsupported = testing::internal::GetCapturedStdout();
+    firewall.status_result = softadastra::LocalFirewallResult::Failed;
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, access), 1);
+    const auto failed = testing::internal::GetCapturedStdout();
+    std::filesystem::current_path(previous);
+
+    EXPECT_NE(unsupported.find("unsupported on this Host"), std::string::npos);
+    EXPECT_EQ(unsupported.find("could not be confirmed"), std::string::npos);
+    EXPECT_NE(failed.find("could not be confirmed"), std::string::npos);
+    EXPECT_EQ(failed.find("unsupported on this Host"), std::string::npos);
+    std::filesystem::remove_all(root);
+  }
+
+  TEST(CliTest, UsesFirstAccessPointWhenProjectHasNoLegacyAccess)
+  {
+    const auto root = std::filesystem::temp_directory_path() /
+                      "softadastra-access-points-only";
+    std::filesystem::create_directories(root);
+    const auto point = softadastra::AccessPoint::create(
+        softadastra::AccessProtocol::Http, 8091);
+    ASSERT_TRUE(point.has_value());
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        root, {"app", "sleep 30", std::nullopt, {*point}}));
+    Platform platform;
+    platform.network_.capability.local_subnet = "192.168.1.0/24";
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    softadastra::Cli cli(
+        client, platform.network_, platform.managed_network_, platform.firewall_);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const char *run[] = {"softadastra", "run"};
+    const char *info[] = {"softadastra", "info"};
+    const char *access[] = {"softadastra", "access"};
+
+    EXPECT_EQ(cli.run(2, run), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, info), 0);
+    const auto info_output = testing::internal::GetCapturedStdout();
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, access), 0);
+    const auto access_output = testing::internal::GetCapturedStdout();
+    std::filesystem::current_path(previous);
+
+    EXPECT_NE(info_output.find("http:8091"), std::string::npos);
+    EXPECT_NE(access_output.find("http:8091"), std::string::npos);
+    EXPECT_EQ(access_output.find("No access configured"), std::string::npos);
     std::filesystem::remove_all(root);
   }
 }

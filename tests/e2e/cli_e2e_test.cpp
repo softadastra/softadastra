@@ -307,7 +307,8 @@ namespace
     ASSERT_NE(run("stop missing"), 0);
     EXPECT_NE(last_output_.find("Software not found: missing"), std::string::npos);
     ASSERT_NE(run("run extra arguments"), 0);
-    EXPECT_NE(last_output_.find("Usage: softadastra run [name]"), std::string::npos);
+    EXPECT_NE(last_output_.find("Usage:"), std::string::npos);
+    EXPECT_NE(last_output_.find("softadastra run [name]"), std::string::npos);
   }
 
   TEST_F(CliE2eTest, RejectsDifferentProjectsWithTheSameName)
