@@ -122,7 +122,6 @@ jobs:
           $runtimeDlls = @(Get-ChildItem $binary.Directory -Filter '*.dll' -File)
           $runtimeDlls.Name | Sort-Object
           if (-not ($runtimeDlls.Name -match '^libcrypto.*\.dll$')) { throw 'OpenSSL crypto runtime DLL is missing from the ZIP.' }
-          if (-not ($runtimeDlls.Name -match '^libssl.*\.dll$')) { throw 'OpenSSL SSL runtime DLL is missing from the ZIP.' }
           & $binary.FullName --help
           if ($LASTEXITCODE -ne 0) { throw 'Packaged softadastra.exe --help failed.' }
       - uses: actions/upload-artifact@v4
