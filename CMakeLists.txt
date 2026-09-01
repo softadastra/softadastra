@@ -310,6 +310,14 @@ if(WIN32)
       POST_EXCLUDE_REGEXES ".*/[Ss]ystem32/.*"
     RUNTIME DESTINATION bin
   )
+  # OpenSSL::SSL and OpenSSL::Crypto are imported DLL targets on the Windows
+  # vcpkg triplet. Install their runtime artifacts through the targets rather
+  # than relying solely on recursive dependency discovery, which may omit an
+  # imported runtime DLL. CMake resolves the actual versioned DLL names.
+  install(
+    IMPORTED_RUNTIME_ARTIFACTS OpenSSL::SSL OpenSSL::Crypto
+    RUNTIME DESTINATION bin
+  )
 endif()
 
 set(CPACK_PACKAGE_NAME "Softadastra")
