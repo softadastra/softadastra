@@ -51,6 +51,69 @@ namespace
     std::filesystem::remove_all(directory);
   }
 
+  TEST(HostStateFileTest, AtomicallyReplacesExistingState)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-state-replace-" + std::to_string(
+                               std::chrono::steady_clock::now()
+                                   .time_since_epoch()
+                                   .count()));
+    const auto path = directory / "host-state";
+    softadastra::HostState original;
+    ASSERT_TRUE(original.add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("original"),
+        softadastra::ProcessSpec("original"))));
+    softadastra::HostState replacement;
+    ASSERT_TRUE(replacement.add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("replacement"),
+        softadastra::ProcessSpec("replacement"))));
+
+    const softadastra::HostStateFile file(path);
+    ASSERT_TRUE(file.save(original));
+    ASSERT_TRUE(file.save(replacement));
+
+    softadastra::HostState restored;
+    ASSERT_TRUE(file.load(restored));
+    EXPECT_EQ(restored.software_count(), 1U);
+    EXPECT_NE(restored.find_software(softadastra::SoftwareId("replacement")),
+              nullptr);
+    EXPECT_EQ(restored.find_software(softadastra::SoftwareId("original")),
+              nullptr);
+    std::filesystem::remove_all(directory);
+  }
+
+  TEST(HostStateFileTest, KeepsExistingStateWhenTemporaryWriteFails)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-state-temporary-failure-" +
+                            std::to_string(
+                                std::chrono::steady_clock::now()
+                                    .time_since_epoch()
+                                    .count()));
+    const auto path = directory / "host-state";
+    softadastra::HostState original;
+    ASSERT_TRUE(original.add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("original"),
+        softadastra::ProcessSpec("original"))));
+    softadastra::HostState replacement;
+    ASSERT_TRUE(replacement.add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("replacement"),
+        softadastra::ProcessSpec("replacement"))));
+
+    const softadastra::HostStateFile file(path);
+    ASSERT_TRUE(file.save(original));
+    ASSERT_TRUE(std::filesystem::create_directory(path.string() + ".tmp"));
+    EXPECT_FALSE(file.save(replacement));
+
+    softadastra::HostState restored;
+    ASSERT_TRUE(file.load(restored));
+    EXPECT_NE(restored.find_software(softadastra::SoftwareId("original")),
+              nullptr);
+    EXPECT_EQ(restored.find_software(softadastra::SoftwareId("replacement")),
+              nullptr);
+    std::filesystem::remove_all(directory);
+  }
+
   TEST(HostStateFileTest, RoundTripsModernNameInVersionSix)
   {
     const auto path = std::filesystem::temp_directory_path() / ("softadastra-name-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())) / "host-state";
@@ -158,6 +221,45 @@ namespace
     EXPECT_TRUE(restored.find_software(softadastra::SoftwareId("example"))
                     ->desired_running());
     std::filesystem::remove_all(path.parent_path());
+  }
+
+  TEST(HostStateFileTest, RestoresVersionSevenStateWithoutDesiredRunning)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-state-v7-" + std::to_string(
+                               std::chrono::steady_clock::now()
+                                   .time_since_epoch()
+                                   .count()));
+    const auto path = directory / "host-state";
+    softadastra::HostState source;
+    ASSERT_TRUE(source.add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("legacy"),
+        softadastra::ProcessSpec("app"))));
+    source.find_software(softadastra::SoftwareId("legacy"))
+        ->set_desired_running(true);
+    const softadastra::HostStateFile file(path);
+    ASSERT_TRUE(file.save(source));
+
+    std::ifstream input(path, std::ios::binary);
+    std::string legacy(
+        (std::istreambuf_iterator<char>(input)),
+        std::istreambuf_iterator<char>());
+    input.close();
+    legacy.replace(
+        0,
+        std::string("softadastra-registrations 8\n").size(),
+        "softadastra-registrations 7\n");
+    legacy.erase(legacy.size() - 2U);
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output << legacy;
+    output.close();
+
+    softadastra::HostState restored;
+    ASSERT_TRUE(file.load(restored));
+    const auto *entry = restored.find_software(softadastra::SoftwareId("legacy"));
+    ASSERT_NE(entry, nullptr);
+    EXPECT_FALSE(entry->desired_running());
+    std::filesystem::remove_all(directory);
   }
 
   TEST(HostStateFileTest, RejectsCorruptStateWithoutChangingHostState)
