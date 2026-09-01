@@ -583,6 +583,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   )
 
   softadastra_add_test(
+    softadastra_project_config_test
+    tests/software/project_config_test.cpp
+  )
+
+  softadastra_add_test(
     softadastra_software_manager_test
     tests/software/software_manager_test.cpp
   )

@@ -14,6 +14,7 @@
 
 #include "software/ProjectConfig.hpp"
 
+#include <charconv>
 #include <fstream>
 
 namespace softadastra
@@ -83,6 +84,48 @@ namespace softadastra
       return result + '"';
     }
 
+    std::optional<std::uint16_t> port_value(
+        const std::string &value) noexcept
+    {
+      if (value.empty())
+      {
+        return std::nullopt;
+      }
+
+      unsigned int number{};
+      const auto [end, error] =
+          std::from_chars(
+              value.data(),
+              value.data() + value.size(),
+              number);
+
+      if (error != std::errc{} ||
+          end != value.data() + value.size() ||
+          number == 0 ||
+          number > 65535)
+      {
+        return std::nullopt;
+      }
+
+      return static_cast<std::uint16_t>(number);
+    }
+
+    std::optional<std::uint16_t> access_port_value(
+        const std::string &line)
+    {
+      if (!line.starts_with("port = "))
+      {
+        return std::nullopt;
+      }
+
+      if (const auto quoted = string_value(line, "port"))
+      {
+        return port_value(*quoted);
+      }
+
+      return port_value(line.substr(7));
+    }
+
   } // namespace
 
   std::optional<std::pair<std::filesystem::path, ProjectConfig>>
@@ -114,7 +157,7 @@ namespace softadastra
         bool in_access = false;
 
         std::optional<std::string> endpoint_protocol;
-        std::optional<std::string> endpoint_port;
+        std::optional<std::uint16_t> endpoint_port;
 
         const auto finish_access = [&]() -> bool
         {
@@ -128,26 +171,7 @@ namespace softadastra
                   ? AccessPoint::protocol(*endpoint_protocol)
                   : std::nullopt;
 
-          std::optional<std::uint16_t> port;
-
-          try
-          {
-            const auto number =
-                endpoint_port
-                    ? std::stoi(*endpoint_port)
-                    : 0;
-
-            if (number > 0 && number <= 65535)
-            {
-              port =
-                  static_cast<std::uint16_t>(number);
-            }
-          }
-          catch (...)
-          {
-          }
-
-          if (!protocol || !port)
+          if (!protocol || !endpoint_port)
           {
             return false;
           }
@@ -155,7 +179,7 @@ namespace softadastra
           const auto point =
               AccessPoint::create(
                   *protocol,
-                  *port);
+                  *endpoint_port);
 
           if (!point)
           {
@@ -173,6 +197,18 @@ namespace softadastra
         {
           if (line == "[[access]]")
           {
+            if (access)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid softadastra.toml: " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
+
             if (!finish_access())
             {
               if (error)
@@ -190,36 +226,119 @@ namespace softadastra
             endpoint_port.reset();
           }
           else if (in_access &&
-                   string_value(line, "protocol"))
+                   line.starts_with("protocol = "))
           {
-            endpoint_protocol =
-                string_value(line, "protocol");
+            if (endpoint_protocol)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid access in " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
+
+            endpoint_protocol = string_value(line, "protocol");
+
+            if (!endpoint_protocol)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid access in " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
           }
           else if (in_access &&
-                   string_value(line, "port"))
+                   line.starts_with("port = "))
           {
-            endpoint_port =
-                string_value(line, "port");
+            if (endpoint_port)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid access in " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
+
+            endpoint_port = access_port_value(line);
+
+            if (!endpoint_port)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid access in " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
           }
-          else if (string_value(line, "id"))
+          else if (!in_access &&
+                   string_value(line, "id"))
           {
             // Accept legacy project files, but keep this user-owned field
             // out of Host identity decisions.
           }
-          else if (const auto name_text =
-                       string_value(line, "name"))
+          else if (!in_access &&
+                   string_value(line, "name"))
           {
-            name = name_text;
+            if (name)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid softadastra.toml: " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
+
+            name = string_value(line, "name");
           }
-          else if (const auto command_text =
-                       string_value(line, "command"))
+          else if (!in_access &&
+                   string_value(line, "command"))
           {
-            command = command_text;
+            if (command)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid softadastra.toml: " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
+
+            command = string_value(line, "command");
           }
-          else if (const auto access_text =
-                       string_value(line, "access"))
+          else if (!in_access &&
+                   string_value(line, "access"))
           {
-            access = access_text;
+            if (access)
+            {
+              if (error)
+              {
+                *error =
+                    "invalid softadastra.toml: " +
+                    path.string();
+              }
+
+              return std::nullopt;
+            }
+
+            access = string_value(line, "access");
           }
           else if (!line.empty() &&
                    line[0] != '#')
@@ -274,25 +393,10 @@ namespace softadastra
                   : AccessPoint::protocol(
                         access->substr(0, colon));
 
-          std::optional<std::uint16_t> port;
-
-          try
-          {
-            const auto number =
-                colon == std::string::npos
-                    ? -1
-                    : std::stoi(
-                          access->substr(colon + 1));
-
-            if (number > 0 && number <= 65535)
-            {
-              port =
-                  static_cast<std::uint16_t>(number);
-            }
-          }
-          catch (...)
-          {
-          }
+          const auto port =
+              colon == std::string::npos
+                  ? std::optional<std::uint16_t>{}
+                  : port_value(access->substr(colon + 1));
 
           if (!protocol.has_value() ||
               !port.has_value() ||
@@ -412,10 +516,9 @@ namespace softadastra
                  std::string(
                      AccessPoint::name(
                          point.protocol())))
-          << "\nport = "
-          << quote(
-                 std::to_string(
-                     point.port()))
+        << "\nport = "
+          << std::to_string(
+                 point.port())
           << "\n";
     }
 
