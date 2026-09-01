@@ -47,6 +47,8 @@ namespace softadastra
       return false;
     }
 
+    host_service_.restore_desired_software();
+
     if (profile_store_ != nullptr &&
         profile_store_->profile() == HostProfile::Box)
     {

@@ -94,8 +94,8 @@ namespace
         std::istreambuf_iterator<char>());
 
     EXPECT_EQ(content,
-              "softadastra-registrations 7\n1\n7\nexample\n0\n\n0\n16\n/usr/bin/example\n"
-              "0\n0\n2\n6\n--port\n4\n8080\n0\n\n");
+              "softadastra-registrations 8\n1\n7\nexample\n0\n\n0\n16\n/usr/bin/example\n"
+              "0\n0\n2\n6\n--port\n4\n8080\n0\n\n0\n");
     EXPECT_EQ(content.find(database.string()), std::string::npos);
     EXPECT_EQ(content.find("business-data-must-not-be-persisted"), std::string::npos);
     EXPECT_EQ(content.find(output.string()), std::string::npos);
@@ -134,8 +134,30 @@ namespace
     ASSERT_NE(second, nullptr);
     EXPECT_EQ(first->state(), softadastra::SoftwareState::Stopped);
     EXPECT_EQ(second->state(), softadastra::SoftwareState::Stopped);
+    EXPECT_FALSE(first->desired_running());
+    EXPECT_FALSE(second->desired_running());
     EXPECT_EQ(second->process_spec().arguments().at(1), "words");
     std::filesystem::remove_all(directory);
+  }
+
+  TEST(HostStateFileTest, PersistsDesiredRunning)
+  {
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("softadastra-desired-" + std::to_string(
+                          std::chrono::steady_clock::now().time_since_epoch().count())) /
+                      "host-state";
+    softadastra::HostState source;
+    ASSERT_TRUE(source.add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("example"), softadastra::ProcessSpec("app"))));
+    source.find_software(softadastra::SoftwareId("example"))
+        ->set_desired_running(true);
+    ASSERT_TRUE(softadastra::HostStateFile(path).save(source));
+
+    softadastra::HostState restored;
+    ASSERT_TRUE(softadastra::HostStateFile(path).load(restored));
+    EXPECT_TRUE(restored.find_software(softadastra::SoftwareId("example"))
+                    ->desired_running());
+    std::filesystem::remove_all(path.parent_path());
   }
 
   TEST(HostStateFileTest, RejectsCorruptStateWithoutChangingHostState)

@@ -105,11 +105,28 @@ namespace
     const std::vector<softadastra::SoftwareEntry> entries{softadastra::SoftwareEntry(
         softadastra::SoftwareId("legacy"), softadastra::ProcessSpec("app"), std::nullopt, access, "app", "Legacy")};
     auto serialized = softadastra::SoftwareRegistrationFormat::serialize(entries);
-    serialized.replace(0, std::string("softadastra-registrations 7\n").size(), "softadastra-registrations 6\n");
+    serialized.replace(0, std::string("softadastra-registrations 8\n").size(), "softadastra-registrations 6\n");
+    serialized.erase(serialized.size() - 2U);
     const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(serialized);
     ASSERT_TRUE(restored);
     ASSERT_EQ(restored->front().access_points().size(), 1U);
     EXPECT_EQ(restored->front().access_points().front().port(), 8080);
+    EXPECT_FALSE(restored->front().desired_running());
+  }
+
+  TEST(SoftwareRegistrationFormatTest, ReadsVersionSevenWithoutDesiredRunning)
+  {
+    const std::vector<softadastra::SoftwareEntry> entries{
+        softadastra::SoftwareEntry(
+            softadastra::SoftwareId("legacy"),
+            softadastra::ProcessSpec("app"))};
+    auto serialized = softadastra::SoftwareRegistrationFormat::serialize(entries);
+    serialized.replace(0, std::string("softadastra-registrations 8\n").size(), "softadastra-registrations 7\n");
+    serialized.erase(serialized.size() - 2U);
+
+    const auto restored = softadastra::SoftwareRegistrationFormat::deserialize(serialized);
+    ASSERT_TRUE(restored);
+    EXPECT_FALSE(restored->front().desired_running());
   }
 
   TEST(SoftwareRegistrationFormatTest, RejectsInvalidInput)

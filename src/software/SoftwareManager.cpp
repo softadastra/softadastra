@@ -266,6 +266,7 @@ namespace softadastra
     {
       if (existing->process->is_running())
       {
+        entry->set_desired_running(true);
         return SoftwareOperationError::AlreadyRunning;
       }
 
@@ -352,6 +353,7 @@ namespace softadastra
     entry->set_state(SoftwareState::Running);
     entry->set_pid(
         processes_.back().process->pid());
+    entry->set_desired_running(true);
 
     return {};
   }
@@ -372,6 +374,7 @@ namespace softadastra
 
     if (managed == nullptr)
     {
+      entry->set_desired_running(false);
       return SoftwareOperationError::NotRunning;
     }
 
@@ -400,6 +403,7 @@ namespace softadastra
     entry->set_state(SoftwareState::Stopped);
     entry->set_pid(std::nullopt);
     entry->clear_result();
+    entry->set_desired_running(false);
 
     return {};
   }

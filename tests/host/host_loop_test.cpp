@@ -151,6 +151,32 @@ namespace
     std::vector<std::shared_ptr<ShutdownProcessState>> states_;
   };
 
+  class RestorationProcessLauncher final : public softadastra::ProcessLauncher
+  {
+  public:
+    [[nodiscard]] softadastra::ProcessLaunchResult launch(
+        const softadastra::ProcessSpec &spec) override
+    {
+      launched_.push_back(spec.executable());
+
+      if (spec.executable() == "failing")
+      {
+        return softadastra::ProcessLaunchError::LaunchFailed;
+      }
+
+      return std::make_unique<ShutdownProcess>(
+          std::make_shared<ShutdownProcessState>());
+    }
+
+    [[nodiscard]] const std::vector<std::string> &launched() const noexcept
+    {
+      return launched_;
+    }
+
+  private:
+    std::vector<std::string> launched_;
+  };
+
   class TestNetwork final : public softadastra::Network
   {
   public:
@@ -432,6 +458,59 @@ namespace
     std::filesystem::remove_all(directory);
   }
 
+  TEST(HostLoopTest, RestoresOnlyDesiredSoftwareAndContinuesAfterFailure)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           "softadastra-host-loop-desired-restore";
+    const auto path = directory / "host-state";
+    std::filesystem::remove_all(directory);
+
+    softadastra::NativePlatform source_platform;
+    softadastra::Host source(source_platform);
+    ASSERT_TRUE(source.state().add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("restore"),
+        softadastra::ProcessSpec("restore"))));
+    ASSERT_TRUE(source.state().add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("stopped"),
+        softadastra::ProcessSpec("stopped"))));
+    ASSERT_TRUE(source.state().add_software(softadastra::SoftwareEntry(
+        softadastra::SoftwareId("failing"),
+        softadastra::ProcessSpec("failing"))));
+    source.state().find_software(softadastra::SoftwareId("restore"))
+        ->set_desired_running(true);
+    source.state().find_software(softadastra::SoftwareId("failing"))
+        ->set_desired_running(true);
+    ASSERT_TRUE(softadastra::HostStateFile(path).save(source.state()));
+
+    softadastra::NativePlatform platform;
+    softadastra::Host host(platform);
+    RestorationProcessLauncher launcher;
+    softadastra::HostService service(host, launcher);
+    softadastra::HostStateFile state_file(path);
+    softadastra::HostLoop loop(
+        service,
+        state_file,
+        std::chrono::milliseconds(1));
+    std::atomic_bool completed{false};
+    std::thread thread([&loop, &completed]()
+                       { completed = loop.run(); });
+
+    EXPECT_TRUE(wait_until([&loop]()
+                           { return loop.is_running(); }));
+    EXPECT_EQ(launcher.launched().size(), 2U);
+    EXPECT_EQ(service.software_state(softadastra::SoftwareId("restore")),
+              softadastra::SoftwareState::Running);
+    EXPECT_EQ(service.software_state(softadastra::SoftwareId("stopped")),
+              softadastra::SoftwareState::Stopped);
+    EXPECT_EQ(service.software_state(softadastra::SoftwareId("failing")),
+              softadastra::SoftwareState::Failed);
+
+    loop.request_stop();
+    thread.join();
+    EXPECT_TRUE(completed);
+    std::filesystem::remove_all(directory);
+  }
+
   TEST(HostLoopTest, StopsManagedSoftwareAndPersistsRegistrations)
   {
     const auto directory = std::filesystem::temp_directory_path() /
@@ -468,9 +547,11 @@ namespace
     const auto state = service.software_state(id);
     ASSERT_TRUE(state.has_value());
     EXPECT_EQ(state.value(), softadastra::SoftwareState::Stopped);
+    EXPECT_TRUE(host.state().find_software(id)->desired_running());
     softadastra::HostState restored;
     EXPECT_TRUE(softadastra::HostStateFile(path).load(restored));
-    EXPECT_NE(restored.find_software(id), nullptr);
+    ASSERT_NE(restored.find_software(id), nullptr);
+    EXPECT_TRUE(restored.find_software(id)->desired_running());
     std::filesystem::remove_all(directory);
   }
 

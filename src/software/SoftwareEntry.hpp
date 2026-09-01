@@ -335,6 +335,22 @@ namespace softadastra
       result_.reset();
     }
 
+    /**
+     * @brief Returns whether the software should be restored when the Host starts.
+     */
+    [[nodiscard]] bool desired_running() const noexcept
+    {
+      return desired_running_;
+    }
+
+    /**
+     * @brief Updates the persistent intent to run this software.
+     */
+    void set_desired_running(bool value) noexcept
+    {
+      desired_running_ = value;
+    }
+
   private:
     SoftwareId id_;
     std::string name_;
@@ -345,6 +361,7 @@ namespace softadastra
     std::optional<long> pid_;
     SoftwareState state_{SoftwareState::Stopped};
     std::optional<SoftwareOperationResult> result_;
+    bool desired_running_{false};
   };
 
 } // namespace softadastra

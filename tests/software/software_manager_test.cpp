@@ -217,6 +217,7 @@ namespace
     EXPECT_EQ(
         manager.state(id).value(),
         softadastra::SoftwareState::Running);
+    EXPECT_TRUE(host_state.find_software(id)->desired_running());
   }
 
   TEST(SoftwareManagerTest, RejectsSecondStartWhileSoftwareIsRunning)
@@ -325,6 +326,7 @@ namespace
     EXPECT_EQ(
         manager.state(id).value(),
         softadastra::SoftwareState::Stopped);
+    EXPECT_FALSE(host_state.find_software(id)->desired_running());
   }
 
   TEST(SoftwareManagerTest, MarksSoftwareFailedWhenStopFails)

@@ -252,6 +252,14 @@ namespace softadastra
         const SoftwareId &id);
 
     /**
+     * @brief Restores software that was persistently requested to run.
+     *
+     * A failed restoration does not prevent other registrations from being
+     * restored.
+     */
+    void restore_desired_software();
+
+    /**
      * @brief Stops every process and managed network owned by the Host.
      *
      * @return true when shutdown completes successfully, otherwise false.

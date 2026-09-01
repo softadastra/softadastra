@@ -27,6 +27,7 @@ namespace softadastra
     constexpr const char *header_v5 = "softadastra-registrations 5\n";
     constexpr const char *header_v6 = "softadastra-registrations 6\n";
     constexpr const char *header_v7 = "softadastra-registrations 7\n";
+    constexpr const char *header_v8 = "softadastra-registrations 8\n";
 
     void append_string(
         std::string &output,
@@ -121,7 +122,7 @@ namespace softadastra
   std::string SoftwareRegistrationFormat::serialize(
       const std::vector<SoftwareEntry> &entries)
   {
-    std::string output(header_v7);
+    std::string output(header_v8);
 
     output += std::to_string(entries.size());
     output += '\n';
@@ -193,6 +194,8 @@ namespace softadastra
       append_string(
           output,
           entry.declared_command());
+
+      output += entry.desired_running() ? "1\n" : "0\n";
     }
 
     return output;
@@ -202,6 +205,9 @@ namespace softadastra
   SoftwareRegistrationFormat::deserialize(
       const std::string &text)
   {
+    const bool version_eight =
+        text.starts_with(header_v8);
+
     const bool version_seven =
         text.starts_with(header_v7);
 
@@ -220,7 +226,8 @@ namespace softadastra
     const bool version_two =
         text.starts_with(header_v2);
 
-    if (!version_seven &&
+    if (!version_eight &&
+        !version_seven &&
         !version_six &&
         !version_five &&
         !version_four &&
@@ -231,21 +238,25 @@ namespace softadastra
       return std::nullopt;
     }
 
-    std::size_t offset =
-        std::char_traits<char>::length(
-            version_seven
-                ? header_v7
-                : (version_six
-                       ? header_v6
-                       : (version_five
+    const char *header =
+        version_eight
+            ? header_v8
+            : version_seven
+                  ? header_v7
+                  : version_six
+                        ? header_v6
+                        : version_five
                               ? header_v5
-                              : (version_four
-                                     ? header_v4
-                                     : (version_three
-                                            ? header_v3
-                                            : (version_two
-                                                   ? header_v2
-                                                   : header_v1))))));
+                              : version_four
+                                    ? header_v4
+                                    : version_three
+                                          ? header_v3
+                                          : version_two
+                                                ? header_v2
+                                                : header_v1;
+
+    std::size_t offset =
+        std::char_traits<char>::length(header);
 
     const auto count =
         read_count(text, offset);
@@ -275,7 +286,7 @@ namespace softadastra
 
       // Empty is an explicit compatibility value for an entry loaded from an
       // older registry with no reliable human name. It is never synthesized.
-      if (version_six || version_seven)
+      if (version_six || version_seven || version_eight)
       {
         const auto value =
             read_string(text, offset);
@@ -293,7 +304,8 @@ namespace softadastra
       if (version_four ||
           version_five ||
           version_six ||
-          version_seven)
+          version_seven ||
+          version_eight)
       {
         const auto configured =
             read_count(text, offset);
@@ -329,7 +341,8 @@ namespace softadastra
           version_four ||
           version_five ||
           version_six ||
-          version_seven)
+          version_seven ||
+          version_eight)
       {
         const auto configured =
             read_count(text, offset);
@@ -359,7 +372,8 @@ namespace softadastra
           version_four ||
           version_five ||
           version_six ||
-          version_seven)
+          version_seven ||
+          version_eight)
       {
         const auto configured =
             read_count(text, offset);
@@ -370,6 +384,7 @@ namespace softadastra
         }
 
         if (!version_seven &&
+            !version_eight &&
             configured.value() > 1)
         {
           return std::nullopt;
@@ -456,7 +471,8 @@ namespace softadastra
 
       if (version_five ||
           version_six ||
-          version_seven)
+          version_seven ||
+          version_eight)
       {
         const auto value =
             read_string(text, offset);
@@ -469,6 +485,21 @@ namespace softadastra
         declared = value.value();
       }
 
+      bool desired_running = false;
+
+      if (version_eight)
+      {
+        const auto value = read_count(text, offset);
+
+        if (!value.has_value() ||
+            value.value() > 1)
+        {
+          return std::nullopt;
+        }
+
+        desired_running = value.value() == 1;
+      }
+
       entries.emplace_back(
           SoftwareId(id.value()),
           ProcessSpec(
@@ -479,6 +510,8 @@ namespace softadastra
           std::move(access_points),
           std::move(declared),
           std::move(name));
+
+      entries.back().set_desired_running(desired_running);
 
       for (std::size_t previous = 0;
            previous + 1 < entries.size();

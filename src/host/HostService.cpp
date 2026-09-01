@@ -187,6 +187,19 @@ namespace softadastra
     return software_manager_.restart(id);
   }
 
+  void HostService::restore_desired_software()
+  {
+    for (const auto &entry : software_manager_.software())
+    {
+      if (entry.desired_running())
+      {
+        static_cast<void>(
+            software_manager_.start(
+                entry.id()));
+      }
+    }
+  }
+
   bool HostService::shutdown()
   {
     const bool stopped =
