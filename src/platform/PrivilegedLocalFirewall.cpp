@@ -1,4 +1,5 @@
 #include "platform/PrivilegedLocalFirewall.hpp"
+#include "platform/InstallPaths.hpp"
 #if defined(__linux__)
 #include <array>
 #include <cerrno>
@@ -34,13 +35,13 @@ return status(r);
 }
 #if defined(__linux__)
 LocalFirewallResult PrivilegedLocalFirewall::status(const LocalFirewallRule&r) {
-auto x=runner_.run("pkexec",{"/usr/libexec/softadastra-firewall-status",std::to_string(r.port),r.subnet,r.owner}); if(x.output=="allowed\n"||x.output=="disabled\n")return LocalFirewallResult::Open; if(x.output=="unsupported\n")return LocalFirewallResult::Unsupported; return x.output=="blocked\n"?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
+auto x=runner_.run("pkexec",{install_paths::firewall_status_helper,std::to_string(r.port),r.subnet,r.owner}); if(x.output=="allowed\n"||x.output=="disabled\n")return LocalFirewallResult::Open; if(x.output=="unsupported\n")return LocalFirewallResult::Unsupported; return x.output=="blocked\n"?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
 }
 LocalFirewallResult PrivilegedLocalFirewall::allow(const LocalFirewallRule&r) {
-auto x=runner_.run("pkexec",{"/usr/libexec/softadastra-firewall-modify","allow-local-tcp",std::to_string(r.port),r.subnet,r.owner});return x.exit_code==0?LocalFirewallResult::Open:x.exit_code==126?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
+auto x=runner_.run("pkexec",{install_paths::firewall_modify_helper,"allow-local-tcp",std::to_string(r.port),r.subnet,r.owner});return x.exit_code==0?LocalFirewallResult::Open:x.exit_code==126?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
 }
 LocalFirewallResult PrivilegedLocalFirewall::deny(const LocalFirewallRule&r) {
-auto x=runner_.run("pkexec",{"/usr/libexec/softadastra-firewall-modify","deny-owned-local-tcp",std::to_string(r.port),r.subnet,r.owner});return x.exit_code==0?LocalFirewallResult::Open:x.exit_code==126?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
+auto x=runner_.run("pkexec",{install_paths::firewall_modify_helper,"deny-owned-local-tcp",std::to_string(r.port),r.subnet,r.owner});return x.exit_code==0?LocalFirewallResult::Open:x.exit_code==126?LocalFirewallResult::PermissionRequired:LocalFirewallResult::Failed;
 }
 #else
 LocalFirewallResult PrivilegedLocalFirewall::status(const LocalFirewallRule&) {

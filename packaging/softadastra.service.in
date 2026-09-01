@@ -7,7 +7,7 @@ Type=simple
 User=softadastra
 Group=softadastra
 Environment=XDG_STATE_HOME=/var/lib
-ExecStart=/usr/bin/softadastra host
+ExecStart=@SOFTADASTRA_EXECUTABLE_PATH@ host
 Restart=on-failure
 RestartSec=2
 StateDirectory=softadastra

@@ -5,6 +5,40 @@ project(
   LANGUAGES CXX
 )
 
+include(GNUInstallDirs)
+
+# Every installed Linux component derives its location from these values.  They
+# are configured once, then shared by the runtime, the Polkit policy and the
+# systemd unit so an installation prefix cannot split the contract.
+set(SOFTADASTRA_FIREWALL_STATUS_PATH
+    "${CMAKE_INSTALL_FULL_LIBEXECDIR}/softadastra-firewall-status")
+set(SOFTADASTRA_FIREWALL_MODIFY_PATH
+    "${CMAKE_INSTALL_FULL_LIBEXECDIR}/softadastra-firewall-modify")
+set(SOFTADASTRA_EXECUTABLE_PATH
+    "${CMAKE_INSTALL_FULL_BINDIR}/softadastra")
+# systemd units are architecture-independent.  GNUInstallDirs may turn
+# CMAKE_INSTALL_LIBDIR into a multiarch directory on Debian, whereas the
+# system-wide unit directory is always lib/systemd/system below the prefix.
+set(SOFTADASTRA_SYSTEMD_UNITDIR "lib/systemd/system")
+set(SOFTADASTRA_GENERATED_PLATFORM_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/platform")
+file(MAKE_DIRECTORY "${SOFTADASTRA_GENERATED_PLATFORM_DIR}")
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/InstallPaths.hpp.in"
+  "${SOFTADASTRA_GENERATED_PLATFORM_DIR}/InstallPaths.hpp"
+  @ONLY
+)
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/com.softadastra.firewall.policy.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/com.softadastra.firewall.policy"
+  @ONLY
+)
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/softadastra.service.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/softadastra.service"
+  @ONLY
+)
+
 # CMake 4.2 normalizes runtime-dependency paths before applying filters.  The
 # filter below is written for normalized paths, so opt into that behavior when
 # the policy exists while retaining compatibility with the project minimum.
@@ -161,6 +195,7 @@ target_include_directories(
   softadastra_internal
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
   PRIVATE
     ${SOFTADASTRA_WEBUI_GENERATED_DIR}
 )
@@ -284,17 +319,17 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   install(
     TARGETS softadastra
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
   install(
     TARGETS softadastra-gateway
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
-  install(TARGETS softadastra-firewall-status softadastra-firewall-modify RUNTIME DESTINATION libexec PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-  install(FILES packaging/com.softadastra.firewall.policy DESTINATION share/polkit-1/actions PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+  install(TARGETS softadastra-firewall-status softadastra-firewall-modify RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.softadastra.firewall.policy" DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
   install(
-    FILES packaging/softadastra.service
-    DESTINATION lib/systemd/system
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/softadastra.service"
+    DESTINATION ${SOFTADASTRA_SYSTEMD_UNITDIR}
   )
 endif()
 

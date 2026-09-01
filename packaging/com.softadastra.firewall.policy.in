@@ -11,7 +11,7 @@
       <allow_inactive>no</allow_inactive>
       <allow_active>yes</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/softadastra-firewall-status</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">@SOFTADASTRA_FIREWALL_STATUS_PATH@</annotate>
   </action>
   <action id="com.softadastra.firewall.modify">
     <description>Modify Softadastra local access</description>
@@ -21,6 +21,6 @@
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/softadastra-firewall-modify</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">@SOFTADASTRA_FIREWALL_MODIFY_PATH@</annotate>
   </action>
 </policyconfig>

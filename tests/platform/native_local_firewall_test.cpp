@@ -1,4 +1,5 @@
 #include "platform/FirewallHelper.hpp"
+#include "platform/InstallPaths.hpp"
 #include "platform/NativeLocalFirewall.hpp"
 #include "platform/PrivilegedLocalFirewall.hpp"
 
@@ -50,19 +51,23 @@ namespace
   softadastra::FirewallHelper helper(Network &network, softadastra::NativeLocalFirewall &firewall)
   { return softadastra::FirewallHelper(network, firewall); }
 
-  TEST(PrivilegedLocalFirewallTest, UsesFixedCommandsAndParsesStructuredStatus)
+  TEST(PrivilegedLocalFirewallTest, UsesConfiguredCommandsAndParsesStructuredStatus)
   {
     Runner runner; softadastra::PrivilegedLocalFirewall firewall(runner);
     const softadastra::LocalFirewallRule rule{"softadastra:abc", "192.168.1.0/24", 8083};
     runner.result = {0, "allowed\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Open);
     EXPECT_EQ(runner.executable, "pkexec");
-    EXPECT_EQ(runner.arguments, (std::vector<std::string>{"/usr/libexec/softadastra-firewall-status", "8083", "192.168.1.0/24", "softadastra:abc"}));
+    EXPECT_EQ(runner.arguments, (std::vector<std::string>{softadastra::install_paths::firewall_status_helper, "8083", "192.168.1.0/24", "softadastra:abc"}));
     runner.result = {0, "blocked\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::PermissionRequired);
     runner.result = {0, "disabled\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Open);
     runner.result = {0, "unsupported\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Unsupported);
     runner.result = {0, "error\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Failed);
     runner.result = {0, "ufw status\n"}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Failed);
     runner.result = {127, {}}; EXPECT_EQ(firewall.status(rule), softadastra::LocalFirewallResult::Failed);
+    runner.result = {0, {}}; EXPECT_EQ(firewall.allow(rule), softadastra::LocalFirewallResult::Open);
+    EXPECT_EQ(runner.arguments, (std::vector<std::string>{softadastra::install_paths::firewall_modify_helper, "allow-local-tcp", "8083", "192.168.1.0/24", "softadastra:abc"}));
+    EXPECT_EQ(firewall.deny(rule), softadastra::LocalFirewallResult::Open);
+    EXPECT_EQ(runner.arguments, (std::vector<std::string>{softadastra::install_paths::firewall_modify_helper, "deny-owned-local-tcp", "8083", "192.168.1.0/24", "softadastra:abc"}));
   }
 
   TEST(FirewallHelperTest, RejectsInvalidStatusAndModifyInterfaces)

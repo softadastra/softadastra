@@ -1,0 +1,9 @@
+#ifndef SOFTADASTRA_PLATFORM_INSTALL_PATHS_HPP
+#define SOFTADASTRA_PLATFORM_INSTALL_PATHS_HPP
+
+namespace softadastra::install_paths {
+inline constexpr const char *firewall_status_helper = "@SOFTADASTRA_FIREWALL_STATUS_PATH@";
+inline constexpr const char *firewall_modify_helper = "@SOFTADASTRA_FIREWALL_MODIFY_PATH@";
+}
+
+#endif

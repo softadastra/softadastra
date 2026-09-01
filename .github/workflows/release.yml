@@ -33,7 +33,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes ninja-build libssl-dev
       - name: Configure
-        run: cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOFTADASTRA_BUILD_TESTS=ON
+        run: cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSOFTADASTRA_BUILD_TESTS=ON
       - name: Build
         run: cmake --build build-release --parallel
       - name: Test Softadastra
