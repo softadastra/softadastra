@@ -16,6 +16,7 @@
 
 #include "software/LocalName.hpp"
 
+#include <algorithm>
 #include <utility>
 
 namespace softadastra
@@ -279,18 +280,11 @@ namespace softadastra
           0};
     }
 
-    const auto access =
-        entry->access_point();
-
-    if (!access ||
-        access->protocol() != AccessProtocol::Http)
-    {
-      return {};
-    }
-
-    return {
-        LocalGatewayLookup::Http,
-        access->port()};
+    const auto access = std::find_if(
+        entry->access_points().begin(), entry->access_points().end(),
+        [](const AccessPoint &point) { return point.protocol() == AccessProtocol::Http; });
+    if (access == entry->access_points().end()) return {};
+    return {LocalGatewayLookup::Http, access->port()};
   }
 
   LocalReachabilityState
@@ -325,32 +319,61 @@ namespace softadastra
   std::optional<LocalAccess> HostService::local_access(
       const SoftwareId &id) noexcept
   {
+    const auto accesses = local_accesses(id);
+    return !accesses || accesses->empty()
+               ? std::nullopt
+               : std::optional<LocalAccess>(accesses->front());
+  }
+
+  std::optional<std::vector<LocalAccess>> HostService::local_accesses(
+      const SoftwareId &id) noexcept
+  {
     const auto entry =
         software(id);
 
     if (!entry.has_value() ||
-        !entry->access_point().has_value())
+        entry->access_points().empty())
     {
       return std::nullopt;
     }
 
-    auto access =
-        resolve_local_access(
-            entry->access_point().value(),
+    auto resolve_all = [&](const ManagedNetworkStatus &managed,
+                           const LocalReachabilityState reachability)
+    {
+      std::vector<LocalAccess> result;
+      result.reserve(entry->access_points().size());
+      for (const auto &point : entry->access_points())
+      {
+        auto access = resolve_local_access(
+            point,
             network_capability(),
-            managed_network_status(),
+            managed,
             entry->state() == SoftwareState::Running,
             entry->name(),
-            local_reachability_state());
+            reachability);
+        if (access.state == LocalAccessState::Available &&
+            !host_.platform().network().tcp_listener(access.ipv4, access.port))
+        {
+          access.state = LocalAccessState::Unavailable;
+          access.url.clear();
+        }
+        result.push_back(std::move(access));
+      }
+      return result;
+    };
+
+    auto accesses = resolve_all(
+        managed_network_status(), local_reachability_state());
 
     // `access` may change networking only here: a real, running AccessPoint
     // has no usable local network and ManagedNetwork has conservatively
     // declared itself available. Existing networks and running managed
     // networks are always used as-is.
-    if (access.state == LocalAccessState::Available ||
+    if (std::any_of(accesses.begin(), accesses.end(), [](const LocalAccess &access)
+                    { return access.state == LocalAccessState::Available; }) ||
         entry->state() != SoftwareState::Running)
     {
-      return access;
+      return accesses;
     }
 
     const auto managed =
@@ -361,29 +384,25 @@ namespace softadastra
         managed.state !=
             ManagedNetworkState::Stopped)
     {
-      return access;
+      return accesses;
     }
 
     static_cast<void>(
         start_managed_network());
 
-    access =
-        resolve_local_access(
-            entry->access_point().value(),
-            network_capability(),
-            managed_network_status(),
-            true,
-            entry->name(),
-            local_reachability_ != nullptr
-                ? local_reachability_->start()
-                : LocalReachabilityState::Unavailable);
+    accesses = resolve_all(
+        managed_network_status(), local_reachability_ != nullptr
+                                      ? local_reachability_->start()
+                                      : LocalReachabilityState::Unavailable);
 
-    if (access.state != LocalAccessState::Available)
+    for (auto &access : accesses)
     {
-      access.managed_network_start_failed = true;
+      if (access.state != LocalAccessState::Available)
+      {
+        access.managed_network_start_failed = true;
+      }
     }
-
-    return access;
+    return accesses;
   }
 
   NetworkCapability HostService::network_capability() const

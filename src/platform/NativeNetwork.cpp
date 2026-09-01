@@ -40,6 +40,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
 
 #if defined(__linux__)
 #include <linux/genetlink.h>
@@ -898,6 +900,56 @@ namespace softadastra
 #endif
 
     return capability;
+  }
+
+  bool NativeNetwork::tcp_listener(
+      const std::string &ipv4,
+      const std::uint16_t port) const noexcept
+  {
+#if defined(_WIN32)
+    static_cast<void>(ipv4);
+    static_cast<void>(port);
+    return false;
+#else
+    const int descriptor = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (descriptor < 0)
+    {
+      return false;
+    }
+
+    const int flags = ::fcntl(descriptor, F_GETFL, 0);
+    if (flags < 0 || ::fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) != 0)
+    {
+      ::close(descriptor);
+      return false;
+    }
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(port);
+    if (::inet_pton(AF_INET, ipv4.c_str(), &address.sin_addr) != 1)
+    {
+      ::close(descriptor);
+      return false;
+    }
+
+    const int connected = ::connect(
+        descriptor, reinterpret_cast<const sockaddr *>(&address), sizeof(address));
+    bool ready = connected == 0;
+    if (!ready && errno == EINPROGRESS)
+    {
+      pollfd poll_descriptor{descriptor, POLLOUT, 0};
+      if (::poll(&poll_descriptor, 1, 200) > 0)
+      {
+        int error = 0;
+        socklen_t size = sizeof(error);
+        ready = ::getsockopt(descriptor, SOL_SOCKET, SO_ERROR, &error, &size) == 0 &&
+                error == 0;
+      }
+    }
+    ::close(descriptor);
+    return ready;
+#endif
   }
 
 } // namespace softadastra

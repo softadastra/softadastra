@@ -274,6 +274,12 @@ namespace softadastra
     return host_service_.local_access(id);
   }
 
+  std::optional<std::vector<LocalAccess>> ControlServer::local_accesses(
+      const SoftwareId &id) noexcept
+  {
+    return host_service_.local_accesses(id);
+  }
+
   NetworkCapability ControlServer::network_capability() const
   {
     return host_service_.network_capability();

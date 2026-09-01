@@ -122,9 +122,8 @@ namespace
     const std::vector<std::string> args{"deny-owned-local-tcp", "8080", network.subnet, "softadastra:abc"};
     EXPECT_EQ(value.run(softadastra::FirewallHelperCommand::Modify, args, output), 0);
     EXPECT_EQ(value.run(softadastra::FirewallHelperCommand::Modify, args, output), 0);
-    ASSERT_EQ(runner.calls.size(), 4U);
-    EXPECT_EQ(runner.calls[1], (std::vector<std::string>{"--force", "delete", "7"}));
-    EXPECT_EQ(runner.calls[2], (std::vector<std::string>{"--force", "delete", "3"}));
-    EXPECT_EQ(runner.calls[3], (std::vector<std::string>{"status", "numbered"}));
+    ASSERT_EQ(runner.calls.size(), 3U);
+    EXPECT_EQ(runner.calls[1], (std::vector<std::string>{"--force", "delete", "3"}));
+    EXPECT_EQ(runner.calls[2], (std::vector<std::string>{"status", "numbered"}));
   }
 }

@@ -365,6 +365,10 @@ namespace softadastra
     [[nodiscard]] std::optional<LocalAccess> local_access(
         const SoftwareId &id) noexcept;
 
+    /** Resolves every declared local access endpoint for software. */
+    [[nodiscard]] std::optional<std::vector<LocalAccess>> local_accesses(
+        const SoftwareId &id) noexcept;
+
     /**
      * @brief Returns the Host's detailed network capability.
      *

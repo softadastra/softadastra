@@ -375,6 +375,27 @@ namespace
     EXPECT_EQ(platform.test_firewall().ensure_calls, 0);
   }
 
+  TEST(HostServiceTest, ResolvesEveryDeclaredAccessPoint)
+  {
+    TestPlatform platform;
+    platform.test_network().set_capability(existing_network());
+    TestProcessLauncher launcher;
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, launcher);
+    const softadastra::SoftwareId id("multiple-accesses");
+    const auto http = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8081);
+    const auto ws = softadastra::AccessPoint::create(softadastra::AccessProtocol::Ws, 9000);
+    ASSERT_TRUE(http && ws);
+    ASSERT_TRUE(service.register_software(id, softadastra::ProcessSpec("/usr/bin/example"), *http));
+    ASSERT_TRUE(service.synchronize_software(id, softadastra::ProcessSpec("/usr/bin/example"), {*http, *ws}));
+    ASSERT_TRUE(service.start_software(id));
+    const auto accesses = service.local_accesses(id);
+    ASSERT_TRUE(accesses);
+    ASSERT_EQ(accesses->size(), 2U);
+    EXPECT_EQ((*accesses)[0].url, "http://192.168.1.6:8081");
+    EXPECT_EQ((*accesses)[1].url, "ws://192.168.1.6:9000");
+  }
+
   TEST(HostServiceTest, DoesNotQueryFirewallWhenReportingLocalAccess)
   {
     TestPlatform platform;

@@ -16,6 +16,7 @@
 #define SOFTADASTRA_PLATFORM_NETWORK_HPP
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace softadastra
@@ -204,6 +205,18 @@ namespace softadastra
       }
 
       return {};
+    }
+
+    /**
+     * Returns whether a TCP listener accepts connections at a locally exposed
+     * address.  Platform implementations must override this; the default
+     * preserves the capability-only behaviour for non-native test platforms.
+     */
+    [[nodiscard]] virtual bool tcp_listener(
+        const std::string &,
+        std::uint16_t) const noexcept
+    {
+      return true;
     }
   };
 

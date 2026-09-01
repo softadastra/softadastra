@@ -1404,4 +1404,31 @@ namespace
     EXPECT_EQ(access_output.find("No access configured"), std::string::npos);
     std::filesystem::remove_all(root);
   }
+
+  TEST(CliTest, ProjectAccessUsesControlDiagnosticsForEveryAccessPoint)
+  {
+    const auto root = std::filesystem::temp_directory_path() / "softadastra-access-control-multiple";
+    std::filesystem::create_directories(root);
+    const auto http = softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8092);
+    const auto ws = softadastra::AccessPoint::create(softadastra::AccessProtocol::Ws, 8093);
+    ASSERT_TRUE(http && ws);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {"access-test", "sleep 30", std::nullopt, {*http, *ws}}));
+    Platform platform;
+    platform.network_.capability.local_subnet = "192.168.1.0/24";
+    softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
+    softadastra::Cli cli(client, platform.network_, platform.managed_network_, platform.firewall_);
+    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    const char *run[] = {"softadastra", "run"}; const char *access[] = {"softadastra", "access"};
+    ASSERT_EQ(cli.run(2, run), 0);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(cli.run(2, access), 0);
+    const auto output = testing::internal::GetCapturedStdout();
+    std::filesystem::current_path(previous);
+    EXPECT_NE(output.find("http:8092"), std::string::npos);
+    EXPECT_NE(output.find("ws:8093"), std::string::npos);
+    EXPECT_NE(output.find("http://10.56.116.55:8092"), std::string::npos);
+    EXPECT_NE(output.find("ws://10.56.116.55:8093"), std::string::npos);
+    std::filesystem::remove_all(root);
+  }
 }

@@ -745,7 +745,7 @@ namespace softadastra
     if (!state.has_value() || !protocol.has_value() || !port.has_value() ||
         !ipv4.has_value() || !url.has_value() || !network.has_value() || !local_network.has_value() ||
         !managed_network.has_value() || state.value() < 0 || state.value() > 1 ||
-        protocol.value() < 0 || protocol.value() > 1 || port.value() < 1 ||
+        protocol.value() < 0 || protocol.value() > 2 || port.value() < 1 ||
         port.value() > 65535 || network.value() < 0 || network.value() > 2 || local_network.value() < 0 ||
         local_network.value() > 1 || managed_network.value() < 0 ||
         managed_network.value() > 1 || !start_failed.has_value() ||
@@ -768,6 +768,47 @@ namespace softadastra
         start_failed.value() != 0,
         static_cast<LocalAccessFirewallState>(firewall.value()),
         subnet.value()};
+  }
+
+  std::optional<std::vector<LocalAccess>> ControlClient::local_accesses(
+      const SoftwareId &id) noexcept
+  {
+    if (server_ != nullptr)
+    {
+      return server_->local_accesses(id);
+    }
+    const auto response = request("local-accesses " + LocalControlProtocol::encode(id.value()));
+    const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
+    if (fields.size() < 2 || fields[0] != "local-accesses") return std::nullopt;
+    const auto count = LocalControlProtocol::integer(fields[1]);
+    if (!count || *count < 0 || fields.size() != 2U + static_cast<std::size_t>(*count) * 11U)
+      return std::nullopt;
+    std::vector<LocalAccess> result;
+    result.reserve(static_cast<std::size_t>(*count));
+    for (std::size_t offset = 2; offset < fields.size(); offset += 11)
+    {
+      const auto state = LocalControlProtocol::integer(fields[offset]);
+      const auto protocol = LocalControlProtocol::integer(fields[offset + 1]);
+      const auto port = LocalControlProtocol::integer(fields[offset + 2]);
+      const auto ipv4 = LocalControlProtocol::decode(fields[offset + 3]);
+      const auto url = LocalControlProtocol::decode(fields[offset + 4]);
+      const auto network = LocalControlProtocol::integer(fields[offset + 5]);
+      const auto local_network = LocalControlProtocol::integer(fields[offset + 6]);
+      const auto managed_network = LocalControlProtocol::integer(fields[offset + 7]);
+      const auto start_failed = LocalControlProtocol::integer(fields[offset + 8]);
+      const auto firewall = LocalControlProtocol::integer(fields[offset + 9]);
+      const auto subnet = LocalControlProtocol::decode(fields[offset + 10]);
+      if (!state || !protocol || !port || !ipv4 || !url || !network || !local_network ||
+          !managed_network || !start_failed || !firewall || !subnet || *state < 0 || *state > 1 ||
+          *protocol < 0 || *protocol > 2 || *port < 1 || *port > 65535 || *network < 0 || *network > 2 ||
+          *local_network < 0 || *local_network > 1 || *managed_network < 0 || *managed_network > 1 ||
+          *firewall < 0 || *firewall > 4 || (*start_failed != 0 && *start_failed != 1)) return std::nullopt;
+      result.push_back({static_cast<LocalAccessState>(*state), static_cast<AccessProtocol>(*protocol),
+          static_cast<std::uint16_t>(*port), *ipv4, *url, static_cast<LocalAccessNetwork>(*network),
+          static_cast<LocalNetworkState>(*local_network), static_cast<ManagedNetworkCapability>(*managed_network),
+          *start_failed != 0, static_cast<LocalAccessFirewallState>(*firewall), *subnet});
+    }
+    return result;
   }
 
   std::optional<NetworkCapability> ControlClient::network_capability() const noexcept

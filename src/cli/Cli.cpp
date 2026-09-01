@@ -91,6 +91,20 @@ namespace
                : "-";
   }
 
+  std::string access_name(const std::vector<AccessPoint> &accesses)
+  {
+    if (accesses.empty()) return "-";
+    std::string result;
+    for (const auto &access : accesses)
+    {
+      if (!result.empty()) result += ", ";
+      result += std::string(AccessPoint::name(access.protocol())) + ":" +
+                std::to_string(access.port());
+    }
+    return result;
+  }
+
+
   std::string command_name(
       const SoftwareEntry &entry)
   {
@@ -657,6 +671,17 @@ namespace
                : target.entry->access_point();
   }
 
+  std::vector<AccessPoint> effective_accesses(const Target &target)
+  {
+    if (target.config)
+    {
+      if (!target.config->access_points.empty()) return target.config->access_points;
+      return target.config->access ? std::vector<AccessPoint>{*target.config->access}
+                                   : std::vector<AccessPoint>{};
+    }
+    return target.entry ? target.entry->access_points() : std::vector<AccessPoint>{};
+  }
+
   std::optional<Target> resolve_target(
       ControlClient &client,
       const std::optional<std::string> &name,
@@ -1038,6 +1063,7 @@ namespace
   }
 
   int print_firewall_access(
+      ControlClient *client,
       const Network *network,
       LocalFirewall *firewall,
       const Target &target)
@@ -1046,6 +1072,32 @@ namespace
     {
       std::cerr << "Local firewall access is unsupported on this Host.\n";
       return 1;
+    }
+    if (client != nullptr && target.entry)
+    {
+      const auto accesses = client->local_accesses(target.id);
+      if (accesses && std::any_of(accesses->begin(), accesses->end(),
+          [](const LocalAccess &access) { return access.state == LocalAccessState::Available; }))
+      {
+        bool failed = false;
+        std::cout << style::field("Software:", target.name, access_field_width) << '\n';
+        for (const auto &access : *accesses)
+        {
+          LocalAccessFirewallStatus status = LocalAccessFirewallStatus::NotChecked;
+          if (access.state == LocalAccessState::Available && access.network == LocalAccessNetwork::Existing)
+          {
+            const auto point = AccessPoint::create(access.protocol, access.port);
+            const auto rule = point && target.root ? local_firewall_rule(network, *target.root, *point) : std::nullopt;
+            status = rule ? local_firewall_status(firewall->status(*rule)) : LocalAccessFirewallStatus::Failed;
+          }
+          const bool available = access.state == LocalAccessState::Available && firewall_allows_local_access(status);
+          std::cout << style::field("Access:", std::string(AccessPoint::name(access.protocol)) + ":" + std::to_string(access.port), access_field_width) << '\n'
+                    << style::field("Local access:", available ? style::success("allowed") : style::warning("unavailable"), access_field_width) << '\n';
+          if (available) std::cout << style::field("Local URL:", access.url, access_field_width) << '\n';
+          else { print_local_firewall_reason(status); failed = true; }
+        }
+        return failed ? 1 : 0;
+      }
     }
     const auto view = local_access_view(
         target,
@@ -1068,9 +1120,8 @@ namespace
     if (firewall_allows_local_access(view.firewall))
     {
       const auto ipv4 = network->network_capability().primary_ipv4;
-      const auto url = view.access->protocol() == AccessProtocol::Https
-                           ? AccessUrl::https(ipv4, view.access->port())
-                           : AccessUrl::http(ipv4, view.access->port());
+      const auto url = std::string(AccessPoint::name(view.access->protocol())) +
+                       "://" + ipv4 + ":" + std::to_string(view.access->port());
       std::cout << style::field("Local access:", style::success("allowed"), access_field_width) << '\n'
                 << style::field("Local URL:", url, access_field_width) << '\n';
       return 0;
@@ -1080,7 +1131,7 @@ namespace
     return 1;
   }
 
-  int print_project_access(const Network *network, LocalFirewall *firewall)
+  int print_project_access(ControlClient &client, const Network *network, LocalFirewall *firewall)
   {
     std::string error;
     const auto project = ProjectConfigFile::find(std::filesystem::current_path(), &error);
@@ -1094,11 +1145,12 @@ namespace
       no_project("access");
       return 1;
     }
+    const auto entry = software_by_project_root(client, project->first);
     return print_firewall_access(
-        network,
+        &client, network,
         firewall,
-        Target{SoftwareId(""), project->second.name, std::nullopt,
-               project->first, project->second});
+        Target{entry ? entry->id() : SoftwareId(""), project->second.name,
+               entry, project->first, project->second});
   }
 
   int print_named_access(
@@ -1120,7 +1172,7 @@ namespace
       return 1;
     }
     return print_firewall_access(
-        network,
+        &client, network,
         firewall,
         Target{entry->id(), entry->name(), entry, *root, std::nullopt});
   }
@@ -1147,46 +1199,32 @@ namespace
       no_project("access " + action);
       return 1;
     }
-    const auto access = effective_access(project->second);
-    const auto rule = access
-                          ? local_firewall_rule(
-                                network,
-                                project->first,
-                                *access)
-                          : std::nullopt;
-    if (!rule)
+    auto accesses = project->second.access_points;
+    if (accesses.empty() && project->second.access) accesses.push_back(*project->second.access);
+    if (accesses.empty())
     {
       std::cerr << "A usable local network and Access are required.\n";
       return 1;
     }
-    const auto result = action == "allow" ? firewall->allow(*rule) : firewall->deny(*rule);
-    const auto firewall_status = local_firewall_status(result);
-    if (firewall_status == LocalAccessFirewallStatus::Blocked)
+    std::vector<std::string> urls;
+    for (const auto &access : accesses)
     {
-      std::cerr << "Firewall authorization was cancelled or denied.\n";
-      return 1;
-    }
-    if (firewall_status == LocalAccessFirewallStatus::Unsupported)
-    {
-      std::cerr << "Local firewall access is unsupported on this Host.\n";
-      return 1;
-    }
-    if (firewall_status != LocalAccessFirewallStatus::Allowed)
-    {
-      std::cerr << "Local firewall access could not be changed.\n";
-      return 1;
+      const auto rule = local_firewall_rule(network, project->first, access);
+      if (!rule) { std::cerr << "A usable local network and Access are required.\n"; return 1; }
+      const auto status = local_firewall_status(action == "allow" ? firewall->allow(*rule) : firewall->deny(*rule));
+      if (status == LocalAccessFirewallStatus::Blocked) { std::cerr << "Firewall authorization was cancelled or denied.\n"; return 1; }
+      if (status == LocalAccessFirewallStatus::Unsupported) { std::cerr << "Local firewall access is unsupported on this Host.\n"; return 1; }
+      if (status != LocalAccessFirewallStatus::Allowed) { std::cerr << "Local firewall access could not be changed.\n"; return 1; }
+      const auto ipv4 = network->network_capability().primary_ipv4;
+      urls.push_back(std::string(AccessPoint::name(access.protocol())) + "://" + ipv4 + ":" + std::to_string(access.port()));
     }
     if (action == "deny")
     {
       std::cout << style::success("Local access denied.") << '\n';
       return 0;
     }
-    const auto ipv4 = network->network_capability().primary_ipv4;
-    const auto url = access->protocol() == AccessProtocol::Https
-                         ? AccessUrl::https(ipv4, access->port())
-                         : AccessUrl::http(ipv4, access->port());
-    std::cout << style::success("Local access allowed.") << '\n'
-              << url << '\n';
+    std::cout << style::success("Local access allowed.") << '\n';
+    for (const auto &url : urls) std::cout << url << '\n';
     return 0;
   }
 
@@ -1196,10 +1234,9 @@ namespace
       const Network *network = nullptr,
       LocalFirewall *firewall = nullptr)
   {
-    const auto configured =
-        effective_access(target);
+    const auto configured = effective_accesses(target);
 
-    if (!configured)
+    if (configured.empty())
     {
       std::cerr
           << "No access configured for: "
@@ -1225,10 +1262,9 @@ namespace
       return false;
     }
 
-    const auto access =
-        client.local_access(target.id);
+    const auto accesses = client.local_accesses(target.id);
 
-    if (!access)
+    if (!accesses)
     {
       std::cerr
           << "Local access information is unavailable\n";
@@ -1245,12 +1281,6 @@ namespace
       return false;
     }
 
-    const auto view = local_access_view(
-        target,
-        access,
-        network,
-        firewall);
-
     std::cout
         << style::field("Software:", target.name, access_field_width)
         << '\n'
@@ -1265,40 +1295,41 @@ namespace
                access_field_width)
         << '\n';
 
-    if (access->state == LocalAccessState::Available)
+    bool available = false;
+    std::string first_url;
+    std::optional<LocalAccessFirewallStatus> firewall_problem;
+    for (const auto &access : *accesses)
     {
-      if (!firewall_allows_local_access(view.firewall))
+      LocalAccessFirewallStatus firewall_status = LocalAccessFirewallStatus::NotChecked;
+      if (access.state == LocalAccessState::Available &&
+          access.network == LocalAccessNetwork::Existing && firewall != nullptr)
       {
-        std::cout
-            << style::field(
-                   "Local access:",
-                   style::warning("unavailable"),
-                   access_field_width)
-            << '\n';
-        print_local_firewall_reason(view.firewall);
-        return false;
+        auto root = target.root;
+        if (!root && target.entry && target.entry->process_spec().working_directory())
+          root = std::filesystem::path(*target.entry->process_spec().working_directory());
+        const auto rule = root ? local_firewall_rule(network, *root,
+            AccessPoint::create(access.protocol, access.port).value()) : std::nullopt;
+        firewall_status = rule ? local_firewall_status(firewall->status(*rule))
+                               : LocalAccessFirewallStatus::Failed;
       }
-      std::cout
-          << style::field(
-                 "Network:",
-                 local_access_network_name(access->network),
-                 access_field_width)
-          << '\n'
-          << style::field(
-                 "Local URL:",
-                 access->url,
-                 access_field_width)
-          << "\n\n";
-
-      if (!QrCode::print(access->url))
+      if (access.state == LocalAccessState::Available &&
+          firewall_allows_local_access(firewall_status))
       {
-        std::cout
-            << "QR generation is unavailable.\n";
+        available = true;
+        if (first_url.empty()) first_url = access.url;
+        std::cout << style::field("Network:", local_access_network_name(access.network), access_field_width) << '\n'
+                  << style::field("Local URL:", access.url, access_field_width) << '\n';
       }
+      else if (firewall_status != LocalAccessFirewallStatus::NotChecked)
+      {
+        firewall_problem = firewall_status;
+      }
+    }
 
-      std::cout
-          << "\nScan with your phone.\n";
-
+    if (available)
+    {
+      if (!QrCode::print(first_url)) std::cout << "QR generation is unavailable.\n";
+      std::cout << "\nScan with your phone.\n";
       return true;
     }
 
@@ -1309,10 +1340,10 @@ namespace
                access_field_width)
         << '\n';
 
-    if (!firewall_allows_local_access(view.firewall))
+    if (firewall_problem)
     {
       std::cout << '\n';
-      print_local_firewall_reason(view.firewall);
+      print_local_firewall_reason(*firewall_problem);
     }
 
     if (entry->state() == SoftwareState::Stopped)
@@ -1337,7 +1368,7 @@ namespace
                      : "softadastra logs " + target.name)
           << "\n";
     }
-    else if (access->managed_network_start_failed)
+    else if (!accesses->empty() && accesses->front().managed_network_start_failed)
     {
       std::cout
           << "\n"
@@ -1345,7 +1376,7 @@ namespace
           << '\n';
     }
     else if (
-        access->local_network_state ==
+        accesses->front().local_network_state ==
         LocalNetworkState::Unavailable)
     {
       std::cout
@@ -1355,7 +1386,7 @@ namespace
           << style::field(
                  "Managed network:",
                  managed_network_capability_name(
-                     access->managed_network_capability),
+                     accesses->front().managed_network_capability),
                  managed_network_field_width)
           << "\n";
     }
@@ -1739,7 +1770,7 @@ namespace softadastra
     if (local_firewall_ != nullptr && command == "access")
     {
       if (argc == 2)
-        return print_project_access(network_, local_firewall_);
+        return print_project_access(client_, network_, local_firewall_);
       if (argc == 3)
         return print_named_access(client_, network_, local_firewall_, argv[2]);
     }
@@ -1934,7 +1965,7 @@ namespace softadastra
 
           row
               << std::setw(13)
-              << access_name(entry.access_point())
+              << access_name(entry.access_points())
               << entry.process_spec()
                      .working_directory()
                      .value_or("-");
@@ -2447,7 +2478,7 @@ namespace softadastra
           << style::field(
                  "Access:",
                  access_name(
-                     effective_access(*target)),
+                     effective_accesses(*target)),
                  software_info_field_width)
           << '\n'
           << style::field(

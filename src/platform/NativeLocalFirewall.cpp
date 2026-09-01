@@ -53,13 +53,16 @@ namespace
     return marker != std::string::npos && line.substr(marker + 2) == owner;
   }
 
-  std::vector<int> owned_rule_numbers(const std::string &output, const std::string &owner)
+  std::vector<int> owned_rule_numbers(const std::string &output, const softadastra::LocalFirewallRule &rule)
   {
     std::vector<int> numbers; std::istringstream lines(output); std::string line;
     while (std::getline(lines, line))
     {
       const auto left = line.find('['); const auto right = line.find(']');
-      if (left == std::string::npos || right == std::string::npos || !has_exact_owner(line, owner)) continue;
+      const auto port = std::to_string(rule.port) + "/tcp";
+      if (left == std::string::npos || right == std::string::npos ||
+          !has_exact_owner(line, rule.owner) || line.find(port) == std::string::npos ||
+          line.find(rule.subnet) == std::string::npos) continue;
       try { numbers.push_back(std::stoi(line.substr(left + 1, right - left - 1))); }
       catch (const std::exception &) {}
     }
@@ -121,7 +124,7 @@ namespace softadastra
 #if defined(__linux__)
     const auto result = runner_ ? runner_->run({"status", "numbered"}) : run_ufw({"status", "numbered"});
     if (result.exit_code != 0) return;
-    for (const int number : owned_rule_numbers(result.output, rule.owner))
+    for (const int number : owned_rule_numbers(result.output, rule))
       static_cast<void>(runner_ ? runner_->run(delete_arguments(number)) : run_ufw(delete_arguments(number)));
 #else
     static_cast<void>(rule);
@@ -136,7 +139,7 @@ namespace softadastra
     const auto result = runner_ ? runner_->run({"status", "numbered"}) : run_ufw({"status", "numbered"});
     if (result.exit_code == 127) return LocalFirewallResult::Unsupported;
     if (result.exit_code != 0) return LocalFirewallResult::Failed;
-    for (const int number : owned_rule_numbers(result.output, rule.owner))
+    for (const int number : owned_rule_numbers(result.output, rule))
     {
       const auto deleted = runner_ ? runner_->run(delete_arguments(number)) : run_ufw(delete_arguments(number));
       if (deleted.exit_code != 0) return LocalFirewallResult::Failed;

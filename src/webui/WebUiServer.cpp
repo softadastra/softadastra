@@ -29,6 +29,7 @@
 #include <asio/write.hpp>
 
 #include <filesystem>
+#include <algorithm>
 #include <istream>
 #include <string_view>
 #include <system_error>
@@ -402,7 +403,7 @@ namespace
 
   std::string access_json(
       const softadastra::SoftwareEntry &entry,
-      const std::string &local_ip)
+      const std::vector<softadastra::LocalAccess> *local_accesses)
   {
     std::string result = "[";
     bool first = true;
@@ -432,16 +433,15 @@ namespace
           std::to_string(point.port()) +
           "\",\"url\":\"";
 
-      if (entry.state() ==
-              softadastra::SoftwareState::Running &&
-          !local_ip.empty())
+      const auto access = local_accesses
+          ? std::find_if(local_accesses->begin(), local_accesses->end(),
+              [&point](const softadastra::LocalAccess &value)
+              { return value.protocol == point.protocol() && value.port == point.port(); })
+          : std::vector<softadastra::LocalAccess>::const_iterator{};
+      if (local_accesses && access != local_accesses->end() &&
+          access->state == softadastra::LocalAccessState::Available)
       {
-        result +=
-            protocol +
-            "://" +
-            local_ip +
-            ":" +
-            std::to_string(point.port());
+        result += access->url;
       }
 
       result += "\"}";
@@ -897,7 +897,7 @@ namespace softadastra
                 body +=
                     access_json(
                         configured,
-                        "");
+                        nullptr);
               }
 
               body += "}";
@@ -1128,8 +1128,7 @@ namespace softadastra
 
               first = false;
 
-              const auto host_access =
-                  client_.local_access();
+              const auto accesses = client_.local_accesses(entry.id());
 
               body +=
                   "{\"name\":\"" +
@@ -1147,9 +1146,7 @@ namespace softadastra
                   "\",\"accesses\":" +
                   access_json(
                       entry,
-                      host_access
-                          ? host_access->primary_ipv4
-                          : "") +
+                      accesses ? &*accesses : nullptr) +
                   ",\"access_configured\":\"";
 
               if (const auto access =

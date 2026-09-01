@@ -67,6 +67,10 @@ namespace softadastra
      * @brief Returns detailed native network capability without changing it.
      */
     [[nodiscard]] NetworkCapability network_capability() const override;
+
+    [[nodiscard]] bool tcp_listener(
+        const std::string &ipv4,
+        std::uint16_t port) const noexcept override;
   };
 
 } // namespace softadastra
