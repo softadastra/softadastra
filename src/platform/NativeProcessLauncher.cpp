@@ -18,6 +18,7 @@
 #include "platform/NativeProcess.hpp"
 
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -29,11 +30,12 @@
 #include <vix/process/Spawn.hpp>
 
 #if defined(__linux__)
-
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/prctl.h>
+#include <sys/syscall.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -178,6 +180,149 @@ namespace softadastra
       return false;
     }
 
+#if defined(__linux__)
+
+    volatile sig_atomic_t supervised_process_group{-1};
+
+    void terminate_supervised_group(int) noexcept
+    {
+      const auto process_group =
+          static_cast<pid_t>(supervised_process_group);
+
+      if (process_group > 0)
+      {
+        static_cast<void>(::kill(-process_group, SIGKILL));
+      }
+
+      _exit(128 + SIGKILL);
+    }
+
+    bool write_process_group(
+        int descriptor,
+        pid_t process_group) noexcept
+    {
+      const auto *data = reinterpret_cast<const char *>(&process_group);
+      std::size_t written = 0;
+
+      while (written < sizeof(process_group))
+      {
+        const auto result = ::write(
+            descriptor,
+            data + written,
+            sizeof(process_group) - written);
+
+        if (result > 0)
+        {
+          written += static_cast<std::size_t>(result);
+          continue;
+        }
+
+        if (result < 0 && errno == EINTR)
+        {
+          continue;
+        }
+
+        return false;
+      }
+
+      return true;
+    }
+
+    bool read_process_group(
+        int descriptor,
+        pid_t &process_group) noexcept
+    {
+      auto *data = reinterpret_cast<char *>(&process_group);
+      std::size_t read = 0;
+
+      while (read < sizeof(process_group))
+      {
+        const auto result = ::read(
+            descriptor,
+            data + read,
+            sizeof(process_group) - read);
+
+        if (result > 0)
+        {
+          read += static_cast<std::size_t>(result);
+          continue;
+        }
+
+        if (result < 0 && errno == EINTR)
+        {
+          continue;
+        }
+
+        return false;
+      }
+
+      return process_group > 0;
+    }
+
+    bool arm_parent_death_signal(
+        pid_t parent,
+        pid_t process_group) noexcept
+    {
+      supervised_process_group =
+          static_cast<sig_atomic_t>(process_group);
+
+      struct sigaction action{};
+      action.sa_handler = terminate_supervised_group;
+      sigemptyset(&action.sa_mask);
+
+      if (::sigaction(SIGUSR1, &action, nullptr) != 0)
+      {
+        return false;
+      }
+
+      struct sigaction ignore_pipe{};
+      ignore_pipe.sa_handler = SIG_IGN;
+      sigemptyset(&ignore_pipe.sa_mask);
+
+      if (::sigaction(SIGPIPE, &ignore_pipe, nullptr) != 0)
+      {
+        return false;
+      }
+
+      sigset_t signals;
+      sigemptyset(&signals);
+      sigaddset(&signals, SIGUSR1);
+
+      return ::pthread_sigmask(SIG_UNBLOCK, &signals, nullptr) == 0 &&
+             ::prctl(PR_SET_PDEATHSIG, SIGUSR1) == 0 &&
+             ::getppid() == parent;
+    }
+
+    void close_inherited_descriptors() noexcept
+    {
+#if defined(SYS_close_range)
+      if (::syscall(
+              SYS_close_range,
+              3U,
+              std::numeric_limits<unsigned int>::max(),
+              0U) == 0)
+      {
+        return;
+      }
+#endif
+
+      const long limit = ::sysconf(_SC_OPEN_MAX);
+      const int maximum =
+          limit > 3 &&
+          limit <= std::numeric_limits<int>::max()
+              ? static_cast<int>(limit)
+              : 65536;
+
+      for (int descriptor = 3;
+           descriptor < maximum;
+           ++descriptor)
+      {
+        static_cast<void>(::close(descriptor));
+      }
+    }
+
+#endif
+
   } // namespace
 
   ProcessLaunchResult NativeProcessLauncher::launch(
@@ -197,16 +342,94 @@ namespace softadastra
 
     if (spec.output_file().has_value())
     {
+      int ready[2]{};
+      int report[2]{};
+
+      if (::pipe(ready) != 0)
+      {
+        return ProcessLaunchError::LaunchFailed;
+      }
+
+      if (::pipe(report) != 0)
+      {
+        ::close(ready[0]);
+        ::close(ready[1]);
+        return ProcessLaunchError::LaunchFailed;
+      }
+
       const pid_t pid = ::fork();
 
       if (pid < 0)
       {
+        ::close(ready[0]);
+        ::close(ready[1]);
+        ::close(report[0]);
+        ::close(report[1]);
         return ProcessLaunchError::LaunchFailed;
       }
 
       if (pid == 0)
       {
-        ::setsid();
+        ::close(report[0]);
+        const pid_t parent = ::getppid();
+
+        if (::setsid() < 0)
+        {
+          _exit(126);
+        }
+
+        const pid_t command = ::fork();
+
+        if (command < 0)
+        {
+          _exit(126);
+        }
+
+        if (command > 0)
+        {
+          ::close(ready[1]);
+          pid_t process_group = -1;
+          int status = 0;
+
+          if (!read_process_group(ready[0], process_group) ||
+              !arm_parent_death_signal(parent, process_group) ||
+              !write_process_group(report[1], process_group))
+          {
+            static_cast<void>(::kill(-process_group, SIGKILL));
+            static_cast<void>(::waitpid(command, nullptr, 0));
+            _exit(126);
+          }
+
+          ::close(ready[0]);
+          ::close(report[1]);
+
+          while (::waitpid(command, &status, 0) < 0 && errno == EINTR)
+          {
+          }
+
+          static_cast<void>(::kill(-process_group, SIGKILL));
+          _exit(
+              WIFEXITED(status)
+                  ? WEXITSTATUS(status)
+                  : 1);
+        }
+
+        ::close(ready[0]);
+        ::close(report[0]);
+        ::close(report[1]);
+        const pid_t command_parent = ::getppid();
+
+        // Preserve the direct child protection: if the supervisor itself
+        // disappears before it can clean up the group, the command dies too.
+        if (::prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 ||
+            ::getppid() != command_parent ||
+            ::setpgid(0, 0) != 0 ||
+            !write_process_group(ready[1], ::getpid()))
+        {
+          _exit(128 + SIGKILL);
+        }
+
+        ::close(ready[1]);
 
         // The Host blocks its own termination signals so its main loop can
         // handle them synchronously. Managed software must not inherit that
@@ -240,6 +463,8 @@ namespace softadastra
         {
           ::close(log);
         }
+
+        close_inherited_descriptors();
 
         if (spec.working_directory().has_value() &&
             ::chdir(spec.working_directory()->c_str()) != 0)
@@ -275,7 +500,21 @@ namespace softadastra
         _exit(127);
       }
 
-      return std::make_unique<NativeProcess>(pid);
+      ::close(ready[0]);
+      ::close(ready[1]);
+      ::close(report[1]);
+      pid_t process_group = -1;
+      const bool ready_to_supervise =
+          read_process_group(report[0], process_group);
+      ::close(report[0]);
+
+      if (!ready_to_supervise)
+      {
+        static_cast<void>(::waitpid(pid, nullptr, 0));
+        return ProcessLaunchError::LaunchFailed;
+      }
+
+      return std::make_unique<NativeProcess>(pid, process_group);
     }
 
 #endif

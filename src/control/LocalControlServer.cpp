@@ -64,6 +64,15 @@ namespace softadastra
              std::to_string(code.value_or(0));
     }
 
+    bool requires_state_checkpoint(
+        const std::vector<std::string> &fields) noexcept
+    {
+      return fields.size() == 2 &&
+             (fields[0] == "start" ||
+              fields[0] == "stop" ||
+              fields[0] == "restart");
+    }
+
   } // namespace
 
   LocalControlServer::LocalControlServer(
@@ -107,7 +116,7 @@ namespace softadastra
 
     descriptor_ = ::socket(
         AF_UNIX,
-        SOCK_SEQPACKET | SOCK_NONBLOCK,
+        SOCK_SEQPACKET | SOCK_NONBLOCK | SOCK_CLOEXEC,
         0);
 
     if (descriptor_ < 0)
@@ -300,6 +309,13 @@ namespace softadastra
           response = handle(server_, request);
         }
 
+        if (requires_state_checkpoint(fields) &&
+            state_persistence_handler_ &&
+            !state_persistence_handler_())
+        {
+          response = "error";
+        }
+
         static_cast<void>(
             ::send(
                 client,
@@ -364,6 +380,13 @@ namespace softadastra
       else
       {
         response = handle(server_, request);
+      }
+
+      if (requires_state_checkpoint(fields) &&
+          state_persistence_handler_ &&
+          !state_persistence_handler_())
+      {
+        response = "error";
       }
 
       DWORD sent{};

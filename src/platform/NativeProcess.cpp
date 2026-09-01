@@ -62,8 +62,11 @@ namespace softadastra
 
 #if defined(__linux__)
 
-  NativeProcess::NativeProcess(pid_t pid) noexcept
-      : native_pid_(pid)
+  NativeProcess::NativeProcess(
+      pid_t pid,
+      pid_t process_group) noexcept
+      : native_pid_(pid),
+        process_group_(process_group > 0 ? process_group : pid)
   {
   }
 
@@ -113,7 +116,7 @@ namespace softadastra
 
     if (native_pid_ > 0)
     {
-      ::kill(-native_pid_, SIGTERM);
+      ::kill(-process_group_, SIGTERM);
 
       int status = 0;
 

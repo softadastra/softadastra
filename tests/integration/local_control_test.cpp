@@ -163,6 +163,19 @@ namespace
       process_ = -1;
     }
 
+    void crash()
+    {
+      if (process_ <= 0)
+      {
+        return;
+      }
+
+      static_cast<void>(::kill(process_, SIGKILL));
+      int status = 0;
+      static_cast<void>(::waitpid(process_, &status, 0));
+      process_ = -1;
+    }
+
     [[nodiscard]] std::string output() const
     {
       pollfd descriptor{output_descriptor_, POLLIN, 0};
@@ -317,6 +330,77 @@ namespace
     std::filesystem::remove_all(state_home);
   }
 
+  TEST(LocalControlTest, RecoversDurablyFromHostCrash)
+  {
+    const auto state_home = std::filesystem::temp_directory_path() /
+                            ("softadastra-crash-" + std::to_string(
+                                std::chrono::steady_clock::now()
+                                    .time_since_epoch()
+                                    .count()));
+    const auto project = state_home / "project";
+    const auto socket = state_home / "softadastra" / "control.sock";
+    const auto state_path = state_home / "softadastra" / "host-state";
+    std::filesystem::create_directories(project);
+    ASSERT_TRUE(softadastra::ProjectConfigFile::create(
+        project, {"crash-test", "exec sleep 30", std::nullopt, {}}));
+
+    HostProcess host(state_home);
+    ASSERT_TRUE(wait_for([&socket]()
+                         { return std::filesystem::exists(socket); }));
+    ASSERT_EQ(invoke_cli(state_home, {"run"}, project).exit_code, 0);
+
+    softadastra::HostState persisted_after_start;
+    ASSERT_TRUE(softadastra::HostStateFile(state_path).load(
+        persisted_after_start));
+    ASSERT_TRUE(persisted_after_start.find_software_by_name("crash-test")
+                    ->desired_running());
+
+    softadastra::ControlClient before_crash(socket);
+    const auto entries = before_crash.software();
+    ASSERT_EQ(entries.size(), 1U);
+    ASSERT_TRUE(entries.front().pid().has_value());
+    const long original_pid = entries.front().pid().value();
+
+    host.crash();
+    EXPECT_TRUE(std::filesystem::exists(socket));
+
+    ASSERT_TRUE(wait_for([original_pid]()
+                         {
+                           errno = 0;
+                           return ::kill(
+                                      static_cast<pid_t>(original_pid),
+                                      0) == -1 &&
+                                  errno == ESRCH;
+                         }));
+
+    HostProcess restored_host(state_home);
+    ASSERT_TRUE(wait_for([&socket]()
+                         { return std::filesystem::exists(socket); }));
+    softadastra::ControlClient after_crash(socket);
+    ASSERT_TRUE(wait_for([&after_crash]()
+                         {
+                           const auto restored = after_crash.software();
+                           return restored.size() == 1U &&
+                                  restored.front().state() ==
+                                      softadastra::SoftwareState::Running;
+                         }));
+    const auto restored = after_crash.software();
+    ASSERT_TRUE(restored.front().pid().has_value());
+    EXPECT_NE(restored.front().pid().value(), original_pid);
+
+    ASSERT_EQ(invoke_cli(state_home, {"stop"}, project).exit_code, 0);
+    softadastra::HostState persisted_after_stop;
+    ASSERT_TRUE(softadastra::HostStateFile(state_path).load(
+        persisted_after_stop));
+    ASSERT_NE(persisted_after_stop.find_software_by_name("crash-test"),
+              nullptr);
+    EXPECT_FALSE(persisted_after_stop.find_software_by_name("crash-test")
+                     ->desired_running());
+
+    restored_host.stop();
+    std::filesystem::remove_all(state_home);
+  }
+
   TEST(LocalControlTest, PreservesRenamedTomlNameAcrossHostRestart)
   {
     const auto state_home = std::filesystem::temp_directory_path() / ("softadastra-rename-restart-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -340,6 +424,7 @@ namespace
     ASSERT_EQ(entries_before_rename.size(), 1U);
     const auto original_id = entries_before_rename.front().id();
     EXPECT_EQ(entries_before_rename.front().name(), "phone-test");
+    ASSERT_EQ(invoke_cli(state_home, {"stop"}, project).exit_code, 0);
     host.stop();
     {
       std::ofstream file(toml);

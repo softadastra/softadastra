@@ -737,6 +737,12 @@ int main(
 #endif
     );
 
+    local_control_server.set_state_persistence_handler(
+        [&state_file, &host]()
+        {
+          return state_file.save(host.state());
+        });
+
     local_control_server.set_shutdown_handler(
         [&host_loop]()
         {

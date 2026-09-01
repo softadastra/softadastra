@@ -64,9 +64,12 @@ namespace softadastra
     /**
      * @brief Creates a native process from a Linux process identifier.
      *
-     * @param pid Native process identifier.
+     * @param pid Native supervisor process identifier.
+     * @param process_group Process group containing the managed software.
      */
-    explicit NativeProcess(pid_t pid) noexcept;
+    explicit NativeProcess(
+        pid_t pid,
+        pid_t process_group = -1) noexcept;
 
     /**
      * @brief Returns the Linux process identifier.
@@ -135,6 +138,7 @@ namespace softadastra
 
 #if defined(__linux__)
     pid_t native_pid_{-1};
+    pid_t process_group_{-1};
 #elif defined(_WIN32)
     DWORD native_pid_{0};
 #else

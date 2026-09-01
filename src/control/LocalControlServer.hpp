@@ -90,6 +90,15 @@ namespace softadastra
     }
 
     /**
+     * @brief Sets the callback that checkpoints Host state before a lifecycle
+     *        response is returned to a client.
+     */
+    void set_state_persistence_handler(std::function<bool()> handler)
+    {
+      state_persistence_handler_ = std::move(handler);
+    }
+
+    /**
      * @brief Executes a request using the shared Host control protocol.
      *
      * @param server Control server that handles the request.
@@ -113,6 +122,7 @@ namespace softadastra
     RemoteAccessConfig *remote_config_;
     RemoteReachability *remote_reachability_;
     std::function<void()> shutdown_handler_;
+    std::function<bool()> state_persistence_handler_;
   };
 
 } // namespace softadastra
