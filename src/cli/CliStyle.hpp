@@ -164,9 +164,8 @@ namespace softadastra::cli::style
   /**
    * @brief Returns an arrow marker suitable for URLs and commands.
    *
-   * A single Unicode arrow is used when color is enabled and the terminal is
-   * assumed to render it; otherwise an ASCII fallback keeps the marker legible
-   * in plain-text output and captured logs.
+   * The portable ASCII marker is styled when color is enabled, and remains
+   * unchanged in plain-text output and captured logs.
    *
    * @param stream Destination stream governing which marker is returned.
    *

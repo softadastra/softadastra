@@ -43,10 +43,15 @@ namespace
 
   namespace style = softadastra::cli::style;
 
-  // Shared column width for all label/value blocks, so that `info`, `status`,
-  // `network info`, and access output align consistently instead of each block
-  // choosing its own hand-tuned padding.
-  constexpr std::size_t field_width = 17;
+  // These are the historical widths of the individual CLI output blocks.
+  // They intentionally differ: output compatibility takes precedence over
+  // visually uniform columns.
+  constexpr std::size_t access_field_width = 15;
+  constexpr std::size_t network_start_field_width = 11;
+  constexpr std::size_t managed_network_field_width = 17;
+  constexpr std::size_t network_info_field_width = 18;
+  constexpr std::size_t managed_network_info_field_width = 19;
+  constexpr std::size_t software_info_field_width = 12;
 
   const char *state_name(
       SoftwareState state) noexcept
@@ -810,19 +815,19 @@ namespace
       return 1;
     }
     const auto result = firewall->status(*rule);
-    std::cout << style::field("Software:", name, field_width) << '\n'
-              << style::field("Access:", access_name(configured), field_width) << '\n';
+    std::cout << style::field("Software:", name, access_field_width) << '\n'
+              << style::field("Access:", access_name(configured), access_field_width) << '\n';
     if (result == LocalFirewallResult::Open)
     {
       const auto ipv4 = network->network_capability().primary_ipv4;
       const auto url = configured.protocol() == AccessProtocol::Https
                            ? AccessUrl::https(ipv4, configured.port())
                            : AccessUrl::http(ipv4, configured.port());
-      std::cout << style::field("Local access:", style::success("allowed"), field_width) << '\n'
-                << style::field("Local URL:", url, field_width) << '\n';
+      std::cout << style::field("Local access:", style::success("allowed"), access_field_width) << '\n'
+                << style::field("Local URL:", url, access_field_width) << '\n';
       return 0;
     }
-    std::cout << style::field("Local access:", style::warning("unavailable"), field_width) << '\n';
+    std::cout << style::field("Local access:", style::warning("unavailable"), access_field_width) << '\n';
     if (result == LocalFirewallResult::PermissionRequired)
       std::cout << style::warning("Firewall rule is blocked.") << '\n';
     else if (result == LocalFirewallResult::Unsupported)
@@ -934,7 +939,7 @@ namespace
                          ? AccessUrl::https(ipv4, access->port())
                          : AccessUrl::http(ipv4, access->port());
     std::cout << style::success("Local access allowed.") << '\n'
-              << style::arrow() << ' ' << url << '\n';
+              << url << '\n';
     return 0;
   }
 
@@ -996,17 +1001,17 @@ namespace
     }
 
     std::cout
-        << style::field("Software:", target.name, field_width)
+        << style::field("Software:", target.name, access_field_width)
         << '\n'
         << style::field(
                "State:",
                state_display(entry->state()),
-               field_width)
+               access_field_width)
         << '\n'
         << style::field(
                "Access:",
                access_name(configured),
-               field_width)
+               access_field_width)
         << '\n';
 
     if (access->state == LocalAccessState::Available)
@@ -1027,7 +1032,7 @@ namespace
               << style::field(
                      "Local access:",
                      style::warning("unavailable"),
-                     field_width)
+                     access_field_width)
               << '\n';
           if (firewall_state == LocalFirewallResult::PermissionRequired)
           {
@@ -1059,12 +1064,12 @@ namespace
           << style::field(
                  "Network:",
                  local_access_network_name(access->network),
-                 field_width)
+                 access_field_width)
           << '\n'
           << style::field(
                  "Local URL:",
                  access->url,
-                 field_width)
+                 access_field_width)
           << "\n\n";
 
       if (!QrCode::print(access->url))
@@ -1083,7 +1088,7 @@ namespace
         << style::field(
                "Local access:",
                style::warning("unavailable"),
-               field_width)
+               access_field_width)
         << '\n';
 
     if (access->firewall == LocalAccessFirewallState::PermissionRequired)
@@ -1146,7 +1151,7 @@ namespace
                  "Managed network:",
                  managed_network_capability_name(
                      access->managed_network_capability),
-                 field_width)
+                 managed_network_field_width)
           << "\n";
     }
 
@@ -1347,9 +1352,9 @@ namespace softadastra
                     : style::success(
                           "Softadastra local network started."))
             << '\n'
-            << style::field("Network:", current->ssid, field_width)
+            << style::field("Network:", current->ssid, network_start_field_width)
             << '\n'
-            << style::field("IPv4:", current->ipv4, field_width)
+            << style::field("IPv4:", current->ipv4, network_start_field_width)
             << '\n';
 
         return 0;
@@ -1398,7 +1403,7 @@ namespace softadastra
             << style::field(
                    "Managed network:",
                    managed_network_state_name(status->state),
-                   field_width)
+                   managed_network_field_width)
             << '\n';
 
         return 0;
@@ -1432,39 +1437,39 @@ namespace softadastra
           << style::field(
                  "State:",
                  network_state_name(capability->state),
-                 field_width)
+                 network_info_field_width)
           << '\n'
           << style::field(
                  "Primary IPv4:",
                  capability->primary_ipv4.empty()
                      ? "-"
                      : capability->primary_ipv4,
-                 field_width)
+                 network_info_field_width)
           << '\n'
           << style::field(
                  "Interface:",
                  capability->primary_interface.empty()
                      ? "-"
                      : capability->primary_interface,
-                 field_width)
+                 network_info_field_width)
           << '\n'
           << style::field(
                  "Type:",
                  network_interface_type_name(
                      capability->interface_type),
-                 field_width)
+                 network_info_field_width)
           << '\n'
           << style::field(
                  "Local network:",
                  local_network_state_name(
                      capability->local_network_state),
-                 field_width)
+                 network_info_field_width)
           << '\n'
           << style::field(
                  "Managed network:",
                  managed_network_capability_name(
                      managed.capability),
-                 field_width);
+                 network_info_field_width);
 
       if (managed.capability ==
           ManagedNetworkCapability::Available)
@@ -1475,7 +1480,7 @@ namespace softadastra
                    "Managed state:",
                    managed_network_state_name(
                        managed.state),
-                   field_width);
+                   network_info_field_width);
 
         if (managed.state ==
             ManagedNetworkState::Running)
@@ -1485,17 +1490,17 @@ namespace softadastra
               << style::field(
                      "Managed interface:",
                      managed.interface_name,
-                     field_width)
+                     managed_network_info_field_width)
               << '\n'
               << style::field(
                      "Managed IPv4:",
                      managed.ipv4,
-                     field_width)
+                     managed_network_info_field_width)
               << '\n'
               << style::field(
                      "Managed SSID:",
                      managed.ssid,
-                     field_width);
+                     managed_network_info_field_width);
         }
       }
 
@@ -1731,12 +1736,11 @@ namespace softadastra
           client_.connectivity_available();
 
       std::cout
-          << style::field(
-                 "network:",
-                 available
-                     ? style::success("available")
-                     : style::warning("unavailable"),
-                 field_width)
+          << style::label("network:")
+          << ' '
+          << (available
+                  ? style::success("available")
+                  : style::warning("unavailable"))
           << '\n';
 
       if (available)
@@ -1745,12 +1749,11 @@ namespace softadastra
             client_.connected();
 
         std::cout
-            << style::field(
-                   "connected:",
-                   connected
-                       ? style::success("yes")
-                       : style::muted("no"),
-                   field_width)
+            << style::label("connected:")
+            << ' '
+            << (connected
+                    ? style::success("yes")
+                    : style::muted("no"))
             << '\n';
       }
 
@@ -1799,15 +1802,11 @@ namespace softadastra
       }
 
       std::cout
+          << style::label("remote reachability:")
+          << ' '
           << (*response == "remote 1"
-                  ? style::field(
-                        "remote reachability:",
-                        style::success("enabled"),
-                        field_width)
-                  : style::field(
-                        "remote reachability:",
-                        style::muted("disabled"),
-                        field_width))
+                  ? style::success("enabled")
+                  : style::muted("disabled"))
           << '\n';
 
       return 0;
@@ -2194,19 +2193,19 @@ namespace softadastra
           *target->entry;
 
       std::cout
-          << style::field("Name:", target->name, field_width)
+          << style::field("Name:", target->name, software_info_field_width)
           << '\n'
           << style::field(
                  "State:",
                  state_display(entry.state()),
-                 field_width)
+                 software_info_field_width)
           << '\n'
           << style::field(
                  "Command:",
                  target->config
                      ? target->config->command
                      : command_name(entry),
-                 field_width)
+                 software_info_field_width)
           << '\n'
           << style::field(
                  "Project:",
@@ -2215,7 +2214,7 @@ namespace softadastra
                      : entry.process_spec()
                            .working_directory()
                            .value_or("-"),
-                 field_width)
+                 software_info_field_width)
           << '\n'
           << style::field(
                  "Access:",
@@ -2223,14 +2222,14 @@ namespace softadastra
                      target->config
                          ? target->config->access
                          : entry.access_point()),
-                 field_width)
+                 software_info_field_width)
           << '\n'
           << style::field(
                  "PID:",
                  entry.pid()
                      ? std::to_string(*entry.pid())
                      : "-",
-                 field_width)
+                 software_info_field_width)
           << '\n';
 
       return 0;

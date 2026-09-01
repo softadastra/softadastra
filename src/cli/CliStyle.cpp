@@ -14,7 +14,6 @@
 
 #include "cli/CliStyle.hpp"
 
-#include <cstdlib>
 #include <string>
 #include <string_view>
 
@@ -34,6 +33,7 @@
 
 #else
 
+#include <cstdlib>
 #include <unistd.h>
 
 #endif
@@ -57,11 +57,21 @@ namespace softadastra::cli::style
     bool has_no_color() noexcept
     {
       // The NO_COLOR convention: any non-empty value disables color.
+#if defined(_WIN32)
+      const DWORD size =
+          GetEnvironmentVariableA(
+              "NO_COLOR",
+              nullptr,
+              0);
+
+      return size != 0;
+#else
       const char *const value =
           std::getenv("NO_COLOR");
 
       return value != nullptr &&
              value[0] != '\0';
+#endif
     }
 
 #if defined(_WIN32)
@@ -291,13 +301,8 @@ namespace softadastra::cli::style
   std::string arrow(
       Stream stream)
   {
-    if (!enabled(stream))
-    {
-      return "->";
-    }
-
     return accent(
-        "\u2192",
+        "->",
         stream);
   }
 

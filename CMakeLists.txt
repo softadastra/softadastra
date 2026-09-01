@@ -5,6 +5,13 @@ project(
   LANGUAGES CXX
 )
 
+# CMake 4.2 normalizes runtime-dependency paths before applying filters.  The
+# filter below is written for normalized paths, so opt into that behavior when
+# the policy exists while retaining compatibility with the project minimum.
+if(POLICY CMP0207)
+  cmake_policy(SET CMP0207 NEW)
+endif()
+
 # Keep the Web UI maintainable as normal source files while embedding it in the
 # offline executable.  Reconfigure when an asset changes so the generated
 # header always follows the source assets.
@@ -295,7 +302,11 @@ if(WIN32)
   install(
     TARGETS softadastra
     RUNTIME_DEPENDENCIES
-      PRE_EXCLUDE_REGEXES "^api-ms-" "^ext-ms-"
+      PRE_EXCLUDE_REGEXES
+        "^api-ms-"
+        "^ext-ms-"
+        "^[Hh]vsiFileTrust\\.dll$"
+        "^[Ww]tdccm\\.dll$"
       POST_EXCLUDE_REGEXES ".*/[Ss]ystem32/.*"
     RUNTIME DESTINATION bin
   )
@@ -306,6 +317,7 @@ set(CPACK_PACKAGE_VENDOR "Softadastra")
 set(CPACK_PACKAGE_CONTACT "Softadastra <support@softadastra.com>")
 set(CPACK_PACKAGE_VERSION "0.1.0")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Softadastra")
+set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}")
 if(WIN32)
   set(CPACK_GENERATOR "ZIP")
 else()
