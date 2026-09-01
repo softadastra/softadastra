@@ -50,7 +50,7 @@ namespace softadastra
 
   bool ControlClient::host_available() const noexcept
   {
-    return server_ != nullptr || request("ping").has_value();
+    return server_ != nullptr || request("ping") == "ok";
   }
 
   bool ControlClient::register_software(

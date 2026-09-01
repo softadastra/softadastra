@@ -311,6 +311,31 @@ namespace
     EXPECT_NE(last_output_.find("softadastra run [name]"), std::string::npos);
   }
 
+  TEST_F(CliE2eTest, ReportsTheCanonicalHostStateAndLifecycleResults)
+  {
+    ASSERT_EQ(run("host status"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Host: stopped"), std::string::npos);
+
+    ASSERT_EQ(run("host start"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Softadastra Host started."), std::string::npos);
+
+    ASSERT_EQ(run("host status"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Host: running"), std::string::npos);
+    ASSERT_EQ(run("host info"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("State:          running"), std::string::npos);
+    ASSERT_EQ(run("box status"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Not provisioned"), std::string::npos);
+
+    ASSERT_EQ(run("host stop"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Softadastra Host stopped."), std::string::npos);
+    ASSERT_EQ(run("host stop"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Softadastra Host is not running."), std::string::npos);
+
+    ASSERT_EQ(run("host restart"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("Softadastra Host restarted."), std::string::npos);
+    ASSERT_EQ(run("host stop"), 0) << last_output_;
+  }
+
   TEST_F(CliE2eTest, RejectsDifferentProjectsWithTheSameName)
   {
     const auto first_project = root_ / "project-a";

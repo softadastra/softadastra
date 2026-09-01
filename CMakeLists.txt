@@ -144,6 +144,7 @@ add_library(
   src/host/HostPeerServer.cpp
   src/host/HostPeerTrust.cpp
   src/host/HostLoop.cpp
+  src/host/HostObservation.cpp
   src/host/LocalAccess.cpp
   src/host/HttpProxy.cpp
   src/host/RemoteReachability.cpp
@@ -673,6 +674,11 @@ if(SOFTADASTRA_BUILD_TESTS)
   softadastra_add_test(
     softadastra_host_state_test
     tests/host/host_state_test.cpp
+  )
+
+  softadastra_add_test(
+    softadastra_host_observation_test
+    tests/host/host_observation_test.cpp
   )
 
   softadastra_add_test(

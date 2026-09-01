@@ -18,6 +18,7 @@
 
 #if defined(__linux__)
 
+#include <cerrno>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
@@ -130,9 +131,62 @@ namespace softadastra
   bool HostInstanceLock::is_held(
       const std::filesystem::path &directory) noexcept
   {
-    HostInstanceLock probe;
+    return probe(directory) == HostInstanceLockState::Held;
+  }
 
-    return !probe.acquire(directory);
+  HostInstanceLockState HostInstanceLock::probe(
+      const std::filesystem::path &directory) noexcept
+  {
+#if defined(__linux__)
+    const int descriptor = ::open(
+        (directory / "host.lock").c_str(),
+        O_CREAT | O_RDWR | O_CLOEXEC,
+        0600);
+
+    if (descriptor < 0)
+    {
+      return errno == ENOENT
+                 ? HostInstanceLockState::Free
+                 : HostInstanceLockState::Error;
+    }
+
+    if (::flock(descriptor, LOCK_EX | LOCK_NB) == 0)
+    {
+      static_cast<void>(::close(descriptor));
+      return HostInstanceLockState::Free;
+    }
+
+    const int error = errno;
+    static_cast<void>(::close(descriptor));
+
+    return error == EWOULDBLOCK || error == EAGAIN
+               ? HostInstanceLockState::Held
+               : HostInstanceLockState::Error;
+
+#elif defined(_WIN32)
+    const std::wstring name =
+        L"Local\\SoftadastraHost-" +
+        std::to_wstring(
+            std::hash<std::wstring>{}(directory.wstring()));
+
+    HANDLE mutex = ::CreateMutexW(nullptr, TRUE, name.c_str());
+
+    if (mutex == nullptr)
+    {
+      return HostInstanceLockState::Error;
+    }
+
+    const DWORD error = ::GetLastError();
+    ::CloseHandle(mutex);
+
+    return error == ERROR_ALREADY_EXISTS
+               ? HostInstanceLockState::Held
+               : HostInstanceLockState::Free;
+
+#else
+    static_cast<void>(directory);
+    return HostInstanceLockState::Error;
+#endif
   }
 
 } // namespace softadastra

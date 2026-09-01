@@ -1,5 +1,6 @@
 #include "control/ControlClient.hpp"
 #include "gateway/ControlLocalGatewayTargetResolver.hpp"
+#include "host/HostObservation.hpp"
 #include "host/LocalGateway.hpp"
 
 #include <cstdint>
@@ -80,7 +81,10 @@ int main(int argc, char **argv)
   if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0) return 1;
 
   softadastra::ControlClient client(arguments.control);
-  if (!client.host_available())
+  if (!softadastra::observe_host(
+           client,
+           arguments.control.parent_path())
+           .available())
   {
     std::cerr << "local control is unavailable\n";
     return 1;

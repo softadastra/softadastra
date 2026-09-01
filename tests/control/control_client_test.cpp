@@ -27,11 +27,75 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
+#include <chrono>
+#include <cstring>
+#include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
+#include <thread>
+
+#if defined(__linux__)
+
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#endif
 
 namespace
 {
+#if defined(__linux__)
+  TEST(ControlClientTest, RejectsAnInvalidPingResponse)
+  {
+    const auto directory = std::filesystem::temp_directory_path() /
+                           ("softadastra-invalid-ping-" +
+                            std::to_string(
+                                std::chrono::steady_clock::now()
+                                    .time_since_epoch()
+                                    .count()));
+    const auto path = directory / "control.sock";
+    std::filesystem::create_directories(directory);
+
+    const int listener = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
+    ASSERT_GE(listener, 0);
+
+    sockaddr_un address{};
+    address.sun_family = AF_UNIX;
+    std::strncpy(
+        address.sun_path,
+        path.c_str(),
+        sizeof(address.sun_path) - 1);
+    ASSERT_EQ(
+        ::bind(
+            listener,
+            reinterpret_cast<const sockaddr *>(&address),
+            sizeof(address)),
+        0);
+    ASSERT_EQ(::listen(listener, 1), 0);
+
+    std::thread server([listener]()
+                       {
+                         const int client = ::accept(listener, nullptr, nullptr);
+                         if (client >= 0)
+                         {
+                           std::array<char, 16> request{};
+                           static_cast<void>(::recv(client, request.data(), request.size(), 0));
+                           static_cast<void>(::send(client, "unexpected", 10, 0));
+                           static_cast<void>(::close(client));
+                         }
+                         static_cast<void>(::close(listener));
+                       });
+
+    softadastra::ControlClient client(path);
+    EXPECT_FALSE(client.host_available());
+
+    server.join();
+    std::filesystem::remove_all(directory);
+  }
+#endif
+
   struct TestProcessState
   {
     bool running{true};

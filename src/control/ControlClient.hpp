@@ -54,9 +54,9 @@ namespace softadastra
     explicit ControlClient(std::filesystem::path path) noexcept;
 
     /**
-     * @brief Checks whether the configured Host control endpoint is reachable.
+     * @brief Checks whether the configured Host control endpoint answers ping.
      *
-     * @return true if the Host can be reached, otherwise false.
+     * @return true only when the Host answers the expected @c ok response.
      */
     [[nodiscard]] bool host_available() const noexcept;
 

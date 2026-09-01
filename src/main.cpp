@@ -20,6 +20,7 @@
 #include "host/Host.hpp"
 #include "host/HostIdentity.hpp"
 #include "host/HostLoop.hpp"
+#include "host/HostObservation.hpp"
 #include "host/HostProfile.hpp"
 #include "host/HostService.hpp"
 #include "host/HostStateFile.hpp"
@@ -69,6 +70,33 @@
 namespace
 {
   constexpr int host_start_attempts = 500;
+
+  softadastra::HostObservation host_observation(
+      const softadastra::ControlClient &client)
+  {
+    return softadastra::observe_host(
+        client,
+        softadastra::NativeDataDirectory::path());
+  }
+
+  bool wait_for_host(
+      const softadastra::ControlClient &client,
+      softadastra::HostAvailability expected,
+      int attempts)
+  {
+    for (int attempt = 0; attempt < attempts; ++attempt)
+    {
+      if (host_observation(client).state == expected)
+      {
+        return true;
+      }
+
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(20));
+    }
+
+    return host_observation(client).state == expected;
+  }
 
 #if defined(__linux__)
 
@@ -749,8 +777,15 @@ int main(
       return 2;
     }
 
-    if (!control_client.host_available())
+    if (!host_observation(control_client).available())
     {
+      if (host_observation(control_client).state !=
+          softadastra::HostAvailability::Stopped)
+      {
+        std::cerr << "Softadastra Host is unavailable\n";
+        return 1;
+      }
+
       if (!start_host_automatically(
               argv[0]))
       {
@@ -760,17 +795,14 @@ int main(
         return 1;
       }
 
-      for (int attempt = 0;
-           attempt < host_start_attempts &&
-           !control_client.host_available();
-           ++attempt)
-      {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(20));
-      }
+      static_cast<void>(
+          wait_for_host(
+              control_client,
+              softadastra::HostAvailability::Running,
+              host_start_attempts));
     }
 
-    if (!control_client.host_available())
+    if (!host_observation(control_client).available())
     {
       std::cerr
           << "Softadastra Host did not become available\n";
@@ -890,8 +922,9 @@ int main(
     if (action == "status" &&
         argc == 3)
     {
-      const bool running =
-          control_client.host_available();
+      const auto observation =
+          host_observation(control_client);
+      const bool running = observation.available();
 
       const auto network =
           running
@@ -930,9 +963,8 @@ int main(
       std::cout
           << "Box:              provisioned\n"
           << "Host:             "
-          << (running
-                  ? "running"
-                  : "stopped")
+          << softadastra::host_availability_name(
+                 observation.state)
           << '\n';
 
       if (state ==
@@ -1044,20 +1076,13 @@ int main(
 
     if (action == "status")
     {
-      const bool responding =
-          control_client.host_available();
-
-      const bool held =
-          softadastra::HostInstanceLock::is_held(
-              softadastra::NativeDataDirectory::path());
+      const auto observation =
+          host_observation(control_client);
 
       std::cout
           << "Host: "
-          << (responding
-                  ? "running"
-                  : (held
-                         ? "stopping"
-                         : "stopped"))
+          << softadastra::host_availability_name(
+                 observation.state)
           << '\n';
 
       return 0;
@@ -1080,10 +1105,16 @@ int main(
           profile_store.load(
               identity.id()));
 
-      if (!control_client.host_available())
+      const auto observation =
+          host_observation(control_client);
+
+      if (!observation.available())
       {
         std::cout
-            << "State:          stopped\n"
+            << "State:          "
+            << softadastra::host_availability_name(
+                   observation.state)
+            << "\n"
             << "Profile:        "
             << softadastra::host_profile_name(
                    profile_store.profile())
@@ -1194,7 +1225,11 @@ int main(
 
     if (action == "stop")
     {
-      if (!control_client.host_available())
+      const auto observation =
+          host_observation(control_client);
+
+      if (observation.state ==
+          softadastra::HostAvailability::Stopped)
       {
         std::cout
             << "Softadastra Host is not running.\n";
@@ -1202,8 +1237,13 @@ int main(
         return 0;
       }
 
-      if (!control_client.request(
-              "shutdown"))
+      if (!observation.available())
+      {
+        std::cerr << "Softadastra Host is unavailable.\n";
+        return 1;
+      }
+
+      if (control_client.request("shutdown") != "shutdown 1")
       {
         std::cerr
             << "Failed to stop Softadastra Host.\n";
@@ -1214,18 +1254,10 @@ int main(
       std::cout
           << "Stopping Softadastra Host...\n";
 
-      for (int index = 0;
-           index < 250 &&
-           softadastra::HostInstanceLock::is_held(
-               softadastra::NativeDataDirectory::path());
-           ++index)
-      {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(20));
-      }
-
-      if (softadastra::HostInstanceLock::is_held(
-              softadastra::NativeDataDirectory::path()))
+      if (!wait_for_host(
+              control_client,
+              softadastra::HostAvailability::Stopped,
+              250))
       {
         std::cerr
             << "Softadastra Host did not stop.\n";
@@ -1242,27 +1274,38 @@ int main(
     if (action == "start" ||
         action == "restart")
     {
-      const bool was_running =
-          control_client.host_available();
+      const auto initial =
+          host_observation(control_client);
+
+      if (initial.state == softadastra::HostAvailability::Unavailable ||
+          initial.state == softadastra::HostAvailability::Unknown)
+      {
+        std::cerr << "Softadastra Host is unavailable.\n";
+        return 1;
+      }
+
+      const bool was_running = initial.available();
 
       if (action == "restart" &&
           was_running)
       {
-        static_cast<void>(
-            control_client.request(
-                "shutdown"));
-
-        for (int index = 0;
-             index < 100 &&
-             control_client.host_available();
-             ++index)
+        if (control_client.request("shutdown") != "shutdown 1")
         {
-          std::this_thread::sleep_for(
-              std::chrono::milliseconds(20));
+          std::cerr << "Failed to stop Softadastra Host.\n";
+          return 1;
+        }
+
+        if (!wait_for_host(
+                control_client,
+                softadastra::HostAvailability::Stopped,
+                250))
+        {
+          std::cerr << "Softadastra Host did not stop.\n";
+          return 1;
         }
       }
 
-      if (!control_client.host_available())
+      if (!host_observation(control_client).available())
       {
         if (!start_host_automatically(
                 argv[0]))
@@ -1270,13 +1313,13 @@ int main(
           return 1;
         }
 
-        for (int index = 0;
-             index < host_start_attempts &&
-             !control_client.host_available();
-             ++index)
+        if (!wait_for_host(
+                control_client,
+                softadastra::HostAvailability::Running,
+                host_start_attempts))
         {
-          std::this_thread::sleep_for(
-              std::chrono::milliseconds(20));
+          std::cerr << "Softadastra Host did not become available\n";
+          return 1;
         }
       }
 
@@ -1344,8 +1387,15 @@ int main(
       !command_help;
 
   if (needs_host &&
-      !control_client.host_available())
+      !host_observation(control_client).available())
   {
+    if (host_observation(control_client).state !=
+        softadastra::HostAvailability::Stopped)
+    {
+      std::cerr << "Softadastra Host is unavailable\n";
+      return 1;
+    }
+
     if (!start_host_automatically(
             argv[0]))
     {
@@ -1355,20 +1405,13 @@ int main(
       return 1;
     }
 
-    for (int attempt = 0;
-         attempt < host_start_attempts;
-         ++attempt)
-    {
-      if (control_client.host_available())
-      {
-        break;
-      }
+    static_cast<void>(
+        wait_for_host(
+            control_client,
+            softadastra::HostAvailability::Running,
+            host_start_attempts));
 
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(20));
-    }
-
-    if (!control_client.host_available())
+    if (!host_observation(control_client).available())
     {
       std::cerr
           << "Softadastra Host did not become available\n";

@@ -14,9 +14,11 @@
 
 #include "cli/Cli.hpp"
 
+#include "host/HostObservation.hpp"
+#include "platform/NativeDataDirectory.hpp"
+
 #include "cli/AccessUrl.hpp"
 #include "cli/CliStyle.hpp"
-#include "platform/NativeDataDirectory.hpp"
 #include "platform/ProcessSpec.hpp"
 #include "platform/QrCode.hpp"
 #include "software/AccessPoint.hpp"
@@ -1857,7 +1859,10 @@ namespace softadastra
       return 0;
     }
 
-    if (!client_.host_available())
+    if (!observe_host(
+             client_,
+             NativeDataDirectory::path())
+             .available())
     {
       std::cerr
           << "Softadastra Host is unavailable\n";

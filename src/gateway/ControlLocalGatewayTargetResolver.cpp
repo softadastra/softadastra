@@ -14,6 +14,9 @@
 
 #include "gateway/ControlLocalGatewayTargetResolver.hpp"
 
+#include "host/HostObservation.hpp"
+#include "platform/NativeDataDirectory.hpp"
+
 namespace softadastra
 {
   ControlLocalGatewayTargetResolver::ControlLocalGatewayTargetResolver(
@@ -25,7 +28,10 @@ namespace softadastra
   LocalGatewayTarget ControlLocalGatewayTargetResolver::resolve(
       std::string_view host) const
   {
-    if (!client_.host_available())
+    if (!observe_host(
+             client_,
+             NativeDataDirectory::path())
+             .available())
     {
       return {
           LocalGatewayLookup::Unavailable,

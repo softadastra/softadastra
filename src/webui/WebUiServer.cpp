@@ -15,7 +15,9 @@
 #include "webui/WebUiServer.hpp"
 
 #include "WebUiAssets.hpp"
+#include "host/HostObservation.hpp"
 #include "platform/NativeDirectoryChooser.hpp"
+#include "platform/NativeDataDirectory.hpp"
 #include "software/ProjectConfig.hpp"
 
 #include <asio/io_context.hpp>
@@ -904,8 +906,13 @@ namespace softadastra
         }
         else if (path == "/api/host")
         {
+          const auto observation =
+              observe_host(
+                  client_,
+                  NativeDataDirectory::path());
+
           status =
-              client_.host_available()
+              observation.available()
                   ? 200
                   : 503;
 
@@ -938,7 +945,9 @@ namespace softadastra
           else
           {
             body =
-                "{\"error\":\"host unavailable\"}";
+                std::string("{\"status\":\"") +
+                host_availability_name(observation.state) +
+                "\"}";
           }
         }
         else if (path == "/api/software")

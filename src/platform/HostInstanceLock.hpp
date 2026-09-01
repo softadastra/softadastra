@@ -25,6 +25,13 @@
 
 namespace softadastra
 {
+  enum class HostInstanceLockState
+  {
+    Free,
+    Held,
+    Error
+  };
+
   /**
    * @brief Holds the runtime lock for one Host data directory.
    *
@@ -58,13 +65,11 @@ namespace softadastra
     [[nodiscard]] bool acquire(
         const std::filesystem::path &directory) noexcept;
 
-    /**
-     * @brief Checks whether the Host data directory is currently locked.
-     *
-     * @param directory Host data directory to inspect.
-     *
-     * @return true if the lock is already held, otherwise false.
-     */
+    /** @brief Probes the current lock state without retaining the lock. */
+    [[nodiscard]] static HostInstanceLockState probe(
+        const std::filesystem::path &directory) noexcept;
+
+    /** @brief Checks whether the Host data directory is currently locked. */
     [[nodiscard]] static bool is_held(
         const std::filesystem::path &directory) noexcept;
 
