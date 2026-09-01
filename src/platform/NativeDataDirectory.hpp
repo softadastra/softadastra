@@ -31,6 +31,14 @@ namespace softadastra
     [[nodiscard]] static std::filesystem::path path();
 
     /**
+     * @brief Returns the fixed state directory of the Linux Box Host.
+     *
+     * On platforms without a system Box Host, this returns the normal local
+     * state directory.
+     */
+    [[nodiscard]] static std::filesystem::path box_path();
+
+    /**
      * @brief Creates the Softadastra state directory when necessary.
      *
      * @return true when the directory exists after the call.

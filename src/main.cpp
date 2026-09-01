@@ -13,6 +13,7 @@
  */
 
 #include "cli/Cli.hpp"
+#include "cli/CliStyle.hpp"
 #include "control/ControlClient.hpp"
 #include "control/ControlServer.hpp"
 #include "control/LocalControlServer.hpp"
@@ -70,6 +71,7 @@
 namespace
 {
   constexpr int host_start_attempts = 500;
+  constexpr std::size_t host_info_field_width = 16;
 
   softadastra::HostObservation host_observation(
       const softadastra::ControlClient &client)
@@ -77,6 +79,35 @@ namespace
     return softadastra::observe_host(
         client,
         softadastra::NativeDataDirectory::path());
+  }
+
+  bool box_host_blocks_user_host()
+  {
+#if defined(__linux__)
+    const auto data_directory =
+        softadastra::NativeDataDirectory::box_path();
+    const softadastra::ControlClient client(
+        data_directory / "control.sock");
+
+    return !softadastra::box_allows_user_host_start(
+        softadastra::observe_host(
+            client,
+            data_directory));
+#else
+    return false;
+#endif
+  }
+
+  bool allow_user_host_start()
+  {
+    if (!box_host_blocks_user_host())
+    {
+      return true;
+    }
+
+    std::cerr
+        << "Softadastra Box Host prevents user Host startup.\n";
+    return false;
   }
 
   bool wait_for_host(
@@ -567,6 +598,11 @@ int main(
 
 #endif
 
+    if (!allow_user_host_start())
+    {
+      return 1;
+    }
+
     const auto data_directory =
         softadastra::NativeDataDirectory::path();
 
@@ -786,6 +822,11 @@ int main(
         return 1;
       }
 
+      if (!allow_user_host_start())
+      {
+        return 1;
+      }
+
       if (!start_host_automatically(
               argv[0]))
       {
@@ -843,15 +884,27 @@ int main(
       std::string(argv[1]) == "box")
   {
     const auto data_directory =
-        softadastra::NativeDataDirectory::path();
+        softadastra::NativeDataDirectory::box_path();
 
-    if (!softadastra::NativeDataDirectory::ensure_exists())
+    std::error_code data_directory_error;
+    std::filesystem::create_directories(
+        data_directory,
+        data_directory_error);
+
+    if (data_directory_error ||
+        !std::filesystem::is_directory(
+            data_directory,
+            data_directory_error) ||
+        data_directory_error)
     {
       std::cerr
           << "failed to initialize Host data directory\n";
 
       return 1;
     }
+
+    softadastra::ControlClient box_control_client(
+        data_directory / "control.sock");
 
     softadastra::HostIdentity identity(
         data_directory / "identity");
@@ -923,12 +976,14 @@ int main(
         argc == 3)
     {
       const auto observation =
-          host_observation(control_client);
+          softadastra::observe_host(
+              box_control_client,
+              data_directory);
       const bool running = observation.available();
 
       const auto network =
           running
-              ? control_client
+              ? box_control_client
                     .managed_network_status()
                     .value_or(
                         softadastra::ManagedNetworkStatus{})
@@ -936,7 +991,7 @@ int main(
 
       const auto reachability =
           running
-              ? control_client
+              ? box_control_client
                     .local_reachability_state()
                     .value_or(
                         softadastra::LocalReachabilityState::
@@ -1080,9 +1135,11 @@ int main(
           host_observation(control_client);
 
       std::cout
-          << "Host: "
-          << softadastra::host_availability_name(
-                 observation.state)
+          << softadastra::cli::style::field(
+                 "Host:",
+                 softadastra::host_availability_name(
+                     observation.state),
+                 6)
           << '\n';
 
       return 0;
@@ -1111,13 +1168,17 @@ int main(
       if (!observation.available())
       {
         std::cout
-            << "State:          "
-            << softadastra::host_availability_name(
-                   observation.state)
-            << "\n"
-            << "Profile:        "
-            << softadastra::host_profile_name(
-                   profile_store.profile())
+            << softadastra::cli::style::field(
+                   "State:",
+                   softadastra::host_availability_name(
+                       observation.state),
+                   host_info_field_width)
+            << '\n'
+            << softadastra::cli::style::field(
+                   "Profile:",
+                   softadastra::host_profile_name(
+                       profile_store.profile()),
+                   host_info_field_width)
             << '\n';
 
         return 0;
@@ -1176,37 +1237,23 @@ int main(
       }
 
       std::cout
-          << "State:          running\n"
-          << "Profile:        "
-          << softadastra::host_profile_name(
-                 profile_store.profile())
-          << "\nHostname:       "
-          << (access
-                  ? access->host_name
-                  : "-")
-          << "\nHost ID:        "
-          << identity.id()
-          << "\nPID:            "
-          << (pid
-                  ? pid->substr(9)
-                  : "-")
-          << "\nIPv4:           "
-          << (access &&
-                      !access->primary_ipv4.empty()
-                  ? access->primary_ipv4
-                  : "-")
-          << "\nLocal name:     "
-          << (identity.id().empty()
-                  ? "-"
-                  : local_name.name())
-          << "\nConnectivity:   "
-          << (control_client.connectivity_available()
-                  ? "available"
-                  : "unavailable")
-          << "\nRemote access:  "
-          << (remote_settings.enabled
-                  ? "enabled"
-                  : "disabled")
+          << softadastra::cli::style::field("State:", "running", host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("Profile:", softadastra::host_profile_name(profile_store.profile()), host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("Hostname:", access ? access->host_name : "-", host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("Host ID:", identity.id(), host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("PID:", pid ? pid->substr(9) : "-", host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("IPv4:", access && !access->primary_ipv4.empty() ? access->primary_ipv4 : "-", host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("Local name:", identity.id().empty() ? "-" : local_name.name(), host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("Connectivity:", control_client.connectivity_available() ? "available" : "unavailable", host_info_field_width)
+          << '\n'
+          << softadastra::cli::style::field("Remote access:", remote_settings.enabled ? "enabled" : "disabled", host_info_field_width)
           << "\n\nSoftware:\n"
           << "  total:    "
           << entries.size()
@@ -1232,7 +1279,9 @@ int main(
           softadastra::HostAvailability::Stopped)
       {
         std::cout
-            << "Softadastra Host is not running.\n";
+            << softadastra::cli::style::warning(
+                   "already stopped:")
+            << " host\n";
 
         return 0;
       }
@@ -1251,9 +1300,6 @@ int main(
         return 1;
       }
 
-      std::cout
-          << "Stopping Softadastra Host...\n";
-
       if (!wait_for_host(
               control_client,
               softadastra::HostAvailability::Stopped,
@@ -1266,7 +1312,8 @@ int main(
       }
 
       std::cout
-          << "Softadastra Host stopped.\n";
+          << softadastra::cli::style::success("stopped:")
+          << " host\n";
 
       return 0;
     }
@@ -1285,6 +1332,12 @@ int main(
       }
 
       const bool was_running = initial.available();
+
+      if (!was_running &&
+          !allow_user_host_start())
+      {
+        return 1;
+      }
 
       if (action == "restart" &&
           was_running)
@@ -1325,10 +1378,11 @@ int main(
 
       std::cout
           << (action == "restart"
-                  ? "Softadastra Host restarted.\n"
+                  ? softadastra::cli::style::success("restarted:")
                   : (was_running
-                         ? "Softadastra Host is already running.\n"
-                         : "Softadastra Host started.\n"));
+                         ? softadastra::cli::style::warning("already running:")
+                         : softadastra::cli::style::success("started:")))
+          << " host\n";
 
       return 0;
     }
@@ -1393,6 +1447,11 @@ int main(
         softadastra::HostAvailability::Stopped)
     {
       std::cerr << "Softadastra Host is unavailable\n";
+      return 1;
+    }
+
+    if (!allow_user_host_start())
+    {
       return 1;
     }
 

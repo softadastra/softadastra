@@ -49,4 +49,10 @@ namespace softadastra
 
     return "unknown";
   }
+
+  bool box_allows_user_host_start(
+      HostObservation observation) noexcept
+  {
+    return observation.state == HostAvailability::Stopped;
+  }
 } // namespace softadastra

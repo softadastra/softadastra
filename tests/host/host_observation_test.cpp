@@ -90,4 +90,16 @@ namespace
             softadastra::HostAvailability::Unknown),
         "unknown");
   }
+
+  TEST(HostObservationTest, AllowsUserHostOnlyWhenBoxIsStopped)
+  {
+    EXPECT_TRUE(softadastra::box_allows_user_host_start(
+        {softadastra::HostAvailability::Stopped}));
+    EXPECT_FALSE(softadastra::box_allows_user_host_start(
+        {softadastra::HostAvailability::Running}));
+    EXPECT_FALSE(softadastra::box_allows_user_host_start(
+        {softadastra::HostAvailability::Unavailable}));
+    EXPECT_FALSE(softadastra::box_allows_user_host_start(
+        {softadastra::HostAvailability::Unknown}));
+  }
 } // namespace

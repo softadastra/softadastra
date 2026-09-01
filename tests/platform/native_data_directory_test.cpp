@@ -34,4 +34,17 @@ namespace
     EXPECT_TRUE(std::filesystem::is_directory(
         softadastra::NativeDataDirectory::path()));
   }
+
+  TEST(NativeDataDirectoryTest, UsesTheFixedLinuxBoxDirectory)
+  {
+#if defined(__linux__)
+    EXPECT_EQ(
+        softadastra::NativeDataDirectory::box_path(),
+        std::filesystem::path("/var/lib/softadastra"));
+#else
+    EXPECT_EQ(
+        softadastra::NativeDataDirectory::box_path(),
+        softadastra::NativeDataDirectory::path());
+#endif
+  }
 } // namespace

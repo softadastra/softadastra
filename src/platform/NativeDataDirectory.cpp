@@ -49,6 +49,15 @@ namespace softadastra
 #endif
   }
 
+  std::filesystem::path NativeDataDirectory::box_path()
+  {
+#if defined(__linux__)
+    return "/var/lib/softadastra";
+#else
+    return path();
+#endif
+  }
+
   bool NativeDataDirectory::ensure_exists()
   {
     std::error_code error;

@@ -317,22 +317,22 @@ namespace
     EXPECT_NE(last_output_.find("Host: stopped"), std::string::npos);
 
     ASSERT_EQ(run("host start"), 0) << last_output_;
-    EXPECT_NE(last_output_.find("Softadastra Host started."), std::string::npos);
+    EXPECT_NE(last_output_.find("started: host"), std::string::npos);
+    ASSERT_EQ(run("host start"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("already running: host"), std::string::npos);
 
     ASSERT_EQ(run("host status"), 0) << last_output_;
     EXPECT_NE(last_output_.find("Host: running"), std::string::npos);
     ASSERT_EQ(run("host info"), 0) << last_output_;
     EXPECT_NE(last_output_.find("State:          running"), std::string::npos);
-    ASSERT_EQ(run("box status"), 0) << last_output_;
-    EXPECT_NE(last_output_.find("Not provisioned"), std::string::npos);
 
     ASSERT_EQ(run("host stop"), 0) << last_output_;
-    EXPECT_NE(last_output_.find("Softadastra Host stopped."), std::string::npos);
+    EXPECT_NE(last_output_.find("stopped: host"), std::string::npos);
     ASSERT_EQ(run("host stop"), 0) << last_output_;
-    EXPECT_NE(last_output_.find("Softadastra Host is not running."), std::string::npos);
+    EXPECT_NE(last_output_.find("already stopped: host"), std::string::npos);
 
     ASSERT_EQ(run("host restart"), 0) << last_output_;
-    EXPECT_NE(last_output_.find("Softadastra Host restarted."), std::string::npos);
+    EXPECT_NE(last_output_.find("restarted: host"), std::string::npos);
     ASSERT_EQ(run("host stop"), 0) << last_output_;
   }
 
