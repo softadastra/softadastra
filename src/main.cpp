@@ -79,21 +79,59 @@ namespace
   constexpr std::size_t host_info_field_width = 16;
 
 #if defined(__linux__)
-  bool prepare_box_prerequisites(const std::filesystem::path &directory)
+
+  bool prepare_box_prerequisites(
+      const std::filesystem::path &directory)
   {
-    if (::geteuid() != 0) return false;
+    if (::geteuid() != 0)
+    {
+      return false;
+    }
+
     if (::getgrnam("softadastra") == nullptr &&
-        std::system("groupadd --system softadastra") != 0) return false;
+        std::system("groupadd --system softadastra") != 0)
+    {
+      return false;
+    }
+
     if (::getpwnam("softadastra") == nullptr &&
-        std::system("useradd --system --gid softadastra --home-dir /var/lib/softadastra --shell /usr/sbin/nologin softadastra") != 0) return false;
-    const auto *account = ::getpwnam("softadastra");
-    if (account == nullptr) return false;
+        std::system(
+            "useradd --system --gid softadastra "
+            "--home-dir /var/lib/softadastra "
+            "--shell /usr/sbin/nologin softadastra") != 0)
+    {
+      return false;
+    }
+
+    const auto *account =
+        ::getpwnam("softadastra");
+
+    if (account == nullptr)
+    {
+      return false;
+    }
+
     std::error_code error;
-    std::filesystem::create_directories(directory, error);
-    if (error || ::chown(directory.c_str(), account->pw_uid, account->pw_gid) != 0 ||
-        ::chmod(directory.c_str(), 0750) != 0) return false;
+
+    std::filesystem::create_directories(
+        directory,
+        error);
+
+    if (error ||
+        ::chown(
+            directory.c_str(),
+            account->pw_uid,
+            account->pw_gid) != 0 ||
+        ::chmod(
+            directory.c_str(),
+            0750) != 0)
+    {
+      return false;
+    }
+
     return true;
   }
+
 #endif
 
   softadastra::HostObservation host_observation(
@@ -107,8 +145,10 @@ namespace
   bool box_host_blocks_user_host()
   {
 #if defined(__linux__)
+
     const auto data_directory =
         softadastra::NativeDataDirectory::box_path();
+
     const softadastra::ControlClient client(
         data_directory / "control.sock");
 
@@ -116,8 +156,11 @@ namespace
         softadastra::observe_host(
             client,
             data_directory));
+
 #else
+
     return false;
+
 #endif
   }
 

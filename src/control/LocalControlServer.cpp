@@ -665,7 +665,8 @@ namespace softadastra
     {
       const auto id = LocalControlProtocol::decode(fields[1]);
       const auto accesses = id ? server.local_accesses(SoftwareId(*id)) : std::nullopt;
-      if (!accesses) return "error";
+      if (!accesses)
+        return "error";
       std::string response = "local-accesses " + std::to_string(accesses->size());
       for (const auto &access : *accesses)
       {

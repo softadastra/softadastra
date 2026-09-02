@@ -241,19 +241,19 @@ namespace softadastra
     const char *header =
         version_eight
             ? header_v8
-            : version_seven
-                  ? header_v7
-                  : version_six
-                        ? header_v6
-                        : version_five
-                              ? header_v5
-                              : version_four
-                                    ? header_v4
-                                    : version_three
-                                          ? header_v3
-                                          : version_two
-                                                ? header_v2
-                                                : header_v1;
+        : version_seven
+            ? header_v7
+        : version_six
+            ? header_v6
+        : version_five
+            ? header_v5
+        : version_four
+            ? header_v4
+        : version_three
+            ? header_v3
+        : version_two
+            ? header_v2
+            : header_v1;
 
     std::size_t offset =
         std::char_traits<char>::length(header);

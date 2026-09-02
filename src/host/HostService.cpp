@@ -282,8 +282,10 @@ namespace softadastra
 
     const auto access = std::find_if(
         entry->access_points().begin(), entry->access_points().end(),
-        [](const AccessPoint &point) { return point.protocol() == AccessProtocol::Http; });
-    if (access == entry->access_points().end()) return {};
+        [](const AccessPoint &point)
+        { return point.protocol() == AccessProtocol::Http; });
+    if (access == entry->access_points().end())
+      return {};
     return {LocalGatewayLookup::Http, access->port()};
   }
 

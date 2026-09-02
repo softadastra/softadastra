@@ -352,11 +352,7 @@ namespace
     ASSERT_TRUE(std::filesystem::remove(root / "softadastra.toml"));
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
         root,
-        {"renamed", "second-command",
-         softadastra::AccessPoint::create(
-             softadastra::AccessProtocol::Http,
-             8080),
-         {}}));
+        {"renamed", "second-command", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080), {}}));
     EXPECT_EQ(cli.run(2, run_args), 0);
     std::filesystem::current_path(previous);
 
@@ -908,11 +904,7 @@ namespace
     EXPECT_NE(output.find("Access:        https:8443"), std::string::npos);
     EXPECT_NE(output.find("https://10.56.116.55:8443"), std::string::npos);
 
-    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
-                                    softadastra::NetworkInterfaceType::Unknown,
-                                    softadastra::LocalNetworkState::Unavailable,
-                                    softadastra::ManagedNetworkCapability::Unavailable,
-                                    {}};
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Unavailable, {}};
     testing::internal::CaptureStdout();
     EXPECT_EQ(cli.run(3, access_secure), 1);
     output = testing::internal::GetCapturedStdout();
@@ -933,11 +925,7 @@ namespace
     const auto id = softadastra::SoftwareId("api");
     ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.start_software(id));
-    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
-                                    softadastra::NetworkInterfaceType::Unknown,
-                                    softadastra::LocalNetworkState::Unavailable,
-                                    softadastra::ManagedNetworkCapability::Available,
-                                    {}};
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available, {}};
     platform.managed_network_.current = {softadastra::ManagedNetworkCapability::Available, softadastra::ManagedNetworkState::Stopped, "wlan1", "10.42.0.1", "Softadastra-test"};
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Started;
     const char *access[] = {"softadastra", "access", "api"};
@@ -1004,11 +992,7 @@ namespace
     const auto id = softadastra::SoftwareId("api");
     ASSERT_TRUE(client.register_software(id, softadastra::ProcessSpec("api"), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8080)));
     ASSERT_TRUE(client.start_software(id));
-    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "",
-                                    softadastra::NetworkInterfaceType::Unknown,
-                                    softadastra::LocalNetworkState::Unavailable,
-                                    softadastra::ManagedNetworkCapability::Available,
-                                    {}};
+    platform.network_.capability = {softadastra::NetworkState::Unavailable, "", "", softadastra::NetworkInterfaceType::Unknown, softadastra::LocalNetworkState::Unavailable, softadastra::ManagedNetworkCapability::Available, {}};
     platform.managed_network_.current.capability = softadastra::ManagedNetworkCapability::Available;
     platform.managed_network_.start_result = softadastra::ManagedNetworkStartResult::Failed;
     const char *access[] = {"softadastra", "access", "api"};
@@ -1157,10 +1141,14 @@ namespace
     Platform platform;
     platform.network_.capability.primary_ipv4 = "192.168.1.7";
     platform.network_.capability.local_subnet = "192.168.1.0/24";
-    softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
-    Firewall firewall; softadastra::Cli cli(client, platform.network_, platform.managed_network_, firewall);
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    Firewall firewall;
+    softadastra::Cli cli(client, platform.network_, platform.managed_network_, firewall);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
     const char *access[] = {"softadastra", "access"};
     EXPECT_EQ(cli.run(2, access), 0);
     std::filesystem::current_path(previous);
@@ -1178,14 +1166,18 @@ namespace
     std::filesystem::create_directories(root);
     Platform platform;
     platform.network_.capability.local_subnet = "10.0.0.0/24";
-    softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
     ASSERT_TRUE(client.register_software(softadastra::SoftwareId("named"), softadastra::ProcessSpec("app", {}, root.string()), softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8090), std::nullopt, "named"));
-    Firewall firewall; softadastra::Cli cli(client, platform.network_, platform.managed_network_, firewall);
+    Firewall firewall;
+    softadastra::Cli cli(client, platform.network_, platform.managed_network_, firewall);
     const char *access[] = {"softadastra", "access", "named"};
     EXPECT_EQ(cli.run(3, access), 0);
     EXPECT_EQ(firewall.status_calls, 1);
-    EXPECT_EQ(firewall.last_rule.owner, [&] { std::uint64_t hash = 1469598103934665603ULL; for (const char character : std::filesystem::weakly_canonical(root).string()) { hash ^= static_cast<unsigned char>(character); hash *= 1099511628211ULL; } std::ostringstream tag; tag << "softadastra:" << std::hex << hash; return tag.str(); }());
+    EXPECT_EQ(firewall.last_rule.owner, [&]
+              { std::uint64_t hash = 1469598103934665603ULL; for (const char character : std::filesystem::weakly_canonical(root).string()) { hash ^= static_cast<unsigned char>(character); hash *= 1099511628211ULL; } std::ostringstream tag; tag << "softadastra:" << std::hex << hash; return tag.str(); }());
     EXPECT_EQ(firewall.allow_calls, 0);
     EXPECT_EQ(firewall.deny_calls, 0);
     std::filesystem::remove_all(root);
@@ -1198,9 +1190,12 @@ namespace
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {"app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8085), {}}));
     Platform platform;
     platform.network_.capability.local_subnet = "192.168.1.0/24";
-    softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
     const char *run[] = {"softadastra", "run"};
     softadastra::Cli cli(client, platform.network_, platform.managed_network_, platform.firewall_);
     testing::internal::CaptureStdout();
@@ -1223,9 +1218,12 @@ namespace
     Platform platform;
     platform.network_.capability.local_subnet = "192.168.1.0/24";
     platform.firewall_.status_result = softadastra::LocalFirewallResult::PermissionRequired;
-    softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
     const char *run[] = {"softadastra", "run"};
     softadastra::Cli cli(client, platform.network_, platform.managed_network_, platform.firewall_);
     testing::internal::CaptureStdout();
@@ -1251,9 +1249,7 @@ namespace
                       "softadastra-run-after-deny-firewall";
     std::filesystem::create_directories(root);
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
-        root, {"app", "sleep 30",
-               softadastra::AccessPoint::create(
-                   softadastra::AccessProtocol::Http, 8087), {}}));
+        root, {"app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8087), {}}));
     Platform platform;
     platform.network_.capability.local_subnet = "192.168.1.0/24";
     softadastra::Host host(platform);
@@ -1292,9 +1288,7 @@ namespace
                       "softadastra-access-run-blocked-firewall";
     std::filesystem::create_directories(root);
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
-        root, {"app", "sleep 30",
-               softadastra::AccessPoint::create(
-                   softadastra::AccessProtocol::Http, 8088), {}}));
+        root, {"app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8088), {}}));
     Platform platform;
     platform.network_.capability.local_subnet = "192.168.1.0/24";
     softadastra::Host host(platform);
@@ -1333,9 +1327,7 @@ namespace
                       "softadastra-firewall-status-distinction";
     std::filesystem::create_directories(root);
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(
-        root, {"app", "sleep 30",
-               softadastra::AccessPoint::create(
-                   softadastra::AccessProtocol::Http, 8089), {}}));
+        root, {"app", "sleep 30", softadastra::AccessPoint::create(softadastra::AccessProtocol::Http, 8089), {}}));
     Platform platform;
     platform.network_.capability.local_subnet = "192.168.1.0/24";
     softadastra::Host host(platform);
@@ -1415,11 +1407,15 @@ namespace
     ASSERT_TRUE(softadastra::ProjectConfigFile::create(root, {"access-test", "sleep 30", std::nullopt, {*http, *ws}}));
     Platform platform;
     platform.network_.capability.local_subnet = "192.168.1.0/24";
-    softadastra::Host host(platform); softadastra::HostService service(host, platform.launcher);
-    softadastra::ControlServer server(service); softadastra::ControlClient client(server);
+    softadastra::Host host(platform);
+    softadastra::HostService service(host, platform.launcher);
+    softadastra::ControlServer server(service);
+    softadastra::ControlClient client(server);
     softadastra::Cli cli(client, platform.network_, platform.managed_network_, platform.firewall_);
-    const auto previous = std::filesystem::current_path(); std::filesystem::current_path(root);
-    const char *run[] = {"softadastra", "run"}; const char *access[] = {"softadastra", "access"};
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const char *run[] = {"softadastra", "run"};
+    const char *access[] = {"softadastra", "access"};
     ASSERT_EQ(cli.run(2, run), 0);
     testing::internal::CaptureStdout();
     EXPECT_EQ(cli.run(2, access), 0);

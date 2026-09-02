@@ -32,8 +32,8 @@ namespace softadastra
     LaunchFailed,
     ProcessExitedSuccessfully,
     ProcessExitedWithNonZeroCode,
-    StopFailed
-    ,LocalAccessUnavailable
+    StopFailed,
+    LocalAccessUnavailable
   };
 
   /**

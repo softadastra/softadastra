@@ -434,10 +434,10 @@ namespace
           "\",\"url\":\"";
 
       const auto access = local_accesses
-          ? std::find_if(local_accesses->begin(), local_accesses->end(),
-              [&point](const softadastra::LocalAccess &value)
-              { return value.protocol == point.protocol() && value.port == point.port(); })
-          : std::vector<softadastra::LocalAccess>::const_iterator{};
+                              ? std::find_if(local_accesses->begin(), local_accesses->end(),
+                                             [&point](const softadastra::LocalAccess &value)
+                                             { return value.protocol == point.protocol() && value.port == point.port(); })
+                              : std::vector<softadastra::LocalAccess>::const_iterator{};
       if (local_accesses && access != local_accesses->end() &&
           access->state == softadastra::LocalAccessState::Available)
       {

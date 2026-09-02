@@ -309,7 +309,7 @@ namespace softadastra
       const long limit = ::sysconf(_SC_OPEN_MAX);
       const int maximum =
           limit > 3 &&
-          limit <= std::numeric_limits<int>::max()
+                  limit <= std::numeric_limits<int>::max()
               ? static_cast<int>(limit)
               : 65536;
 

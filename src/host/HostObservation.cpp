@@ -1,6 +1,15 @@
 /**
  *
  *  @file HostObservation.cpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Gaspard Kirira.
+ *  https://github.com/softadastra/softadastra
+ *
+ *  Licensed under the Apache License, Version 2.0.
+ *  See the LICENSE file in the project root for license information.
+ *
+ *  Softadastra
  */
 
 #include "host/HostObservation.hpp"
@@ -16,20 +25,29 @@ namespace softadastra
   {
     if (client.host_available())
     {
-      return {HostAvailability::Running};
+      return {
+          HostAvailability::Running};
     }
 
-    switch (HostInstanceLock::probe(data_directory))
+    switch (
+        HostInstanceLock::probe(
+            data_directory))
     {
     case HostInstanceLockState::Free:
-      return {HostAvailability::Stopped};
+      return {
+          HostAvailability::Stopped};
+
     case HostInstanceLockState::Held:
-      return {HostAvailability::Unavailable};
+      return {
+          HostAvailability::Unavailable};
+
     case HostInstanceLockState::Error:
-      return {HostAvailability::Unknown};
+      return {
+          HostAvailability::Unknown};
     }
 
-    return {HostAvailability::Unknown};
+    return {
+        HostAvailability::Unknown};
   }
 
   const char *host_availability_name(
@@ -39,10 +57,13 @@ namespace softadastra
     {
     case HostAvailability::Running:
       return "running";
+
     case HostAvailability::Stopped:
       return "stopped";
+
     case HostAvailability::Unavailable:
       return "unavailable";
+
     case HostAvailability::Unknown:
       return "unknown";
     }
@@ -53,6 +74,8 @@ namespace softadastra
   bool box_allows_user_host_start(
       HostObservation observation) noexcept
   {
-    return observation.state == HostAvailability::Stopped;
+    return observation.state ==
+           HostAvailability::Stopped;
   }
+
 } // namespace softadastra

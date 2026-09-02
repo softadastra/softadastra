@@ -68,10 +68,14 @@ namespace softadastra
   {
     switch (state)
     {
-    case SoftwareState::Stopped: return "stopped";
-    case SoftwareState::Starting: return "starting";
-    case SoftwareState::Running: return "running";
-    case SoftwareState::Failed: return "failed";
+    case SoftwareState::Stopped:
+      return "stopped";
+    case SoftwareState::Starting:
+      return "starting";
+    case SoftwareState::Running:
+      return "running";
+    case SoftwareState::Failed:
+      return "failed";
     }
     return "unknown";
   }

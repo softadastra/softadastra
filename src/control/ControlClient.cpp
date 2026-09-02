@@ -779,7 +779,8 @@ namespace softadastra
     }
     const auto response = request("local-accesses " + LocalControlProtocol::encode(id.value()));
     const auto fields = response ? LocalControlProtocol::fields(*response) : std::vector<std::string>{};
-    if (fields.size() < 2 || fields[0] != "local-accesses") return std::nullopt;
+    if (fields.size() < 2 || fields[0] != "local-accesses")
+      return std::nullopt;
     const auto count = LocalControlProtocol::integer(fields[1]);
     if (!count || *count < 0 || fields.size() != 2U + static_cast<std::size_t>(*count) * 11U)
       return std::nullopt;
@@ -802,11 +803,12 @@ namespace softadastra
           !managed_network || !start_failed || !firewall || !subnet || *state < 0 || *state > 1 ||
           *protocol < 0 || *protocol > 2 || *port < 1 || *port > 65535 || *network < 0 || *network > 2 ||
           *local_network < 0 || *local_network > 1 || *managed_network < 0 || *managed_network > 1 ||
-          *firewall < 0 || *firewall > 4 || (*start_failed != 0 && *start_failed != 1)) return std::nullopt;
+          *firewall < 0 || *firewall > 4 || (*start_failed != 0 && *start_failed != 1))
+        return std::nullopt;
       result.push_back({static_cast<LocalAccessState>(*state), static_cast<AccessProtocol>(*protocol),
-          static_cast<std::uint16_t>(*port), *ipv4, *url, static_cast<LocalAccessNetwork>(*network),
-          static_cast<LocalNetworkState>(*local_network), static_cast<ManagedNetworkCapability>(*managed_network),
-          *start_failed != 0, static_cast<LocalAccessFirewallState>(*firewall), *subnet});
+                        static_cast<std::uint16_t>(*port), *ipv4, *url, static_cast<LocalAccessNetwork>(*network),
+                        static_cast<LocalNetworkState>(*local_network), static_cast<ManagedNetworkCapability>(*managed_network),
+                        *start_failed != 0, static_cast<LocalAccessFirewallState>(*firewall), *subnet});
     }
     return result;
   }

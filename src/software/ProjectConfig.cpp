@@ -516,7 +516,7 @@ namespace softadastra
                  std::string(
                      AccessPoint::name(
                          point.protocol())))
-        << "\nport = "
+          << "\nport = "
           << std::to_string(
                  point.port())
           << "\n";

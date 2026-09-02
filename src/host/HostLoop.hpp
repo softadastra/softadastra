@@ -52,9 +52,9 @@ namespace softadastra
         HostService &host_service,
         HostStateFile &state_file,
         std::chrono::milliseconds interval = std::chrono::seconds(1),
-      LocalControlServer *local_control_server = nullptr,
-      const HostProfileStore *profile_store = nullptr,
-      LocalReachability *local_reachability = nullptr) noexcept;
+        LocalControlServer *local_control_server = nullptr,
+        const HostProfileStore *profile_store = nullptr,
+        LocalReachability *local_reachability = nullptr) noexcept;
 
     /**
      * @brief Restores state and runs until a stop request is received.

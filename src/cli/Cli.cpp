@@ -93,17 +93,18 @@ namespace
 
   std::string access_name(const std::vector<AccessPoint> &accesses)
   {
-    if (accesses.empty()) return "-";
+    if (accesses.empty())
+      return "-";
     std::string result;
     for (const auto &access : accesses)
     {
-      if (!result.empty()) result += ", ";
+      if (!result.empty())
+        result += ", ";
       result += std::string(AccessPoint::name(access.protocol())) + ":" +
                 std::to_string(access.port());
     }
     return result;
   }
-
 
   std::string command_name(
       const SoftwareEntry &entry)
@@ -190,16 +191,26 @@ namespace
   {
     switch (result.error().value_or(SoftwareOperationError::LaunchFailed))
     {
-    case SoftwareOperationError::ProcessExitedSuccessfully: return "exited successfully";
-    case SoftwareOperationError::ProcessExitedWithNonZeroCode: return "process exited with code " + std::to_string(result.exit_code().value_or(-1));
-    case SoftwareOperationError::SoftwareUnknown: return "software is unknown";
-    case SoftwareOperationError::AlreadyRunning: return "software is already running";
-    case SoftwareOperationError::NotRunning: return "software is not running";
-    case SoftwareOperationError::ExecutableNotFound: return "command could not be started";
-    case SoftwareOperationError::PermissionDenied: return "permission denied";
-    case SoftwareOperationError::LaunchFailed: return "launch failed";
-    case SoftwareOperationError::StopFailed: return "stop failed";
-    case SoftwareOperationError::LocalAccessUnavailable: return "local access could not be opened on this Host";
+    case SoftwareOperationError::ProcessExitedSuccessfully:
+      return "exited successfully";
+    case SoftwareOperationError::ProcessExitedWithNonZeroCode:
+      return "process exited with code " + std::to_string(result.exit_code().value_or(-1));
+    case SoftwareOperationError::SoftwareUnknown:
+      return "software is unknown";
+    case SoftwareOperationError::AlreadyRunning:
+      return "software is already running";
+    case SoftwareOperationError::NotRunning:
+      return "software is not running";
+    case SoftwareOperationError::ExecutableNotFound:
+      return "command could not be started";
+    case SoftwareOperationError::PermissionDenied:
+      return "permission denied";
+    case SoftwareOperationError::LaunchFailed:
+      return "launch failed";
+    case SoftwareOperationError::StopFailed:
+      return "stop failed";
+    case SoftwareOperationError::LocalAccessUnavailable:
+      return "local access could not be opened on this Host";
     }
     return "launch failed";
   }
@@ -211,9 +222,10 @@ namespace
   {
     if (result)
     {
-      std::cout << '\n' << style::field(
-          state == SoftwareState::Failed ? "Reason:" : "Result:",
-          operation_result_text(*result), width);
+      std::cout << '\n'
+                << style::field(
+                       state == SoftwareState::Failed ? "Reason:" : "Result:",
+                       operation_result_text(*result), width);
     }
   }
 
@@ -675,7 +687,8 @@ namespace
   {
     if (target.config)
     {
-      if (!target.config->access_points.empty()) return target.config->access_points;
+      if (!target.config->access_points.empty())
+        return target.config->access_points;
       return target.config->access ? std::vector<AccessPoint>{*target.config->access}
                                    : std::vector<AccessPoint>{};
     }
@@ -1077,7 +1090,8 @@ namespace
     {
       const auto accesses = client->local_accesses(target.id);
       if (accesses && std::any_of(accesses->begin(), accesses->end(),
-          [](const LocalAccess &access) { return access.state == LocalAccessState::Available; }))
+                                  [](const LocalAccess &access)
+                                  { return access.state == LocalAccessState::Available; }))
       {
         bool failed = false;
         std::cout << style::field("Software:", target.name, access_field_width) << '\n';
@@ -1093,8 +1107,13 @@ namespace
           const bool available = access.state == LocalAccessState::Available && firewall_allows_local_access(status);
           std::cout << style::field("Access:", std::string(AccessPoint::name(access.protocol)) + ":" + std::to_string(access.port), access_field_width) << '\n'
                     << style::field("Local access:", available ? style::success("allowed") : style::warning("unavailable"), access_field_width) << '\n';
-          if (available) std::cout << style::field("Local URL:", access.url, access_field_width) << '\n';
-          else { print_local_firewall_reason(status); failed = true; }
+          if (available)
+            std::cout << style::field("Local URL:", access.url, access_field_width) << '\n';
+          else
+          {
+            print_local_firewall_reason(status);
+            failed = true;
+          }
         }
         return failed ? 1 : 0;
       }
@@ -1200,7 +1219,8 @@ namespace
       return 1;
     }
     auto accesses = project->second.access_points;
-    if (accesses.empty() && project->second.access) accesses.push_back(*project->second.access);
+    if (accesses.empty() && project->second.access)
+      accesses.push_back(*project->second.access);
     if (accesses.empty())
     {
       std::cerr << "A usable local network and Access are required.\n";
@@ -1210,11 +1230,27 @@ namespace
     for (const auto &access : accesses)
     {
       const auto rule = local_firewall_rule(network, project->first, access);
-      if (!rule) { std::cerr << "A usable local network and Access are required.\n"; return 1; }
+      if (!rule)
+      {
+        std::cerr << "A usable local network and Access are required.\n";
+        return 1;
+      }
       const auto status = local_firewall_status(action == "allow" ? firewall->allow(*rule) : firewall->deny(*rule));
-      if (status == LocalAccessFirewallStatus::Blocked) { std::cerr << "Firewall authorization was cancelled or denied.\n"; return 1; }
-      if (status == LocalAccessFirewallStatus::Unsupported) { std::cerr << "Local firewall access is unsupported on this Host.\n"; return 1; }
-      if (status != LocalAccessFirewallStatus::Allowed) { std::cerr << "Local firewall access could not be changed.\n"; return 1; }
+      if (status == LocalAccessFirewallStatus::Blocked)
+      {
+        std::cerr << "Firewall authorization was cancelled or denied.\n";
+        return 1;
+      }
+      if (status == LocalAccessFirewallStatus::Unsupported)
+      {
+        std::cerr << "Local firewall access is unsupported on this Host.\n";
+        return 1;
+      }
+      if (status != LocalAccessFirewallStatus::Allowed)
+      {
+        std::cerr << "Local firewall access could not be changed.\n";
+        return 1;
+      }
       const auto ipv4 = network->network_capability().primary_ipv4;
       urls.push_back(std::string(AccessPoint::name(access.protocol())) + "://" + ipv4 + ":" + std::to_string(access.port()));
     }
@@ -1224,7 +1260,8 @@ namespace
       return 0;
     }
     std::cout << style::success("Local access allowed.") << '\n';
-    for (const auto &url : urls) std::cout << url << '\n';
+    for (const auto &url : urls)
+      std::cout << url << '\n';
     return 0;
   }
 
@@ -1308,7 +1345,8 @@ namespace
         if (!root && target.entry && target.entry->process_spec().working_directory())
           root = std::filesystem::path(*target.entry->process_spec().working_directory());
         const auto rule = root ? local_firewall_rule(network, *root,
-            AccessPoint::create(access.protocol, access.port).value()) : std::nullopt;
+                                                     AccessPoint::create(access.protocol, access.port).value())
+                               : std::nullopt;
         firewall_status = rule ? local_firewall_status(firewall->status(*rule))
                                : LocalAccessFirewallStatus::Failed;
       }
@@ -1316,7 +1354,8 @@ namespace
           firewall_allows_local_access(firewall_status))
       {
         available = true;
-        if (first_url.empty()) first_url = access.url;
+        if (first_url.empty())
+          first_url = access.url;
         std::cout << style::field("Network:", local_access_network_name(access.network), access_field_width) << '\n'
                   << style::field("Local URL:", access.url, access_field_width) << '\n';
       }
@@ -1328,7 +1367,8 @@ namespace
 
     if (available)
     {
-      if (!QrCode::print(first_url)) std::cout << "QR generation is unavailable.\n";
+      if (!QrCode::print(first_url))
+        std::cout << "QR generation is unavailable.\n";
       std::cout << "\nScan with your phone.\n";
       return true;
     }
@@ -2531,29 +2571,29 @@ namespace softadastra
       if (!result && !already_running)
       {
         std::cerr
-              << "Failed to start software: "
-              << target->name
-              << "\n\nCommand:\n"
-              << "  "
-              << (target->config
-                      ? target->config->command
-                      : command_name(*target->entry))
-              << "\n\nProject:\n"
-              << "  "
-              << (target->root
-                      ? target->root->string()
-                      : target->entry
-                            ->process_spec()
-                            .working_directory()
-                            .value_or("-"))
-              << "\n\nReason:\n"
-              << "  ";
+            << "Failed to start software: "
+            << target->name
+            << "\n\nCommand:\n"
+            << "  "
+            << (target->config
+                    ? target->config->command
+                    : command_name(*target->entry))
+            << "\n\nProject:\n"
+            << "  "
+            << (target->root
+                    ? target->root->string()
+                    : target->entry
+                          ->process_spec()
+                          .working_directory()
+                          .value_or("-"))
+            << "\n\nReason:\n"
+            << "  ";
 
-          operation_error(result);
+        operation_error(result);
 
-          launch_output_hint(target->id);
+        launch_output_hint(target->id);
 
-          std::cerr << '\n';
+        std::cerr << '\n';
 
         return 1;
       }
