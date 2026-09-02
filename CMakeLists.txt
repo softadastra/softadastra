@@ -497,9 +497,13 @@ if(SOFTADASTRA_BUILD_TESTS)
 
     if(target STREQUAL "softadastra_local_control_test" OR
        target STREQUAL "softadastra_cli_e2e_test")
-      gtest_discover_tests(${target} PROPERTIES RUN_SERIAL TRUE)
+      gtest_discover_tests(
+        ${target}
+        DISCOVERY_TIMEOUT 30
+        PROPERTIES RUN_SERIAL TRUE
+      )
     else()
-      gtest_discover_tests(${target})
+      gtest_discover_tests(${target} DISCOVERY_TIMEOUT 30)
     endif()
   endfunction()
 
