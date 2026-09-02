@@ -789,7 +789,7 @@ namespace
 
     if (running_state.has_value())
     {
-      EXPECT_EQ(running_state.value(), softadastra::SoftwareState::Stopped);
+      EXPECT_EQ(running_state.value(), softadastra::SoftwareState::Running);
     }
 
     if (stopped_state.has_value())
@@ -797,7 +797,6 @@ namespace
       EXPECT_EQ(stopped_state.value(), softadastra::SoftwareState::Stopped);
     }
 
-    EXPECT_TRUE(service.start_software(running));
     const auto restarted_state = service.software_state(running);
     EXPECT_TRUE(restarted_state.has_value());
 

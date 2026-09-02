@@ -121,6 +121,18 @@ if(NOT Vix_FOUND)
 endif()
 find_package(OpenSSL REQUIRED)
 
+# Vix and GTest may be installed with different standalone Asio header trees.
+# Asio is header-only, so mixing such trees in one linked binary violates its
+# ODR contract. Use the vendored, pinned distribution through the sole project
+# target used by every Softadastra target.
+add_library(softadastra_asio INTERFACE)
+target_include_directories(
+  softadastra_asio
+  SYSTEM
+  INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/asio/include"
+)
+
 add_library(
   softadastra_internal
   STATIC
@@ -214,6 +226,7 @@ endif()
 target_link_libraries(
   softadastra_internal
   PUBLIC
+    softadastra_asio
     vix::process
     OpenSSL::Crypto
     OpenSSL::SSL
