@@ -38,8 +38,10 @@ TEST(RemoteAccessConfigTest, PersistsDisabledAndExplicitEnabledConfiguration)
   legacy << "1 127.0.0.1 45678\n";
   legacy.close();
   EXPECT_FALSE(config.load(enabled));
-  std::ifstream preserved(path);
-  std::string contents((std::istreambuf_iterator<char>(preserved)), {});
-  EXPECT_EQ(contents, "1 127.0.0.1 45678\n");
+  {
+    std::ifstream preserved(path);
+    std::string contents((std::istreambuf_iterator<char>(preserved)), {});
+    EXPECT_EQ(contents, "1 127.0.0.1 45678\n");
+  }
   std::filesystem::remove_all(path.parent_path());
 }

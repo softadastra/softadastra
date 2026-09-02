@@ -54,6 +54,8 @@ jobs:
           smoke_root=$(mktemp -d)
           trap 'rm -rf "$smoke_root"' EXIT
           dpkg-deb --extract "$package" "$smoke_root"
+          mkdir -p "$smoke_root/usr/lib/systemd/system"
+          cp /usr/lib/systemd/system/sysinit.target "$smoke_root/usr/lib/systemd/system/"
           installed="$smoke_root/usr/bin/softadastra"
           test -x "$installed"
           test -x "$smoke_root/usr/bin/softadastra-gateway"
@@ -65,7 +67,7 @@ jobs:
           grep -F '/usr/libexec/softadastra-firewall-status' "$policy"
           grep -F '/usr/libexec/softadastra-firewall-modify' "$policy"
           grep -F 'ExecStart=/usr/bin/softadastra host' "$unit"
-          systemd-analyze verify "$unit"
+          systemd-analyze verify --root="$smoke_root" /usr/lib/systemd/system/softadastra.service
           ldd "$installed"
           ! ldd "$installed" | grep -F 'not found'
           env -i PATH=/usr/bin:/bin HOME="$smoke_root/home" "$installed" --help

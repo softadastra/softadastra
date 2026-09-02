@@ -313,6 +313,11 @@ namespace
 
   TEST_F(CliE2eTest, ReportsTheCanonicalHostStateAndLifecycleResults)
   {
+#if defined(_WIN32)
+    ASSERT_EQ(run("host stop"), 0) << last_output_;
+    EXPECT_NE(last_output_.find("stopped: host"), std::string::npos);
+#endif
+
     ASSERT_EQ(run("host status"), 0) << last_output_;
     EXPECT_NE(last_output_.find("Host: stopped"), std::string::npos);
 

@@ -149,7 +149,7 @@ namespace
     ASSERT_TRUE(std::filesystem::create_directories(child));
     const auto discovered = softadastra::ProjectConfigFile::find(child);
     ASSERT_TRUE(discovered);
-    EXPECT_EQ(discovered->first, root_);
+    EXPECT_TRUE(std::filesystem::equivalent(discovered->first, root_));
   }
 
   TEST_F(ProjectConfigTest, WritesCanonicalIntegerPortsAndRoundTrips)

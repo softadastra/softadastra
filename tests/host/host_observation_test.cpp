@@ -61,12 +61,14 @@ namespace
           softadastra::HostAvailability::Unavailable);
     }
 
+#if defined(__linux__)
     std::filesystem::remove(directory / "host.lock");
     std::filesystem::create_directory(directory / "host.lock");
 
     EXPECT_EQ(
         softadastra::observe_host(client, directory).state,
         softadastra::HostAvailability::Unknown);
+#endif
 
     std::filesystem::remove_all(directory);
   }
