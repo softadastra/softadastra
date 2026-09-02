@@ -1,24 +1,24 @@
 # Softadastra
 
-Softadastra is a simple hosting layer for software.
-
-It turns a machine into a Host that can run software, supervise it, and make its declared access points reachable.
+Softadastra turns a machine into a Host for running software.
 
 ```text
 Machine + Softadastra = Host
 ```
 
+A Host runs software, keeps it available, and makes its declared access points reachable.
+
 The software itself stays independent. It does not need a Softadastra framework, SDK, database, authentication system, programming language, or application architecture.
 
 ## Why Softadastra
 
-Running an application is often only the beginning.
+Running software is often only the beginning.
 
-The application also needs a machine, a process lifecycle, logs, networking, recovery, and some way to remain available.
+It also needs a machine, a process lifecycle, logs, networking, recovery, and a way to remain available.
 
-These infrastructure concerns can become part of the application even when they have little to do with what the application actually does.
+These are infrastructure concerns. They should not have to become part of the software's architecture.
 
-Softadastra explores a simpler boundary:
+Softadastra keeps the boundary simple:
 
 ```text
 Software
@@ -28,15 +28,38 @@ Softadastra Host
 Machine
 ```
 
-The software describes what should run and how it can be reached. The Host handles the infrastructure around that execution.
+A project tells the Host two essential things:
 
-## A first application
+```text
+what to run
+how to reach it
+```
 
-Inside a project, tell Softadastra how the software is started and how it can be reached:
+The Host handles the infrastructure around that execution.
+
+## Install
+
+### Linux
+
+```bash
+curl -fsSL https://softadastra.com/install.sh | bash
+```
+
+### Windows
+
+Download Softadastra for Windows from:
+
+https://softadastra.com/download
+
+Other installation methods, packages, and portable builds are available on the download page.
+
+## Run your first software
+
+Inside a project, describe how the software starts and how it can be reached:
 
 ```bash
 softadastra init my-app \
-  --command "./my-app" \
+  --command "node server.js" \
   --access http:8080
 ```
 
@@ -44,11 +67,11 @@ This creates `softadastra.toml`:
 
 ```toml
 name = "my-app"
-command = "./my-app"
+command = "node server.js"
 access = "http:8080"
 ```
 
-Run the software:
+Run it:
 
 ```bash
 softadastra run
@@ -66,47 +89,129 @@ Read its logs:
 softadastra logs
 ```
 
+Allow local access when needed:
+
+```bash
+softadastra access allow
+```
+
+Then inspect how it can be reached:
+
+```bash
+softadastra access
+```
+
 Stop it:
 
 ```bash
 softadastra stop
 ```
 
-The command is opaque to Softadastra. It describes how the software is started, not what kind of software it is.
+The command is not limited to an executable file.
 
-## Host
+It can start any software compatible with the Host:
+
+```toml
+command = "./server"
+```
+
+```toml
+command = "python3 app.py"
+```
+
+```toml
+command = "node server.js"
+```
+
+```toml
+command = "php -S 0.0.0.0:8080"
+```
+
+Softadastra does not classify software by language, framework, runtime, or application type.
+
+It only needs to know how the software starts and how it can be reached.
+
+## Host, Software, Access
+
+Softadastra is built around a small set of public concepts:
+
+```text
+Host
+├── Software
+└── Access
+```
+
+### Host
 
 A machine running Softadastra becomes a Host.
 
-The Host has three fundamental responsibilities:
+A Host is responsible for:
 
 ```text
-run
-reach
-available
+Execution
+Reachability
+Availability
 ```
 
-It runs software, makes it reachable, and supervises its availability.
-
-A Host can be:
-
-- a personal computer
-- a mini-PC
-- a server
-- a virtual machine
-- a dedicated Softadastra Box
+The machine can be a personal computer, mini-PC, server, virtual machine, or dedicated Softadastra Box.
 
 A Box is not a separate application platform. It is a Host running on dedicated hardware.
 
-## Project configuration
+### Software
 
-A project is described by `softadastra.toml`.
+Software is what the Host runs and supervises.
 
-A project can declare multiple access points:
+Softadastra treats it as opaque.
+
+It does not need to understand:
+
+- its programming language
+- its framework
+- its database
+- its authentication system
+- its internal services
+- its application architecture
+
+Software can be managed directly from its project directory:
+
+```bash
+softadastra start
+softadastra stop
+softadastra restart
+softadastra status
+```
+
+Registered software can also be addressed by name:
+
+```bash
+softadastra status my-app
+```
+
+Run:
+
+```bash
+softadastra --help
+```
+
+to explore the complete command-line interface.
+
+### Access
+
+Access describes how software can be reached.
+
+A project can declare one access point:
 
 ```toml
 name = "example"
-command = "./example"
+command = "python3 app.py"
+access = "http:8080"
+```
+
+Or several:
+
+```toml
+name = "example"
+command = "node server.js"
 
 [[access]]
 protocol = "http"
@@ -117,87 +222,43 @@ protocol = "ws"
 port = 9090
 ```
 
-The configuration describes the software to the Host without describing the internal architecture of the application.
+Access describes the boundary between the software and the Host.
 
-## Commands
-
-The command-line interface provides the main Host and software operations.
-
-```text
-softadastra init
-softadastra run
-softadastra register
-
-softadastra start
-softadastra stop
-softadastra restart
-
-softadastra status
-softadastra info
-softadastra list
-softadastra remove
-
-softadastra logs
-softadastra access
-softadastra access allow
-softadastra access deny
-
-softadastra connectivity
-softadastra network
-softadastra remote
-
-softadastra ui
-softadastra host
-softadastra box
-```
-
-Most software commands can work in two ways.
-
-From the current project:
-
-```bash
-softadastra start
-```
-
-Or by referring to registered software:
-
-```bash
-softadastra start my-app
-```
-
-Use:
-
-```bash
-softadastra --help
-```
-
-or the help for an individual command to inspect the available options.
+It does not describe the internal architecture of the software.
 
 ## Local first
 
 A local Host should not require Internet access just to run local software.
 
 ```text
-Application
+Software
     ↓
 Host
-    ├── local access
-    └── remote access, optional
+    ├── Local access
+    └── Remote access, optional
 ```
 
-If Internet disappears, local operation should remain possible as long as the application itself does not depend on an external Internet service.
+If Internet connectivity disappears, local operation can continue as long as the hosted software itself does not depend on an external Internet service.
 
 Remote access extends the Host. It does not define the Host.
 
-## Linux and Windows
+## One Host model
 
-Softadastra is designed for Linux and Windows.
+Softadastra keeps the same Host model across different machines.
 
-The Host model remains the same while platform-specific implementation details stay below it.
+```text
+Personal computer
+Mini-PC
+Server
+Virtual machine
+Softadastra Box
+        ↓
+       Host
+```
 
-For example, process management and local control may use different operating-system mechanisms without changing how hosted software is represented.
+Platform-specific mechanisms remain below this model.
 
-Not every capability is necessarily available on every platform at the same stage of development. Advanced managed networking is currently primarily a Linux and dedicated-Host concern.
+Process management, networking, local control, and system integration may differ between operating systems without changing how hosted software is represented to the user.
 
 ## Web interface
 
@@ -207,11 +268,13 @@ Softadastra also provides a local Web interface:
 softadastra ui
 ```
 
-The interface provides a simpler view of applications, their state, configuration, lifecycle, and logs.
+The CLI and Web interface control the same Host.
 
-The CLI and Web interface control the same Host. They are not separate hosting systems.
+They are two interfaces to the same system, not separate hosting platforms.
 
-## What Softadastra does not require
+## Boundaries
+
+Softadastra hosts software. It does not define the software.
 
 Hosted software does not need to adopt:
 
@@ -225,31 +288,7 @@ Hosted software does not need to adopt:
 
 Softadastra also does not make incompatible software portable automatically.
 
-A program must still be compatible with the operating system, CPU architecture, runtime, and dependencies available on the Host.
-
-## Architecture
-
-The public architecture is intentionally small:
-
-```text
-Host
-  ↓
-Software
-  ↓
-Access
-```
-
-More details are available in [`docs/architecture.md`](docs/architecture.md).
-
-Host-to-Host work is documented separately in [`docs/host-to-host.md`](docs/host-to-host.md).
-
-## Roadmap
-
-Softadastra is being developed incrementally.
-
-The current direction moves from a reliable Host toward local reachability, dedicated Boxes, secure remote access, resource control, and eventually cooperation between Hosts.
-
-See [`ROADMAP.md`](ROADMAP.md).
+The software must still be compatible with the operating system, CPU architecture, runtime, and dependencies available on the Host.
 
 ## Mission
 
@@ -257,25 +296,26 @@ Softadastra is built around a broader question:
 
 > Can software be separated from the infrastructure that executes it?
 
-The project does not try to hide the physical limits of computing. It tries to prevent infrastructure choices from becoming unnecessary application architecture.
+The project does not try to hide the physical limits of computing.
+
+It tries to prevent infrastructure choices from becoming unnecessary application architecture.
 
 See [`MISSION.md`](MISSION.md).
+
+## Learn more
+
+- [Architecture](docs/architecture.md)
+- [Mission](MISSION.md)
+- [Roadmap](ROADMAP.md)
+- [Host-to-Host](docs/host-to-host.md)
 
 ## Development
 
 Softadastra is written in C++ and uses Vix.cpp internally.
 
-Vix.cpp is an implementation dependency of Softadastra. Applications hosted by Softadastra do not need to use Vix.cpp.
+Vix.cpp is an implementation dependency of Softadastra. Software hosted by Softadastra does not need to use Vix.cpp.
 
-The project uses unit, integration, and end-to-end tests across Linux and Windows. Platform-specific mechanisms are kept behind common Host concepts whenever practical.
-
-## Status
-
-Softadastra is under active development.
-
-The Host foundation is being stabilized before larger capabilities are added. Interfaces, package formats, and some system behavior may still change before later stable releases.
-
-See [`ROADMAP.md`](ROADMAP.md) for the current development order.
+The project uses unit, integration, and end-to-end tests across supported platforms.
 
 ## License
 
