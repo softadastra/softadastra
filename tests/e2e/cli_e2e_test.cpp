@@ -1,3 +1,5 @@
+#include "control/LocalControlEndpoint.hpp"
+
 #include <gtest/gtest.h>
 
 #include <chrono>
@@ -111,6 +113,14 @@ namespace
       ::CloseHandle(process.hThread);
       host_process_ = process.hProcess;
       host_pid_ = process.dwProcessId;
+
+      const auto control_pipe =
+          softadastra::local_control_pipe_name(
+              state_ / "Softadastra" / "control.sock");
+
+      ASSERT_TRUE(::WaitNamedPipeW(
+          control_pipe.c_str(),
+          5000));
 #endif
     }
 
