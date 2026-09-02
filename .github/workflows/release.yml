@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing vMAJOR.MINOR.PATCH tag to release
+        description: Existing vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rc.N tag to release
         required: true
         type: string
 
@@ -21,7 +21,7 @@ jobs:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: Validate tag
-        run: '[[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+        run: '[[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]'
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
@@ -83,7 +83,7 @@ jobs:
     steps:
       - name: Validate tag
         shell: pwsh
-        run: if ($env:TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Tag must be vMAJOR.MINOR.PATCH.' }
+        run: if ($env:TAG -notmatch '^v\d+\.\d+\.\d+(-rc\.\d+)?$') { throw 'Tag must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rc.N.' }
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
