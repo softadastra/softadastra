@@ -133,9 +133,13 @@ jobs:
           $binary = $binaries[0]
           $runtimeDlls = @(Get-ChildItem $binary.Directory -Filter '*.dll' -File)
           $runtimeDlls.Name | Sort-Object
+          $systemDlls = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+          Get-ChildItem (Join-Path $env:SystemRoot 'System32') -Filter '*.dll' -File | ForEach-Object {
+            [void] $systemDlls.Add($_.Name)
+          }
           $dependencies = @((dumpbin /dependents $binary.FullName) | Select-String -Pattern '\.dll' | ForEach-Object { ($_ -replace '^\s*','').Trim() })
           foreach ($dependency in $dependencies) {
-            if ($dependency -match '^(KERNEL32|ADVAPI32|SHELL32|WS2_32|OLE32|USER32|GDI32)\.dll$') { continue }
+            if ($systemDlls.Contains($dependency)) { continue }
             if (-not (Test-Path (Join-Path $binary.Directory $dependency))) { throw "Missing packaged runtime dependency: $dependency" }
           }
           & $binary.FullName --help
