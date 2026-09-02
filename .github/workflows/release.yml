@@ -140,6 +140,7 @@ jobs:
           $dependencies = @((dumpbin /dependents $binary.FullName) | Select-String -Pattern '\.dll' | ForEach-Object { ($_ -replace '^\s*','').Trim() })
           foreach ($dependency in $dependencies) {
             if ($systemDlls.Contains($dependency)) { continue }
+            if ($dependency -imatch '^(api-ms-|ext-ms-)') { continue }
             if (-not (Test-Path (Join-Path $binary.Directory $dependency))) { throw "Missing packaged runtime dependency: $dependency" }
           }
           & $binary.FullName --help
