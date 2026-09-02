@@ -1,5 +1,3 @@
-#include "control/LocalControlEndpoint.hpp"
-
 #include <gtest/gtest.h>
 
 #include <chrono>
@@ -92,35 +90,7 @@ namespace
           "LOCALAPPDATA", state_.string().c_str()));
       ASSERT_TRUE(::SetEnvironmentVariableA("HOME", root_.string().c_str()));
 
-      std::wstring command =
-          L"\"" + std::filesystem::path(SOFTADASTRA_E2E_BINARY).wstring() +
-          L"\" host";
-      STARTUPINFOW startup{};
-      startup.cb = sizeof(startup);
-      PROCESS_INFORMATION process{};
-
-      ASSERT_TRUE(::CreateProcessW(
-          nullptr,
-          command.data(),
-          nullptr,
-          nullptr,
-          FALSE,
-          CREATE_NEW_PROCESS_GROUP,
-          nullptr,
-          project_.c_str(),
-          &startup,
-          &process));
-      ::CloseHandle(process.hThread);
-      host_process_ = process.hProcess;
-      host_pid_ = process.dwProcessId;
-
-      const auto control_pipe =
-          softadastra::local_control_pipe_name(
-              state_ / "Softadastra" / "control.sock");
-
-      ASSERT_TRUE(::WaitNamedPipeW(
-          control_pipe.c_str(),
-          5000));
+      ASSERT_EQ(run("host start"), 0) << last_output_;
 #endif
     }
 
@@ -128,18 +98,6 @@ namespace
     {
 #if defined(_WIN32)
       static_cast<void>(run("host stop"));
-
-      if (host_process_ != nullptr)
-      {
-        if (::WaitForSingleObject(host_process_, 5000) == WAIT_TIMEOUT)
-        {
-          static_cast<void>(::TerminateProcess(host_process_, 1));
-          static_cast<void>(::WaitForSingleObject(host_process_, INFINITE));
-        }
-
-        ::CloseHandle(host_process_);
-        host_process_ = nullptr;
-      }
 
       static_cast<void>(::SetEnvironmentVariableA(
           "LOCALAPPDATA",
@@ -244,8 +202,6 @@ namespace
       return result;
     }
 
-    HANDLE host_process_{nullptr};
-    DWORD host_pid_{0};
     std::optional<std::string> previous_local_app_data_;
     std::optional<std::string> previous_home_;
 #endif
