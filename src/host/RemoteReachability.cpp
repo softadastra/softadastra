@@ -16,12 +16,14 @@
 
 #include "host/HttpProxy.hpp"
 #include "host/NativeSocket.hpp"
+#include "relay/RelayProtocol.hpp"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <limits>
 #include <mutex>
+#include <utility>
 
 #if defined(_WIN32)
 
@@ -38,10 +40,6 @@
 
 namespace
 {
-  constexpr std::size_t max_frame = 1024 * 1024;
-  constexpr std::size_t max_headers = 128;
-  constexpr std::size_t max_field = 32768;
-
   int close_socket(
       softadastra::NativeSocket fd)
   {
@@ -147,54 +145,11 @@ namespace
     return true;
   }
 
-  std::uint16_t u16(
-      const char *value)
-  {
-    return static_cast<std::uint16_t>(
-        (static_cast<std::uint16_t>(
-             static_cast<unsigned char>(value[0]))
-         << 8) |
-        static_cast<std::uint16_t>(
-            static_cast<unsigned char>(value[1])));
-  }
-
-  std::uint32_t u32(
-      const char *value)
-  {
-    return (static_cast<std::uint32_t>(
-                static_cast<unsigned char>(value[0]))
-            << 24) |
-           (static_cast<std::uint32_t>(
-                static_cast<unsigned char>(value[1]))
-            << 16) |
-           (static_cast<std::uint32_t>(
-                static_cast<unsigned char>(value[2]))
-            << 8) |
-           static_cast<unsigned char>(value[3]);
-  }
-
-  void put32(
-      std::string &value,
-      std::uint32_t number)
-  {
-    value.push_back(
-        static_cast<char>(number >> 24));
-
-    value.push_back(
-        static_cast<char>(number >> 16));
-
-    value.push_back(
-        static_cast<char>(number >> 8));
-
-    value.push_back(
-        static_cast<char>(number));
-  }
-
   bool read_frame(
       softadastra::NativeSocket fd,
       std::string &frame)
   {
-    std::array<char, 4> header{};
+    std::array<char, softadastra::RelayProtocol::frame_header_size> header{};
 
     if (!receive_all(
             fd,
@@ -205,199 +160,39 @@ namespace
     }
 
     const auto size =
-        u32(header.data());
+        softadastra::RelayProtocol::decode_frame_header(
+            std::string_view(
+                header.data(),
+                header.size()));
 
-    if (size == 0 ||
-        size > max_frame)
+    if (!size)
     {
       return false;
     }
 
-    frame.resize(size);
+    frame.resize(*size);
 
     return receive_all(
         fd,
         frame.data(),
-        size);
+        *size);
   }
 
   bool write_frame(
       softadastra::NativeSocket fd,
       const std::string &frame)
   {
-    if (frame.size() > max_frame)
+    const auto header =
+        softadastra::RelayProtocol::encode_frame_header(
+            frame.size());
+
+    if (!header)
     {
       return false;
     }
 
-    std::string header;
-
-    put32(
-        header,
-        static_cast<std::uint32_t>(
-            frame.size()));
-
-    return send_all(fd, header) &&
+    return send_all(fd, *header) &&
            send_all(fd, frame);
-  }
-
-  bool take(
-      const std::string &value,
-      std::size_t &position,
-      std::size_t size,
-      std::string &output)
-  {
-    if (size > max_field ||
-        position > value.size() ||
-        size > value.size() - position)
-    {
-      return false;
-    }
-
-    output.assign(
-        value.data() + position,
-        size);
-
-    position += size;
-
-    return true;
-  }
-
-  bool parse_request(
-      const std::string &frame,
-      std::string &software,
-      softadastra::HttpProxyRequest &request)
-  {
-    if (frame.empty() ||
-        frame[0] != 1)
-    {
-      return false;
-    }
-
-    std::size_t position = 1;
-
-    if (position + 2 > frame.size())
-    {
-      return false;
-    }
-
-    auto size =
-        u16(frame.data() + position);
-
-    position += 2;
-
-    if (!take(
-            frame,
-            position,
-            size,
-            software) ||
-        position + 2 > frame.size())
-    {
-      return false;
-    }
-
-    size =
-        u16(frame.data() + position);
-
-    position += 2;
-
-    if (!take(
-            frame,
-            position,
-            size,
-            request.method) ||
-        position + 4 > frame.size())
-    {
-      return false;
-    }
-
-    const auto path =
-        u32(frame.data() + position);
-
-    position += 4;
-
-    if (!take(
-            frame,
-            position,
-            path,
-            request.target) ||
-        position + 2 > frame.size())
-    {
-      return false;
-    }
-
-    const auto count =
-        u16(frame.data() + position);
-
-    position += 2;
-
-    if (count > max_headers)
-    {
-      return false;
-    }
-
-    for (std::size_t index = 0;
-         index < count;
-         ++index)
-    {
-      if (position + 2 > frame.size())
-      {
-        return false;
-      }
-
-      size =
-          u16(frame.data() + position);
-
-      position += 2;
-
-      std::string key;
-      std::string value;
-
-      if (!take(
-              frame,
-              position,
-              size,
-              key) ||
-          position + 2 > frame.size())
-      {
-        return false;
-      }
-
-      size =
-          u16(frame.data() + position);
-
-      position += 2;
-
-      if (!take(
-              frame,
-              position,
-              size,
-              value))
-      {
-        return false;
-      }
-
-      request.headers.emplace_back(
-          std::move(key),
-          std::move(value));
-    }
-
-    if (position + 4 > frame.size())
-    {
-      return false;
-    }
-
-    const auto body =
-        u32(frame.data() + position);
-
-    position += 4;
-
-    return take(
-               frame,
-               position,
-               body,
-               request.body) &&
-           position == frame.size();
   }
 
   softadastra::NativeSocket connect_to(
@@ -646,29 +441,46 @@ namespace softadastra
       while (!stopping_ && ok)
       {
         std::string frame;
-        std::string software;
-        HttpProxyRequest request;
 
         ok =
-            read_frame(fd, frame) &&
-            parse_request(
-                frame,
-                software,
-                request);
+            read_frame(fd, frame);
 
         if (ok)
         {
-          std::string answer(1, 2);
+          const auto relay_request =
+              RelayProtocol::decode_request(frame);
 
-          answer +=
-              proxy.forward(
-                  software,
-                  request);
+          if (!relay_request)
+          {
+            ok = false;
+            continue;
+          }
+
+          HttpProxyRequest request;
+
+          request.method =
+              relay_request->method;
+
+          request.target =
+              relay_request->target;
+
+          request.headers =
+              relay_request->headers;
+
+          request.body =
+              relay_request->body;
+
+          const auto answer =
+              RelayProtocol::encode_response(
+                  proxy.forward(
+                      relay_request->software,
+                      request));
 
           ok =
+              answer.has_value() &&
               write_frame(
                   fd,
-                  answer);
+                  answer.value());
         }
       }
 

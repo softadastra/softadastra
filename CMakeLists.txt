@@ -181,6 +181,7 @@ add_library(
   src/platform/NativeProcess.cpp
   src/platform/NativeProcessLauncher.cpp
   src/platform/NativeService.cpp
+  src/relay/RelayProtocol.cpp
   src/software/SoftwareManager.cpp
   src/software/SoftwareId.cpp
   src/software/ProjectIdentity.cpp
